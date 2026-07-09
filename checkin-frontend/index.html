@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gym Check-in</title>
+    <link rel="stylesheet" href="/checkin/styles.css" />
+  </head>
+  <body class="checkin-body">
+    <main class="checkin-shell">
+      <section class="brand-panel" aria-label="Gym check-in">
+        <div class="brand-top">
+          <div class="brand-mark" id="brandMark">GA</div>
+          <div>
+            <p class="eyebrow">Member check-in</p>
+            <h1 id="gymName">Gym Check-in</h1>
+          </div>
+        </div>
+        <p id="gymIntro">Scan, enter your member ID or mobile number, and keep your attendance record updated.</p>
+        <div class="checkin-summary">
+          <div>
+            <span>Today</span>
+            <strong id="todayLabel">--</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong id="memberStatus">Ready</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="checkin-card">
+        <form id="checkinForm" class="checkin-form">
+          <label>
+            Member ID or mobile
+            <input id="identifier" required autocomplete="off" inputmode="text" placeholder="GYM1001 or mobile" />
+          </label>
+          <button type="submit" id="checkinButton">Check in</button>
+        </form>
+        <button class="secondary" id="forgetMe" type="button">Forget saved ID</button>
+        <div id="result" class="result-box" role="status" aria-live="polite"></div>
+
+        <section class="member-panel" id="memberPanel" hidden>
+          <div class="member-head">
+            <img id="memberPhoto" alt="" />
+            <div>
+              <span id="memberGymId"></span>
+              <h2 id="memberName"></h2>
+              <p id="memberPhone"></p>
+            </div>
+          </div>
+          <div class="history-head">
+            <h3>Recent check-ins</h3>
+            <span id="historyCount">0 visits</span>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/checkin/checkin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#073f2d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Gym Admin" />
+    <title>Gym Admin Dashboard</title>
+    <link rel="stylesheet" href="/admin/style.css" />
+  </head>
+  <body>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="dashboard-shell">
+      <header class="mobile-appbar">
+        <button class="hamburger" id="menuToggle" type="button" aria-label="Open menu" aria-controls="adminSidebar" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <span class="mobile-appbar-title" id="mobileTitle">Dashboard</span>
+        <button class="mobile-appbar-add" id="mobileAddMember" type="button" aria-label="Add member">+</button>
+      </header>
+
+      <div class="sidebar-scrim" id="sidebarScrim" hidden></div>
+
+      <aside class="sidebar" id="adminSidebar" aria-label="Admin navigation">
+        <div class="brand-block">
+          <div class="brand-logo" id="brandLogo">GA</div>
+          <div>
+            <strong id="sidebarGymName">Gym Admin</strong>
+            <span>Dashboard</span>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <p>Overview</p>
+          <button class="nav-link active" data-view="dashboard" type="button"><span>🏠</span>Dashboard</button>
+          <p>Attendance</p>
+          <button class="nav-link" data-view="attendance" type="button"><span>✅</span>Mark Attendance</button>
+          <button class="nav-link" data-view="checkin" type="button"><span>📱</span>QR Check-in</button>
+          <button class="nav-link" data-view="history" type="button"><span>🗓️</span>Attendance History</button>
+          <p>Members</p>
+          <button class="nav-link" data-view="members" type="button"><span>👥</span>Members</button>
+          <button class="nav-link" data-view="trainers" type="button"><span>🏋</span>Trainers</button>
+          <button id="sideAddMember" type="button"><span>➕</span>Add Member</button>
+          <p>Billing</p>
+          <button class="nav-link" data-view="payments" type="button"><span>💰</span>Payments</button>
+          <p>Settings</p>
+          <button class="nav-link" data-view="settings" type="button"><span>⚙</span>Settings</button>
+        </nav>
+
+        <div class="support-card">
+          <strong>Need help?</strong>
+          <span>Contact support</span>
+        </div>
+      </aside>
+
+      <main class="main-content" id="dashboard">
+        <header class="topbar">
+          <div>
+            <h1 id="pageTitle">Welcome back, Admin!</h1>
+            <p id="pageSubtitle">Here is what is happening at <span id="headerGymName">your gym</span> today.</p>
+          </div>
+          <div class="topbar-actions">
+            <span class="date-pill" id="todayLabel"></span>
+            <button class="primary-action" id="openAddMember" type="button">
+              <span>+</span>
+              Add member
+            </button>
+          </div>
+        </header>
+
+        <section class="view active" data-view-panel="dashboard">
+          <section class="stats-grid" aria-label="Gym summary">
+            <article class="stat-card total">
+              <div class="stat-icon">◇</div>
+              <span>Total Members</span>
+              <strong id="totalMembers">0</strong>
+              <small>Registered members</small>
+            </article>
+            <article class="stat-card due">
+              <div class="stat-icon">!</div>
+              <span>Overdue Fees</span>
+              <strong id="overdueMembers">0</strong>
+              <small>Members with dues</small>
+            </article>
+            <article class="stat-card paid">
+              <div class="stat-icon">▣</div>
+              <span>Paid This Month</span>
+              <strong id="paidMembers">0</strong>
+              <small>Members</small>
+            </article>
+            <article class="stat-card attend">
+              <div class="stat-icon">✓</div>
+              <span>Today Present</span>
+              <strong id="todayPresent">0</strong>
+              <small>Members</small>
+            </article>
+            <article class="stat-card trainers">
+              <div class="stat-icon">T</div>
+              <span>Active Trainers</span>
+              <strong id="activeTrainerCount">0</strong>
+              <small id="totalTrainerCount">0 total trainers</small>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <section class="panel mini-panel">
+              <div class="panel-head compact">
+                <div>
+                  <h2>Activity Summary</h2>
+                  <p>This month overview</p>
+                </div>
+              </div>
+              <div class="summary-list">
+                <div><span>Total visits</span><strong id="summaryVisits">0</strong></div>
+                <div><span>Attendance rate</span><strong id="summaryRate">0%</strong></div>
+                <div><span>Active members</span><strong id="summaryActive">0</strong></div>
+              </div>
+            </section>
+
+            <section class="panel quick-panel">
+              <div class="panel-head compact">
+                <div>
+                  <h2>Quick Actions</h2>
+                  <p>Open the daily workflows from the sidebar.</p>
+                </div>
+              </div>
+              <div class="quick-actions-grid">
+                <button class="secondary-action nav-shortcut" data-view="attendance" type="button">Mark Attendance</button>
+                <button class="secondary-action nav-shortcut" data-view="history" type="button">View History</button>
+                <button class="secondary-action nav-shortcut" data-view="members" type="button">Manage Members</button>
+                <button class="secondary-action nav-shortcut" data-view="trainers" type="button">Manage Trainers</button>
+                <button class="secondary-action nav-shortcut" data-view="settings" type="button">Settings</button>
+              </div>
+            </section>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="attendance">
+          <section class="panel attendance-section" id="attendance" aria-label="Attendance sheet">
+            <div class="panel-head">
+              <div>
+                <h2>Mark Attendance</h2>
+                <p>Use this sheet for manual check-ins and careful attendance corrections.</p>
+              </div>
+              <label class="date-picker">
+                Date
+                <input id="attendanceDate" type="date" />
+              </label>
+            </div>
+            <label class="attendance-search search-box">
+              <span>Search member</span>
+              <input id="attendanceSearch" type="search" placeholder="Name or mobile" />
+            </label>
+            <div class="attendance-summary">
+              <strong id="selectedDatePresent">0 checked in</strong>
+              <span id="selectedDateLabel"></span>
+            </div>
+            <div class="attendance-list" id="attendanceList"></div>
+            <div class="empty-state compact-empty" id="attendanceEmpty">
+              <div class="empty-avatar">+</div>
+              <h3>No members to mark</h3>
+              <p>Add members first, then this sheet becomes the fastest place to take daily attendance.</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="checkin">
+          <section class="panel checkin-status-panel" aria-live="polite">
+            <div class="checkin-status" id="checkinStatus" data-state="checking">
+              <span class="status-dot"></span>
+              <div>
+                <strong id="checkinStatusTitle">Checking check-in server…</strong>
+                <p id="checkinStatusHint">Looking for the QR check-in service.</p>
+              </div>
+              <button class="secondary-action" id="checkinRetry" type="button">Retry</button>
+            </div>
+          </section>
+
+          <section class="checkin-grid">
+            <section class="panel checkin-qr-panel">
+              <div class="panel-head compact">
+                <div>
+                  <h2>Scan to check in</h2>
+                  <p>Place this QR on the front desk. Members scan it to mark their own attendance.</p>
+                </div>
+              </div>
+              <div class="qr-frame">
+                <img id="checkinQrImage" alt="Check-in QR code" />
+              </div>
+              <div class="checkin-url-row">
+                <span id="checkinUrlText">Loading check-in URL…</span>
+                <button class="secondary-action" id="copyCheckinUrl" type="button">Copy</button>
+              </div>
+              <ol class="checkin-steps">
+                <li>Member scans the QR or opens the URL.</li>
+                <li>They enter their Gym ID or mobile number.</li>
+                <li>The check-in appears here and is added to attendance automatically.</li>
+              </ol>
+            </section>
+
+            <section class="panel checkin-feed-panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Today's check-ins</h2>
+                  <p id="checkinFeedCount">0 check-ins</p>
+                </div>
+                <button class="primary-action" id="refreshCheckins" type="button">Refresh</button>
+              </div>
+              <div class="checkin-feed" id="checkinFeed"></div>
+            </section>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="history">
+          <section class="panel attendance-history" id="attendanceHistory">
+            <div class="panel-head">
+              <div>
+                <h2>Attendance History</h2>
+                <p id="attendanceHistoryLabel">Choose a member to view attendance details.</p>
+              </div>
+              <button class="primary-action" id="exportAttendanceCsv" type="button">Export CSV</button>
+            </div>
+
+            <div class="history-filters">
+              <label>
+                Search member
+                <input id="historySearch" type="search" placeholder="Name or mobile" />
+              </label>
+              <label>
+                From
+                <input id="historyStartDate" type="date" />
+              </label>
+              <label>
+                To
+                <input id="historyEndDate" type="date" />
+              </label>
+              <label>
+                Status
+                <select id="historyStatusFilter">
+                  <option value="all">All dates</option>
+                  <option value="present">Present only</option>
+                  <option value="absent">Absent only</option>
+                  <option value="holiday">Holidays only</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="history-workspace">
+              <div>
+                <h3 class="subhead">Members</h3>
+                <div class="history-member-grid" id="historyMemberGrid"></div>
+              </div>
+              <div class="history-report" id="historyReport"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="members">
+          <section class="panel action-panel" aria-label="Quick actions">
+            <label class="search-box">
+              <span>Search</span>
+              <input id="searchInput" type="search" placeholder="Name, mobile, or address" />
+            </label>
+            <div class="filter-tabs" role="group" aria-label="Member filter">
+              <button class="tab active" data-filter="all" type="button">All</button>
+              <button class="tab" data-filter="overdue" type="button">Overdue</button>
+              <button class="tab" data-filter="paid" type="button">Paid</button>
+              <button class="tab" data-filter="present" type="button">Present</button>
+            </div>
+          </section>
+
+          <section class="panel member-section" id="members">
+            <div class="panel-head">
+              <div>
+                <h2>Members</h2>
+                <p>Tap a card to manage attendance, payment, and reminders.</p>
+              </div>
+              <span id="monthLabel"></span>
+            </div>
+            <div class="member-list" id="memberList"></div>
+            <div class="empty-state" id="emptyState">
+              <div class="empty-avatar">+</div>
+              <h3>No members yet</h3>
+              <p>Add the first person when they come in, then track attendance and fees from one place.</p>
+              <button class="primary-action" id="emptyAddMember" type="button">Add member</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="trainers">
+          <section class="panel trainer-section" id="trainers">
+            <div class="panel-head">
+              <div>
+                <h2>Trainers</h2>
+                <p>Keep trainer profiles on the frontend for now. Backend sync can use the same fields later.</p>
+              </div>
+              <button class="primary-action" id="openAddTrainer" type="button">
+                <span>+</span>
+                Add trainer
+              </button>
+            </div>
+
+            <div class="trainer-toolbar">
+              <label class="search-box">
+                <span>Search trainer</span>
+                <input id="trainerSearch" type="search" placeholder="Name, mobile, specialty, or shift" />
+              </label>
+              <label>
+                Status
+                <select id="trainerStatusFilter">
+                  <option value="all">All trainers</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="trainer-summary">
+              <article>
+                <span>Total trainers</span>
+                <strong id="trainerSummaryTotal">0</strong>
+              </article>
+              <article>
+                <span>Active trainers</span>
+                <strong id="trainerSummaryActive">0</strong>
+              </article>
+              <article>
+                <span>Specialties</span>
+                <strong id="trainerSummarySpecialties">0</strong>
+              </article>
+              <article>
+                <span>Present today</span>
+                <strong id="trainerSummaryPresent">0</strong>
+              </article>
+            </div>
+
+            <section class="trainer-attendance-panel" aria-label="Trainer attendance">
+              <div class="panel-head compact">
+                <div>
+                  <h3>Trainer Attendance</h3>
+                  <p>Manual attendance only. Trainers do not use QR check-in.</p>
+                </div>
+                <label class="date-picker">
+                  Date
+                  <input id="trainerAttendanceDate" type="date" />
+                </label>
+              </div>
+              <div class="attendance-summary trainer-attendance-summary">
+                <strong id="trainerAttendancePresent">0 checked in</strong>
+                <span id="trainerAttendanceLabel"></span>
+              </div>
+              <div class="trainer-attendance-list" id="trainerAttendanceList"></div>
+            </section>
+
+            <div class="trainer-list" id="trainerList"></div>
+            <div class="empty-state" id="trainerEmptyState">
+              <div class="empty-avatar">T</div>
+              <h3>No trainers yet</h3>
+              <p>Add your first trainer profile with contact details, specialty, shift, and status.</p>
+              <button class="primary-action" id="emptyAddTrainer" type="button">Add trainer</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="payments">
+          <section class="panel billing-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Payment History</h2>
+                <p>Open a customer card to see their payment records.</p>
+              </div>
+            </div>
+            <div class="history-filters payment-filters">
+              <label>
+                Search customer
+                <input id="paymentSearch" type="search" placeholder="Name or mobile" />
+              </label>
+              <label>
+                From
+                <input id="paymentStartDate" type="date" />
+              </label>
+              <label>
+                To
+                <input id="paymentEndDate" type="date" />
+              </label>
+              <label>
+                Status
+                <select id="paymentStatusFilter">
+                  <option value="all">All customers</option>
+                  <option value="paid">Paid this month</option>
+                  <option value="pending">Pending this month</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </label>
+            </div>
+            <div class="history-workspace payment-workspace">
+              <div>
+                <h3 class="subhead" id="paymentCustomerCount">Customers</h3>
+                <div id="paymentCustomerGrid" class="payment-customer-grid"></div>
+              </div>
+              <div id="paymentCustomerDetail" class="payment-customer-detail"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="settings">
+          <section class="panel settings-panel" id="settings">
+            <div class="panel-head compact">
+              <div>
+                <h2>Settings</h2>
+                <p>Update gym profile, logo, and billing cycle.</p>
+              </div>
+            </div>
+            <form id="settingsForm" class="settings-form">
+              <div class="settings-logo-row">
+                <div class="settings-logo" id="settingsLogoPreview">GA</div>
+                <label class="logo-upload">
+                  Upload logo
+                  <input id="gymLogoInput" type="file" accept="image/*" />
+                </label>
+              </div>
+              <label>
+                Gym name
+                <input id="gymNameInput" name="gymName" required />
+              </label>
+              <fieldset class="theme-settings">
+                <legend>App colours</legend>
+                <div class="theme-grid">
+                  <label>
+                    Primary
+                    <input type="color" data-theme-color="primary" value="#11784a" />
+                  </label>
+                  <label>
+                    Sidebar
+                    <input type="color" data-theme-color="primaryDark" value="#073f2d" />
+                  </label>
+                  <label>
+                    Accent
+                    <input type="color" data-theme-color="accent" value="#4f46e5" />
+                  </label>
+                  <label>
+                    Danger
+                    <input type="color" data-theme-color="danger" value="#c43d32" />
+                  </label>
+                  <label>
+                    Background
+                    <input type="color" data-theme-color="background" value="#f6f8f5" />
+                  </label>
+                  <label>
+                    Panel
+                    <input type="color" data-theme-color="panel" value="#ffffff" />
+                  </label>
+                  <label>
+                    Text
+                    <input type="color" data-theme-color="text" value="#17201b" />
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="billing-cycle-settings">
+                <legend>Billing cycle</legend>
+                <label class="billing-cycle-option">
+                  <input type="radio" name="billingCycleMode" value="month-start" />
+                  <span>
+                    <strong>1st day of every month</strong>
+                    <small>Fees are due from the 1st of each month, even for members who joined later in that month.</small>
+                  </span>
+                </label>
+                <label class="billing-cycle-option">
+                  <input type="radio" name="billingCycleMode" value="30-days" />
+                  <span>
+                    <strong>30-day membership</strong>
+                    <small>Each member is billed every 30 days from their start date.</small>
+                  </span>
+                </label>
+                <label class="billing-cycle-option">
+                  <input type="radio" name="billingCycleMode" value="custom-days" />
+                  <span>
+                    <strong>Custom days</strong>
+                    <small>Set your own membership length, such as 25 days.</small>
+                  </span>
+                </label>
+                <label class="custom-billing-days">
+                  Custom membership days
+                  <input id="customBillingDaysInput" name="customBillingDays" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+              </fieldset>
+              <button class="primary-action" type="submit">Save settings</button>
+            </form>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="member-dialog" id="memberDialog">
+      <form class="member-form" id="memberForm" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Easy onboarding</p>
+            <h2 id="dialogTitle">Add new member</h2>
+          </div>
+          <button class="icon-button" id="closeDialog" aria-label="Close" type="button">×</button>
+        </div>
+
+        <div class="photo-field">
+          <img id="photoPreview" alt="Member photo preview" />
+          <label>
+            <span>Take or upload photo</span>
+            <input id="photoInput" name="photo" type="file" accept="image/*" capture="environment" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Gym ID
+            <input id="gymIdInput" name="gymId" placeholder="Auto generated" />
+          </label>
+          <label>
+            Name
+            <input id="nameInput" name="name" required autocomplete="name" />
+          </label>
+          <label>
+            Mobile number
+            <input id="phoneInput" name="phone" required inputmode="tel" autocomplete="tel" />
+          </label>
+          <label class="wide">
+            Address
+            <textarea id="addressInput" name="address" rows="3" required></textarea>
+          </label>
+          <fieldset class="membership-options wide">
+            <legend>Membership type</legend>
+            <label class="membership-option">
+              <input type="radio" name="membershipType" value="monthly" checked />
+              <span>
+                <strong>Monthly membership</strong>
+                <small>Bills every month using the gym billing cycle.</small>
+              </span>
+            </label>
+            <label class="membership-option">
+              <input type="radio" name="membershipType" value="package" />
+              <span>
+                <strong>Package membership</strong>
+                <small>Bills again after the selected package period.</small>
+              </span>
+            </label>
+          </fieldset>
+          <label>
+            Fee amount
+            <input id="feeInput" name="fee" type="number" min="0" step="1" required inputmode="numeric" />
+          </label>
+          <label id="packageMonthsField" class="package-months-field">
+            Package months
+            <input id="packageMonthsInput" name="packageMonths" type="number" min="1" step="1" inputmode="numeric" value="3" />
+          </label>
+          <label>
+            Start date
+            <input id="startDateInput" name="startDate" type="date" required />
+          </label>
+          <label class="wide">
+            Assigned trainer
+            <select id="assignedTrainerInput" name="trainerId">
+              <option value="">No trainer assigned</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button class="secondary-action" id="deleteMember" type="button">Delete</button>
+          <button class="primary-action" type="submit">Save member</button>
+        </div>
+      </form>
+    </dialog>
+
+
+    <dialog class="member-dialog" id="trainerDialog">
+      <form class="member-form" id="trainerForm" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Trainer profile</p>
+            <h2 id="trainerDialogTitle">Add trainer</h2>
+          </div>
+          <button class="icon-button" id="closeTrainerDialog" aria-label="Close" type="button">×</button>
+        </div>
+
+        <div class="photo-field">
+          <img id="trainerPhotoPreview" alt="Trainer photo preview" />
+          <label>
+            <span>Take or upload photo</span>
+            <input id="trainerPhotoInput" name="photo" type="file" accept="image/*" capture="environment" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Name
+            <input id="trainerNameInput" name="name" required autocomplete="name" />
+          </label>
+          <label>
+            Mobile number
+            <input id="trainerPhoneInput" name="phone" required inputmode="tel" autocomplete="tel" />
+          </label>
+          <label>
+            Specialty
+            <input id="trainerSpecialtyInput" name="specialty" placeholder="Strength, yoga, cardio" required />
+          </label>
+          <label>
+            Shift
+            <input id="trainerShiftInput" name="shift" placeholder="Morning, evening, full day" required />
+          </label>
+          <label>
+            Status
+            <select id="trainerStatusInput" name="status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+          <label class="wide">
+            Notes
+            <textarea id="trainerBioInput" name="bio" rows="3" placeholder="Experience, certifications, or assigned batches"></textarea>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button class="secondary-action" id="deleteTrainer" type="button">Delete</button>
+          <button class="primary-action" type="submit">Save trainer</button>
+        </div>
+      </form>
+    </dialog>
+
+
+    <dialog class="fee-dialog" id="feeDialog">
+      <form class="fee-dialog-panel" id="feeCollectionForm" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Fee collection</p>
+            <h2 id="feeDialogTitle">Collect fee</h2>
+            <p id="feeDialogMeta"></p>
+          </div>
+          <button class="icon-button" id="closeFeeDialog" aria-label="Close" type="button">×</button>
+        </div>
+        <div class="fee-month-summary">
+          <strong id="feeSelectedTotal">₹0</strong>
+          <span id="feeSelectedCount">0 months selected</span>
+        </div>
+        <div class="fee-month-list" id="feeMonthList"></div>
+        <div class="form-actions">
+          <button class="secondary-action" id="cancelFeeDialog" type="button">Cancel</button>
+          <button class="primary-action" id="confirmFeeCollection" type="submit">Collect selected</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="detail-dialog" id="detailDialog">
+      <div class="detail-panel">
+        <div class="dialog-head">
+          <div class="member-title">
+            <img id="detailPhoto" alt="" />
+            <div>
+              <p class="eyebrow" id="detailStatus">Member</p>
+              <h2 id="detailName"></h2>
+              <p id="detailMeta"></p>
+            </div>
+          </div>
+          <button class="icon-button" id="closeDetail" aria-label="Close" type="button">×</button>
+        </div>
+
+        <div class="detail-actions">
+          <button class="secondary-action" id="editMember" type="button">Edit details</button>
+        </div>
+
+        <section class="detail-grid">
+          <article>
+            <span>Fee</span>
+            <strong id="detailFee"></strong>
+          </article>
+          <article>
+            <span>Next due date</span>
+            <strong id="detailDueDate"></strong>
+          </article>
+          <article>
+            <span>This month attendance</span>
+            <strong id="detailAttendance"></strong>
+          </article>
+          <article>
+            <span>Last payment</span>
+            <strong id="detailLastPayment"></strong>
+          </article>
+        </section>
+
+        <section class="calendar-section">
+          <div class="panel-head compact">
+            <div>
+              <h3>Attendance calendar</h3>
+              <p id="calendarHint"></p>
+            </div>
+          </div>
+          <div class="calendar-grid" id="attendanceCalendar"></div>
+        </section>
+
+        <section class="payment-history">
+          <h3>Payment history</h3>
+          <div id="paymentHistory"></div>
+        </section>
+      </div>
+    </dialog>
+
+    <script src="/admin/script.js?v=8"></script>
+  </body>
+</html>

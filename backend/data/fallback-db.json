@@ -1,0 +1,90 @@
+{
+  "settings": {
+    "gymName": "test",
+    "logo": "/uploads/logo-1783415633283-19877140-be05-46d7-b11e-7b2502c9bf22.jpg",
+    "billingCycleMode": "month-start",
+    "customBillingDays": 25,
+    "theme": {
+      "primary": "#11a77c",
+      "primaryDark": "#00850f",
+      "accent": "#fcfcfc",
+      "danger": "#c43d32",
+      "background": "#e6e7e4",
+      "panel": "#ffffff",
+      "text": "#17201b"
+    }
+  },
+  "members": [
+    {
+      "id": "a6cbbc4f-a055-4b1e-a19e-c5f702baf28d",
+      "gymId": "GYM1001",
+      "name": "sujal das",
+      "phone": "919430798527",
+      "address": "ghatshila",
+      "fee": 5000,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "startDate": "2026-06-30",
+      "photo": "/uploads/member-1782788491046-249c3d8e-3107-49ce-bd1b-b61514fdf26c.jpg",
+      "attendance": [
+        "2026-06-30",
+        "2026-07-07"
+      ],
+      "payments": [
+        {
+          "id": "e11ecf49-7715-44ea-808a-bda68ed39bd5",
+          "date": "2026-07-07",
+          "month": "2026-07",
+          "billingMonth": "2026-06",
+          "billingPeriod": "2026-06",
+          "amount": 5000
+        },
+        {
+          "id": "3d9a347e-801d-46de-b82b-c5192a04375c",
+          "date": "2026-07-07",
+          "month": "2026-07",
+          "billingMonth": "2026-07",
+          "billingPeriod": "2026-07",
+          "amount": 5000
+        }
+      ],
+      "createdAt": "2026-06-30T03:01:31.048Z"
+    },
+    {
+      "id": "abcbc272-ed8a-4025-adc1-fcad592c70a6",
+      "gymId": "GYM1002",
+      "name": "sujal das",
+      "phone": "919430798522",
+      "address": "ghatshila",
+      "fee": 200,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "startDate": "2026-07-09",
+      "photo": "/uploads/member-1783614175589-79d0f55c-55eb-49c6-bfec-722ba471aaa5.jpg",
+      "attendance": [],
+      "payments": [],
+      "createdAt": "2026-07-09T16:22:55.592Z"
+    }
+  ],
+  "checkins": [
+    {
+      "id": "7f0b2aeb-e248-44ec-9928-bd10bdb6c94b",
+      "memberId": "a6cbbc4f-a055-4b1e-a19e-c5f702baf28d",
+      "gymId": "GYM1001",
+      "memberName": "sujal das",
+      "phone": "919430798527",
+      "date": "2026-06-30",
+      "time": "2026-06-30T03:13:32.624Z"
+    },
+    {
+      "id": "51611b81-3860-43c8-b09d-b5e3c4eba8d0",
+      "memberId": "a6cbbc4f-a055-4b1e-a19e-c5f702baf28d",
+      "gymId": "GYM1001",
+      "memberName": "sujal das",
+      "phone": "919430798527",
+      "date": "2026-07-07",
+      "time": "2026-07-07T09:08:30.866Z"
+    }
+  ],
+  "attendanceRevision": 8
+}

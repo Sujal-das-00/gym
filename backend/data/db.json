@@ -1,0 +1,48 @@
+{
+  "members": [
+    {
+      "id": "a6cbbc4f-a055-4b1e-a19e-c5f702baf28d",
+      "gymId": "GYM1001",
+      "name": "sujal das",
+      "phone": "919430798527",
+      "address": "ghatshila",
+      "fee": 5000,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "startDate": "2026-06-30",
+      "photo": "/uploads/member-1782788491046-249c3d8e-3107-49ce-bd1b-b61514fdf26c.jpg",
+      "attendance": [
+        "2026-06-30"
+      ],
+      "payments": [],
+      "createdAt": "2026-06-30T03:01:31.048Z"
+    }
+  ],
+  "checkins": [
+    {
+      "id": "7f0b2aeb-e248-44ec-9928-bd10bdb6c94b",
+      "memberId": "a6cbbc4f-a055-4b1e-a19e-c5f702baf28d",
+      "gymId": "GYM1001",
+      "memberName": "sujal das",
+      "phone": "919430798527",
+      "date": "2026-06-30",
+      "time": "2026-06-30T03:13:32.624Z"
+    }
+  ],
+  "attendanceRevision": 1,
+  "settings": {
+    "gymName": "sujal gym",
+    "logo": "/uploads/logo-1782751305806-42fb28b8-52ca-48aa-9bab-1d85daedb004.png",
+    "billingCycleMode": "month-start",
+    "customBillingDays": 25,
+    "theme": {
+      "primary": "#064130",
+      "primaryDark": "#073f2d",
+      "accent": "#fcfcfc",
+      "danger": "#c43d32",
+      "background": "#e6e7e4",
+      "panel": "#ffffff",
+      "text": "#17201b"
+    }
+  }
+}

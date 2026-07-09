@@ -1,0 +1,84 @@
+const { exec, query } = require("../config/database");
+const { toDateKey } = require("../utils/date");
+const { normalizeMember } = require("../utils/member");
+const { mapPaymentRow } = require("./paymentModel");
+
+async function hydrateMember(row) {
+  if (!row) return null;
+  const [attendanceRows, paymentRows] = await Promise.all([
+    query("SELECT attendance_date FROM attendance WHERE member_id = ? ORDER BY attendance_date", [row.id]),
+    query("SELECT * FROM payments WHERE member_id = ? ORDER BY payment_date, created_at", [row.id]),
+  ]);
+
+  return normalizeMember({
+    id: row.id,
+    gymId: row.gym_id,
+    name: row.name,
+    phone: row.phone,
+    address: row.address,
+    fee: row.fee,
+    membershipType: row.membership_type,
+    packageMonths: row.package_months,
+    startDate: row.start_date,
+    photo: row.photo,
+    createdAt: row.created_at,
+    attendance: attendanceRows.map((item) => toDateKey(item.attendance_date)),
+    payments: paymentRows.map(mapPaymentRow),
+  });
+}
+
+async function getAllMembers() {
+  const rows = await query("SELECT * FROM members ORDER BY name");
+  return Promise.all(rows.map(hydrateMember));
+}
+
+async function getMemberById(id) {
+  const rows = await query("SELECT * FROM members WHERE id = ?", [id]);
+  return hydrateMember(rows[0]);
+}
+
+async function findMember(identifier) {
+  const value = String(identifier || "").trim();
+  const phone = String(value).replace(/\D/g, "");
+  const rows = await query(
+    "SELECT * FROM members WHERE LOWER(id) = LOWER(?) OR LOWER(gym_id) = LOWER(?) OR phone = ? LIMIT 1",
+    [value, value, phone],
+  );
+  return hydrateMember(rows[0]);
+}
+
+async function saveMember(member) {
+  await exec(
+    `INSERT INTO members (id, gym_id, name, phone, address, fee, membership_type, package_months, start_date, photo, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       gym_id = VALUES(gym_id), name = VALUES(name), phone = VALUES(phone), address = VALUES(address),
+       fee = VALUES(fee), membership_type = VALUES(membership_type), package_months = VALUES(package_months),
+       start_date = VALUES(start_date), photo = VALUES(photo)`,
+    [member.id, member.gymId, member.name, member.phone, member.address, member.fee, member.membershipType, member.packageMonths, member.startDate, member.photo, member.createdAt],
+  );
+  return getMemberById(member.id);
+}
+
+async function deleteMember(id) {
+  return exec("DELETE FROM members WHERE id = ?", [id]);
+}
+
+async function countMembers() {
+  const rows = await query("SELECT COUNT(*) AS count FROM members");
+  return Number(rows[0]?.count || 0);
+}
+
+function duplicateMemberError(error) {
+  return error && (error.code === "ER_DUP_ENTRY" || error.errno === 1062);
+}
+
+module.exports = {
+  countMembers,
+  deleteMember,
+  duplicateMemberError,
+  findMember,
+  getAllMembers,
+  getMemberById,
+  saveMember,
+};
