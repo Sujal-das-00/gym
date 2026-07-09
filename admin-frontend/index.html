@@ -488,6 +488,45 @@
                   <input id="customBillingDaysInput" name="customBillingDays" type="number" min="1" step="1" inputmode="numeric" />
                 </label>
               </fieldset>
+              <fieldset class="billing-cycle-settings">
+                <legend>Payment collection</legend>
+                <label class="billing-cycle-option">
+                  <input type="radio" name="defaultCollectionTiming" value="at-join" />
+                  <span>
+                    <strong>Collect at join (upfront)</strong>
+                    <small>Members pay when they join. Their first term is marked paid and the next payment is due one cycle later.</small>
+                  </span>
+                </label>
+                <label class="billing-cycle-option">
+                  <input type="radio" name="defaultCollectionTiming" value="fixed-day" />
+                  <span>
+                    <strong>Collect after the period</strong>
+                    <small>Nothing is recorded at join. Each period's fee falls due at the end of that period, not the start.</small>
+                  </span>
+                </label>
+                <small class="custom-billing-days">This is the default for new members. You can change it per member while adding them.</small>
+              </fieldset>
+              <fieldset class="billing-cycle-settings holiday-settings">
+                <legend>Gym holidays</legend>
+                <small class="holiday-hint">Pick the weekdays your gym stays closed. Holidays are excluded from each member's attendance rate.</small>
+                <div class="weekday-picker" id="weeklyHolidayPicker">
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="0" /><span>Sun</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="1" /><span>Mon</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="2" /><span>Tue</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="3" /><span>Wed</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="4" /><span>Thu</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="5" /><span>Fri</span></label>
+                  <label class="weekday-chip"><input type="checkbox" name="weeklyHoliday" value="6" /><span>Sat</span></label>
+                </div>
+                <div class="holiday-date-add">
+                  <label class="custom-billing-days">
+                    Add a specific holiday date (festival, event)
+                    <input id="holidayDateInput" type="date" />
+                  </label>
+                  <button class="secondary-action" id="addHolidayDate" type="button">Add date</button>
+                </div>
+                <div class="holiday-date-list" id="holidayDateList"></div>
+              </fieldset>
               <button class="primary-action" type="submit">Save settings</button>
             </form>
           </section>
@@ -559,6 +598,23 @@
             Start date
             <input id="startDateInput" name="startDate" type="date" required />
           </label>
+          <fieldset class="membership-options wide">
+            <legend>Payment collection</legend>
+            <label class="membership-option">
+              <input type="radio" name="collectionTiming" value="at-join" />
+              <span>
+                <strong>Collect at join (upfront)</strong>
+                <small>Mark the first term paid now. Next payment is due one cycle later.</small>
+              </span>
+            </label>
+            <label class="membership-option">
+              <input type="radio" name="collectionTiming" value="fixed-day" />
+              <span>
+                <strong>Collect after the period</strong>
+                <small>No payment at join. Due at the end of the period.</small>
+              </span>
+            </label>
+          </fieldset>
           <label class="wide">
             Assigned trainer
             <select id="assignedTrainerInput" name="trainerId">

@@ -7,8 +7,11 @@ const state = {
   settings: {
     gymName: "Gym Admin",
     logo: "",
-    billingCycleMode: "month-start",
+    billingCycleMode: "30-days",
     customBillingDays: 25,
+    defaultCollectionTiming: "at-join",
+    weeklyHolidays: [0],
+    holidayDates: [],
     theme: {
       primary: "#11784a",
       primaryDark: "#073f2d",
@@ -90,6 +93,12 @@ const els = {
   gymLogoInput: document.querySelector("#gymLogoInput"),
   customBillingDaysInput: document.querySelector("#customBillingDaysInput"),
   billingCycleInputs: document.querySelectorAll("input[name='billingCycleMode']"),
+  defaultCollectionTimingInputs: document.querySelectorAll("input[name='defaultCollectionTiming']"),
+  collectionTimingInputs: document.querySelectorAll("input[name='collectionTiming']"),
+  weeklyHolidayInputs: document.querySelectorAll("input[name='weeklyHoliday']"),
+  holidayDateInput: document.querySelector("#holidayDateInput"),
+  addHolidayDate: document.querySelector("#addHolidayDate"),
+  holidayDateList: document.querySelector("#holidayDateList"),
   themeInputs: document.querySelectorAll("[data-theme-color]"),
   todayLabel: document.querySelector("#todayLabel"),
   sideAddMember: document.querySelector("#sideAddMember"),
@@ -232,9 +241,63 @@ function daysBetween(startKey, endKey) {
   return days;
 }
 
+function getWeeklyHolidays() {
+  const days = Array.isArray(state.settings.weeklyHolidays) ? state.settings.weeklyHolidays : [];
+  return days.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+}
+
+function getHolidayDates() {
+  const dates = Array.isArray(state.settings.holidayDates) ? state.settings.holidayDates : [];
+  return dates.map((date) => String(date || "").slice(0, 10)).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date));
+}
+
 function isHoliday(dayKey) {
-  const day = parseDateKey(dayKey).getDay();
-  return day === 0;
+  const key = String(dayKey || "").slice(0, 10);
+  if (getHolidayDates().includes(key)) return true;
+  const day = parseDateKey(key).getDay();
+  return getWeeklyHolidays().includes(day);
+}
+
+function renderHolidaySettings() {
+  const weekly = getWeeklyHolidays();
+  els.weeklyHolidayInputs.forEach((input) => {
+    input.checked = weekly.includes(Number(input.value));
+  });
+  renderHolidayDateList();
+}
+
+function renderHolidayDateList() {
+  if (!els.holidayDateList) return;
+  const dates = getHolidayDates();
+  els.holidayDateList.innerHTML = dates.length
+    ? dates
+        .map(
+          (date) => `
+            <span class="holiday-chip">
+              ${displayDate(date)}
+              <button type="button" class="holiday-chip-remove" data-holiday-date="${date}" aria-label="Remove ${displayDate(date)}">×</button>
+            </span>`,
+        )
+        .join("")
+    : `<p class="holiday-empty">No specific holiday dates added.</p>`;
+}
+
+function addHolidayDate() {
+  const value = String(els.holidayDateInput?.value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    showToast("Pick a valid date first");
+    return;
+  }
+  const dates = new Set(getHolidayDates());
+  dates.add(value);
+  state.settings.holidayDates = [...dates].sort();
+  if (els.holidayDateInput) els.holidayDateInput.value = "";
+  renderHolidayDateList();
+}
+
+function removeHolidayDate(date) {
+  state.settings.holidayDates = getHolidayDates().filter((item) => item !== date);
+  renderHolidayDateList();
 }
 
 function getDefaultHistoryRange() {
@@ -660,6 +723,16 @@ function getBillingCycleDays() {
   return Number.isFinite(days) && days > 0 ? Math.round(days) : 25;
 }
 
+function getDefaultCollectionTiming() {
+  const mode = state.settings.defaultCollectionTiming || "at-join";
+  return mode === "fixed-day" ? "fixed-day" : "at-join";
+}
+
+function getCollectionTiming(member) {
+  const mode = member?.collectionTiming || getDefaultCollectionTiming();
+  return mode === "fixed-day" ? "fixed-day" : "at-join";
+}
+
 
 function getMembershipType(member) {
   return member?.membershipType === "package" ? "package" : "monthly";
@@ -753,22 +826,49 @@ function getUnpaidPeriods(member) {
   return getBillingPeriodKeys(member).filter((period) => !paidPeriods.has(period));
 }
 
-function getDueDate(member) {
-  const unpaid = getUnpaidPeriods(member);
-  if (unpaid.length) {
-    const first = unpaid[0];
-    return parseDateKey(first.length === 7 ? first + "-01" : first);
-  }
+function periodStartDate(periodKey) {
+  const key = String(periodKey || "");
+  return parseDateKey(key.length === 7 ? key + "-01" : key);
+}
+
+// The date a period rolls over into the next one (its renewal / end-of-term date).
+function periodEndDate(member, periodKey) {
+  const start = periodStartDate(periodKey);
+  if (Number.isNaN(start.getTime())) return start;
+  if (getMembershipType(member) === "package") return addMonths(start, getPackageMonths(member));
+  if (getBillingCycleMode() === "month-start") return addMonths(start, 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + getBillingCycleDays());
+  return end;
+}
+
+// Date after the last generated period — i.e. when the next, not-yet-started period begins.
+function nextPeriodStartDate(member) {
   const start = parseDateKey(member.startDate);
+  const count = getBillingPeriodKeys(member).length;
   if (getMembershipType(member) === "package") {
-    return addMonths(start, getBillingPeriodKeys(member).length * getPackageMonths(member));
+    return addMonths(start, count * getPackageMonths(member));
   }
   if (getBillingCycleMode() === "month-start") {
-    return addMonths(new Date(start.getFullYear(), start.getMonth(), 1), getBillingPeriodKeys(member).length);
+    return addMonths(new Date(start.getFullYear(), start.getMonth(), 1), count);
   }
   const next = new Date(start);
-  next.setDate(next.getDate() + getBillingPeriodKeys(member).length * getBillingCycleDays());
+  next.setDate(next.getDate() + count * getBillingCycleDays());
   return next;
+}
+
+function getDueDate(member) {
+  const unpaid = getUnpaidPeriods(member);
+  if (getCollectionTiming(member) === "fixed-day") {
+    // Payment is collected after the period, so it falls due when the period ends.
+    if (unpaid.length) return periodEndDate(member, unpaid[0]);
+    const periods = getBillingPeriodKeys(member);
+    const last = periods[periods.length - 1];
+    return last ? periodEndDate(member, last) : nextPeriodStartDate(member);
+  }
+  // at-join: payment is due at the start of each period.
+  if (unpaid.length) return periodStartDate(unpaid[0]);
+  return nextPeriodStartDate(member);
 }
 
 function getDueDateKey(member) {
@@ -782,7 +882,13 @@ function isPaidThisPeriod(member) {
 }
 
 function isOverdue(member) {
-  return getUnpaidPeriods(member).some((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
+  const unpaid = getUnpaidPeriods(member);
+  if (getCollectionTiming(member) === "fixed-day") {
+    // Only overdue once a period has fully ended without payment; the in-progress period is not yet due.
+    const today = todayKey();
+    return unpaid.some((period) => localDateKey(periodEndDate(member, period)) < today);
+  }
+  return unpaid.some((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
 }
 
 function isPresentToday(member) {
@@ -878,6 +984,10 @@ function renderBrand() {
     els.customBillingDaysInput.value = String(getBillingCycleDays());
     els.customBillingDaysInput.disabled = getBillingCycleMode() !== "custom-days";
   }
+  els.defaultCollectionTimingInputs.forEach((input) => {
+    input.checked = input.value === getDefaultCollectionTiming();
+  });
+  renderHolidaySettings();
 
   [els.brandLogo, els.settingsLogoPreview].forEach((node) => {
     if (!node) return;
@@ -1615,6 +1725,10 @@ function openMemberDialog(member = null) {
   });
   if (els.packageMonthsInput) els.packageMonthsInput.value = String(getPackageMonths(member));
   updateMembershipFields();
+  const timing = getCollectionTiming(member);
+  els.collectionTimingInputs.forEach((input) => {
+    input.checked = input.value === timing;
+  });
   els.startDateInput.value = member?.startDate || todayKey();
   renderTrainerOptions(member?.trainerId || "");
   els.photoPreview.src = state.stagedPhoto || "";
@@ -1753,6 +1867,12 @@ async function saveGymSettings(event) {
   state.settings.gymName = els.gymNameInput.value.trim() || "Gym Admin";
   state.settings.billingCycleMode = [...els.billingCycleInputs].find((input) => input.checked)?.value || "month-start";
   state.settings.customBillingDays = Math.max(1, Math.round(Number(els.customBillingDaysInput.value || 25)));
+  state.settings.defaultCollectionTiming = [...els.defaultCollectionTimingInputs].find((input) => input.checked)?.value === "fixed-day" ? "fixed-day" : "at-join";
+  state.settings.weeklyHolidays = [...els.weeklyHolidayInputs]
+    .filter((input) => input.checked)
+    .map((input) => Number(input.value))
+    .sort((a, b) => a - b);
+  state.settings.holidayDates = getHolidayDates();
   state.settings.theme = normalizeTheme(
     [...els.themeInputs].reduce((theme, input) => {
       theme[input.dataset.themeColor] = input.value;
@@ -1782,6 +1902,7 @@ async function saveMember(event) {
     fee: Number(formData.get("fee")),
     membershipType: String(formData.get("membershipType") || "monthly") === "package" ? "package" : "monthly",
     packageMonths: Math.max(1, Math.round(Number(formData.get("packageMonths") || 1))),
+    collectionTiming: String(formData.get("collectionTiming") || "") === "fixed-day" ? "fixed-day" : "at-join",
     startDate: String(formData.get("startDate")),
     trainerId: String(formData.get("trainerId") || ""),
     photo: state.stagedPhoto,
@@ -1985,6 +2106,13 @@ function bindEvents() {
   els.membershipTypeInputs.forEach((input) => {
     input.addEventListener("change", updateMembershipFields);
   });
+  if (els.addHolidayDate) els.addHolidayDate.addEventListener("click", addHolidayDate);
+  if (els.holidayDateList) {
+    els.holidayDateList.addEventListener("click", (event) => {
+      const date = event.target.closest("[data-holiday-date]")?.dataset.holidayDate;
+      if (date) removeHolidayDate(date);
+    });
+  }
   els.deleteMember.addEventListener("click", deleteCurrentMember);
   els.deleteTrainer.addEventListener("click", deleteCurrentTrainer);
   els.editMember.addEventListener("click", () => {

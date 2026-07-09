@@ -48,7 +48,7 @@ h1, h2, h3, p { margin-top: 0; }
 .sidebar {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: auto;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -114,7 +114,7 @@ h1, h2, h3, p { margin-top: 0; }
 .side-nav span { width: 18px; text-align: center; }
 
 .support-card {
-  margin-top: auto;
+  margin-top: 10px;
   border: 1px solid rgba(255,255,255,.13);
   border-radius: 8px;
   background: rgba(255,255,255,.08);
@@ -773,6 +773,17 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 .membership-option small, .billing-cycle-option small { display: block; margin-top: 3px; color: var(--muted); line-height: 1.35; }
 .package-months-field[hidden] { display: none; }
 .custom-billing-days input:disabled { background: #f2f5f2; color: var(--muted); }
+.holiday-settings .holiday-hint { color: var(--muted); font-size: .82rem; line-height: 1.35; }
+.weekday-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.weekday-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 8px 12px; cursor: pointer; font-weight: 800; font-size: .82rem; color: var(--muted); user-select: none; }
+.weekday-chip input { width: auto; min-height: auto; margin: 0; }
+.weekday-chip:has(input:checked) { background: var(--green-soft); border-color: var(--green); color: var(--green-dark); }
+.holiday-date-add { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.holiday-date-add .secondary-action { min-height: 44px; white-space: nowrap; }
+.holiday-date-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.holiday-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 6px 6px 6px 12px; font-weight: 800; font-size: .82rem; color: var(--ink); }
+.holiday-chip-remove { width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--red-soft); color: var(--red); font-weight: 900; line-height: 1; cursor: pointer; padding: 0; }
+.holiday-empty { color: var(--muted); font-size: .82rem; margin: 0; }
 .theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .theme-grid label { display: grid; grid-template-columns: 1fr 52px; align-items: center; gap: 10px; color: var(--muted); font-size: .82rem; font-weight: 850; }
 .theme-grid input { width: 52px; min-height: 40px; padding: 4px; }

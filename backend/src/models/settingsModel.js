@@ -4,9 +4,9 @@ const { mapSettingsRow, normalizeSettings } = require("../utils/settings");
 
 async function ensureDefaultSettings() {
   await exec(
-    `INSERT IGNORE INTO app_settings (id, gym_name, logo, billing_cycle_mode, custom_billing_days, theme)
-     VALUES (1, ?, ?, ?, ?, ?)`,
-    [DEFAULT_SETTINGS.gymName, DEFAULT_SETTINGS.logo, DEFAULT_SETTINGS.billingCycleMode, DEFAULT_SETTINGS.customBillingDays, JSON.stringify(DEFAULT_SETTINGS.theme)],
+    `INSERT IGNORE INTO app_settings (id, gym_name, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, weekly_holidays, holiday_dates, theme)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [DEFAULT_SETTINGS.gymName, DEFAULT_SETTINGS.logo, DEFAULT_SETTINGS.billingCycleMode, DEFAULT_SETTINGS.customBillingDays, DEFAULT_SETTINGS.defaultCollectionTiming, JSON.stringify(DEFAULT_SETTINGS.weeklyHolidays), JSON.stringify(DEFAULT_SETTINGS.holidayDates), JSON.stringify(DEFAULT_SETTINGS.theme)],
   );
 }
 
@@ -18,12 +18,13 @@ async function getSettings() {
 async function saveSettings(settings) {
   const normalized = normalizeSettings(settings);
   await exec(
-    `INSERT INTO app_settings (id, gym_name, logo, billing_cycle_mode, custom_billing_days, theme)
-     VALUES (1, ?, ?, ?, ?, ?)
+    `INSERT INTO app_settings (id, gym_name, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, weekly_holidays, holiday_dates, theme)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        gym_name = VALUES(gym_name), logo = VALUES(logo), billing_cycle_mode = VALUES(billing_cycle_mode),
-       custom_billing_days = VALUES(custom_billing_days), theme = VALUES(theme)`,
-    [normalized.gymName, normalized.logo, normalized.billingCycleMode, normalized.customBillingDays, JSON.stringify(normalized.theme)],
+       custom_billing_days = VALUES(custom_billing_days), default_collection_timing = VALUES(default_collection_timing),
+       weekly_holidays = VALUES(weekly_holidays), holiday_dates = VALUES(holiday_dates), theme = VALUES(theme)`,
+    [normalized.gymName, normalized.logo, normalized.billingCycleMode, normalized.customBillingDays, normalized.defaultCollectionTiming, JSON.stringify(normalized.weeklyHolidays), JSON.stringify(normalized.holidayDates), JSON.stringify(normalized.theme)],
   );
   return normalized;
 }

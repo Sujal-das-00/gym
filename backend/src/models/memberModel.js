@@ -19,6 +19,7 @@ async function hydrateMember(row) {
     fee: row.fee,
     membershipType: row.membership_type,
     packageMonths: row.package_months,
+    collectionTiming: row.collection_timing,
     startDate: row.start_date,
     photo: row.photo,
     createdAt: row.created_at,
@@ -49,13 +50,13 @@ async function findMember(identifier) {
 
 async function saveMember(member) {
   await exec(
-    `INSERT INTO members (id, gym_id, name, phone, address, fee, membership_type, package_months, start_date, photo, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO members (id, gym_id, name, phone, address, fee, membership_type, package_months, collection_timing, start_date, photo, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        gym_id = VALUES(gym_id), name = VALUES(name), phone = VALUES(phone), address = VALUES(address),
        fee = VALUES(fee), membership_type = VALUES(membership_type), package_months = VALUES(package_months),
-       start_date = VALUES(start_date), photo = VALUES(photo)`,
-    [member.id, member.gymId, member.name, member.phone, member.address, member.fee, member.membershipType, member.packageMonths, member.startDate, member.photo, member.createdAt],
+       collection_timing = VALUES(collection_timing), start_date = VALUES(start_date), photo = VALUES(photo)`,
+    [member.id, member.gymId, member.name, member.phone, member.address, member.fee, member.membershipType, member.packageMonths, member.collectionTiming || "", member.startDate, member.photo, member.createdAt],
   );
   return getMemberById(member.id);
 }

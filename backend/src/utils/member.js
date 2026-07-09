@@ -19,6 +19,9 @@ function normalizeMember(member) {
     fee: Number(member.fee || 0),
     membershipType: (member.membershipType || member.membership_type) === "package" ? "package" : "monthly",
     packageMonths: Math.max(1, Math.round(Number(member.packageMonths || member.package_months || 1))),
+    collectionTiming: ["at-join", "fixed-day"].includes(member.collectionTiming || member.collection_timing)
+      ? member.collectionTiming || member.collection_timing
+      : "",
     startDate: toDateKey(member.startDate || member.start_date || todayKey()),
     photo: String(member.photo || ""),
     attendance: Array.isArray(member.attendance) ? [...new Set(member.attendance.map(toDateKey))].sort() : [],

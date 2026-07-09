@@ -14,6 +14,9 @@ function mergeMemberPayload(existing, payload) {
     fee: Number(payload.fee ?? existing?.fee ?? 0),
     membershipType: payload.membershipType === "package" ? "package" : existing?.membershipType === "package" ? "package" : "monthly",
     packageMonths: Math.max(1, Math.round(Number(payload.packageMonths ?? existing?.packageMonths ?? 1))),
+    collectionTiming: ["at-join", "fixed-day"].includes(payload.collectionTiming)
+      ? payload.collectionTiming
+      : existing?.collectionTiming || "",
     startDate: String(payload.startDate || existing?.startDate || todayKey()),
     photo:
       payload.photo && payload.photo !== existing?.photo
@@ -31,10 +34,40 @@ function mergeMemberPayload(existing, payload) {
   return normalizeMember(source);
 }
 
+// The billing period a member's start date falls into (the term they join on).
+function firstBillingPeriodKey(member, settings) {
+  const start = String(member.startDate || todayKey()).slice(0, 10);
+  if (member.membershipType === "package") return start;
+  if (settings.billingCycleMode === "month-start") return start.slice(0, 7);
+  return start; // 30-days / custom-days cycles are keyed by the exact start date
+}
+
 async function createMember(payload) {
+  const settings = await repo().getSettings();
   const member = mergeMemberPayload(null, payload);
   member.id = crypto.randomUUID();
-  return publicMember(await repo().saveMember(member));
+  // Snapshot the collection timing on the member so it stays stable if the gym default changes later.
+  if (!member.collectionTiming) member.collectionTiming = settings.defaultCollectionTiming;
+
+  const saved = await repo().saveMember(member);
+
+  // "Collect at join" means the joining term is paid upfront — record that payment so the
+  // next due date lands one cycle later instead of showing the join period as already due.
+  if (member.collectionTiming === "at-join") {
+    const periodKey = firstBillingPeriodKey(member, settings);
+    await repo().addPayments(saved, [
+      {
+        date: member.startDate,
+        amount: member.fee,
+        month: periodKey.length === 7 ? periodKey : periodKey.slice(0, 7),
+        billingMonth: periodKey.length === 7 ? periodKey : "",
+        billingPeriod: periodKey,
+      },
+    ]);
+    return publicMember(await repo().getMemberById(saved.id));
+  }
+
+  return publicMember(saved);
 }
 
 async function updateMember(id, payload) {

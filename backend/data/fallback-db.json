@@ -1,15 +1,20 @@
 {
   "settings": {
-    "gymName": "test",
+    "gymName": "sujal gym",
     "logo": "/uploads/logo-1783415633283-19877140-be05-46d7-b11e-7b2502c9bf22.jpg",
-    "billingCycleMode": "month-start",
+    "billingCycleMode": "30-days",
     "customBillingDays": 25,
+    "defaultCollectionTiming": "at-join",
+    "weeklyHolidays": [
+      0
+    ],
+    "holidayDates": [],
     "theme": {
-      "primary": "#11a77c",
-      "primaryDark": "#00850f",
-      "accent": "#fcfcfc",
+      "primary": "#11784a",
+      "primaryDark": "#073f2d",
+      "accent": "#4f46e5",
       "danger": "#c43d32",
-      "background": "#e6e7e4",
+      "background": "#f6f8f5",
       "panel": "#ffffff",
       "text": "#17201b"
     }
@@ -24,6 +29,7 @@
       "fee": 5000,
       "membershipType": "monthly",
       "packageMonths": 1,
+      "collectionTiming": "",
       "startDate": "2026-06-30",
       "photo": "/uploads/member-1782788491046-249c3d8e-3107-49ce-bd1b-b61514fdf26c.jpg",
       "attendance": [
@@ -59,11 +65,94 @@
       "fee": 200,
       "membershipType": "monthly",
       "packageMonths": 1,
+      "collectionTiming": "",
       "startDate": "2026-07-09",
       "photo": "/uploads/member-1783614175589-79d0f55c-55eb-49c6-bfec-722ba471aaa5.jpg",
       "attendance": [],
       "payments": [],
       "createdAt": "2026-07-09T16:22:55.592Z"
+    },
+    {
+      "id": "28591b0a-5927-41db-96fa-7b61809994ac",
+      "gymId": "GYM877618",
+      "name": "Test AtJoin",
+      "phone": "9111111111",
+      "address": "a",
+      "fee": 1000,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "collectionTiming": "at-join",
+      "startDate": "2026-07-09",
+      "photo": "",
+      "attendance": [],
+      "payments": [
+        {
+          "id": "8169da6d-25fb-4465-8de6-ed035bfe35e8",
+          "date": "2026-07-09",
+          "month": "2026-07",
+          "billingMonth": "2026-07",
+          "billingPeriod": "2026-07",
+          "amount": 1000
+        }
+      ],
+      "createdAt": "2026-07-09T17:07:57.620Z"
+    },
+    {
+      "id": "155d209d-0d15-4413-82f5-47d37f3425e4",
+      "gymId": "GYM877651",
+      "name": "Test Fixed",
+      "phone": "9222222222",
+      "address": "a",
+      "fee": 1000,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "collectionTiming": "fixed-day",
+      "startDate": "2026-07-09",
+      "photo": "",
+      "attendance": [],
+      "payments": [],
+      "createdAt": "2026-07-09T17:07:57.651Z"
+    },
+    {
+      "id": "22a718a6-9f54-4d71-836a-f4087c690ccf",
+      "gymId": "GYM1005",
+      "name": "sujal das",
+      "phone": "9430798520",
+      "address": "ghatshila",
+      "fee": 300,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "collectionTiming": "at-join",
+      "startDate": "2026-07-09",
+      "photo": "/uploads/member-1783617254631-450da1d3-4300-49fd-a187-abc199280cc4.jpg",
+      "attendance": [],
+      "payments": [
+        {
+          "id": "d9723a85-d8bc-43f4-abe8-45e39baefa9d",
+          "date": "2026-07-09",
+          "month": "2026-07",
+          "billingMonth": "2026-07",
+          "billingPeriod": "2026-07",
+          "amount": 300
+        }
+      ],
+      "createdAt": "2026-07-09T17:14:14.632Z"
+    },
+    {
+      "id": "36d04839-ea38-4ea9-8fc1-b53c043002c9",
+      "gymId": "GYM1006",
+      "name": "ss",
+      "phone": "9194307985",
+      "address": "ghatshila",
+      "fee": 200,
+      "membershipType": "monthly",
+      "packageMonths": 1,
+      "collectionTiming": "fixed-day",
+      "startDate": "2026-07-09",
+      "photo": "/uploads/member-1783618329241-0c52677c-868c-4ae5-b5d0-c0f2e0ff4e6c.png",
+      "attendance": [],
+      "payments": [],
+      "createdAt": "2026-07-09T17:32:09.253Z"
     }
   ],
   "checkins": [
@@ -86,5 +175,5 @@
       "time": "2026-07-07T09:08:30.866Z"
     }
   ],
-  "attendanceRevision": 8
+  "attendanceRevision": 12
 }

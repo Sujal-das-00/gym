@@ -14,8 +14,11 @@ const SCHEMA_PATH = path.join(BACKEND_ROOT, "schema.sql");
 const DEFAULT_SETTINGS = {
   gymName: "Gym Admin",
   logo: "",
-  billingCycleMode: "month-start",
+  billingCycleMode: "30-days",
   customBillingDays: 25,
+  defaultCollectionTiming: "at-join",
+  weeklyHolidays: [0],
+  holidayDates: [],
   theme: {
     primary: "#11784a",
     primaryDark: "#073f2d",
