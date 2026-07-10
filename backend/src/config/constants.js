@@ -6,6 +6,7 @@ const PROJECT_ROOT = path.resolve(BACKEND_ROOT, "..");
 const PORT = Number(process.env.PORT || 5051);
 const ADMIN_DIR = path.join(PROJECT_ROOT, "admin-frontend");
 const CHECKIN_DIR = path.join(PROJECT_ROOT, "checkin-frontend");
+const ICONS_DIR = path.join(PROJECT_ROOT, "icons");
 const DATA_DIR = path.join(BACKEND_ROOT, "data");
 const UPLOAD_DIR = path.join(BACKEND_ROOT, "uploads");
 const LEGACY_DB_PATH = path.join(DATA_DIR, "db.json");
@@ -32,8 +33,10 @@ const DEFAULT_SETTINGS = {
 
 module.exports = {
   PORT,
+  PROJECT_ROOT,
   ADMIN_DIR,
   CHECKIN_DIR,
+  ICONS_DIR,
   DATA_DIR,
   UPLOAD_DIR,
   LEGACY_DB_PATH,

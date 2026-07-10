@@ -8,6 +8,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Gym Admin" />
+    <meta name="description" content="Gym management dashboard for members, attendance, and payments." />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="icon" href="/icons/icon-192.svg" />
     <title>Gym Admin Dashboard</title>
     <link rel="stylesheet" href="/admin/style.css" />
   </head>
@@ -764,5 +768,12 @@
     </dialog>
 
     <script src="/admin/script.js?v=8"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
