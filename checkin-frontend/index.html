@@ -46,6 +46,7 @@
           </label>
           <button type="submit" id="checkinButton">Check in</button>
         </form>
+        <button class="secondary" id="installAppButton" type="button" hidden>Install app</button>
         <button class="secondary" id="forgetMe" type="button">Forget saved ID</button>
         <div id="result" class="result-box" role="status" aria-live="polite"></div>
 
@@ -68,6 +69,32 @@
     </main>
     <script src="/checkin/checkin.js"></script>
     <script>
+      (() => {
+        const installButton = document.getElementById("installAppButton");
+        let installPrompt;
+
+        const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+
+        window.addEventListener("beforeinstallprompt", (event) => {
+          event.preventDefault();
+          installPrompt = event;
+          if (!isInstalled()) installButton.hidden = false;
+        });
+
+        installButton.addEventListener("click", async () => {
+          if (!installPrompt) return;
+          installPrompt.prompt();
+          await installPrompt.userChoice;
+          installPrompt = null;
+          installButton.hidden = true;
+        });
+
+        window.addEventListener("appinstalled", () => {
+          installPrompt = null;
+          installButton.hidden = true;
+        });
+      })();
+
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/service-worker.js").catch(() => {});

@@ -69,6 +69,7 @@
           </div>
           <div class="topbar-actions">
             <span class="date-pill" id="todayLabel"></span>
+            <button class="secondary-action" id="installAppButton" type="button" hidden>Install app</button>
             <button class="primary-action" id="openAddMember" type="button">
               <span>+</span>
               Add member
@@ -866,6 +867,32 @@
 
     <script src="/admin/script.js?v=9"></script>
     <script>
+      (() => {
+        const installButton = document.getElementById("installAppButton");
+        let installPrompt;
+
+        const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+
+        window.addEventListener("beforeinstallprompt", (event) => {
+          event.preventDefault();
+          installPrompt = event;
+          if (!isInstalled()) installButton.hidden = false;
+        });
+
+        installButton.addEventListener("click", async () => {
+          if (!installPrompt) return;
+          installPrompt.prompt();
+          await installPrompt.userChoice;
+          installPrompt = null;
+          installButton.hidden = true;
+        });
+
+        window.addEventListener("appinstalled", () => {
+          installPrompt = null;
+          installButton.hidden = true;
+        });
+      })();
+
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/service-worker.js").catch(() => {});
