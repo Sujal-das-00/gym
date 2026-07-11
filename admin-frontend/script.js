@@ -571,7 +571,7 @@ async function loadCheckinConfig() {
     setCheckinStatus("offline");
     return;
   }
-  const checkinUrl = state.checkinConfig.localUrl + "/checkin";
+  const checkinUrl = state.checkinConfig.checkinUrl || state.checkinConfig.localUrl + "/checkin";
   els.checkinUrlText.textContent = checkinUrl;
   const qrSrc = "/api/qr?url=" + encodeURIComponent(checkinUrl);
   if (els.checkinQrImage.getAttribute("src") !== qrSrc) {

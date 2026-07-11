@@ -1,0 +1,22 @@
+# -----------------------------------------------------------------------------
+# REFERENCE ONLY — do not copy this blindly.
+#
+# When you create the app via cPanel > "Setup Node.js App", cPanel writes the
+# correct Passenger .htaccess into the subdomain document root automatically.
+# You normally do NOT need to touch it.
+#
+# Use the block below only if your host uses Passenger but does NOT generate
+# the .htaccess for you. Adjust the paths to match what cPanel shows for your
+# app (Application root / Passenger app root / interpreter path).
+# -----------------------------------------------------------------------------
+
+PassengerAppRoot "/home/CPANEL_USER/gymbot.toolszila.com"
+PassengerBaseURI "/"
+PassengerNodejs "/home/CPANEL_USER/nodevenv/gymbot.toolszila.com/18/bin/node"
+PassengerAppType node
+PassengerStartupFile app.js
+
+# Force HTTPS (optional — many hosts already redirect at the panel level)
+# RewriteEngine On
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
