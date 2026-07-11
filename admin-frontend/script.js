@@ -1,5 +1,34 @@
 const API_BASE = "";
 const TRAINERS_STORAGE_KEY = "gym-admin-trainers-v1";
+const AUTH_TOKEN_KEY = "gym-admin-token";
+
+// The session cookie is HttpOnly, but some setups don't deliver it back (opening
+// the app on a different host than you logged in on — localhost vs 127.0.0.1 —
+// SameSite, or Secure over http). We keep the JWT here too and send it as a
+// Bearer header, which the backend accepts as an equivalent to the cookie.
+function getToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setToken(token) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+  } catch {
+    // localStorage unavailable (private mode) — cookie auth still applies.
+  }
+}
+
+function clearToken() {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 const state = {
   members: [],
@@ -328,7 +357,19 @@ function displayDate(value) {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(API_BASE + path, options);
+  const opts = { credentials: "include", ...options };
+  opts.headers = { ...(options.headers || {}) };
+  const token = getToken();
+  if (token) opts.headers["Authorization"] = "Bearer " + token;
+  // A super-admin operates on a chosen gym; every other role is locked to their own.
+  if (authState.user && authState.user.role === "super_admin" && authState.gymId) {
+    opts.headers["x-gym-id"] = authState.gymId;
+  }
+  const res = await fetch(API_BASE + path, opts);
+  if (res.status === 401) {
+    showLogin();
+    throw new Error("Your session has expired. Please sign in again.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
@@ -2298,4 +2339,308 @@ async function init() {
   }
 }
 
-init();
+/* ---------------------------------------------------------------------------
+ * Authentication + multi-gym context (multi-tenant separation).
+ * Only admins/staff log in. A super-admin picks which gym to manage; gym admins
+ * and staff are locked to their own gym server-side.
+ * ------------------------------------------------------------------------- */
+const authState = { user: null, gymId: "", gyms: [] };
+let appStarted = false;
+const ACTIVE_GYM_KEY = "gym-admin-active-gym";
+
+function authEl(id) {
+  return document.getElementById(id);
+}
+
+function roleLabel(role) {
+  if (role === "super_admin") return "Owner";
+  if (role === "gym_admin") return "Admin";
+  return "Staff";
+}
+
+function showLogin() {
+  authState.user = null;
+  authState.gymId = "";
+  appStarted = false;
+  clearToken();
+  if (authEl("loginOverlay")) authEl("loginOverlay").hidden = false;
+  if (authEl("authBar")) authEl("authBar").hidden = true;
+  document.body.classList.add("auth-locked");
+}
+
+function hideLogin() {
+  if (authEl("loginOverlay")) authEl("loginOverlay").hidden = true;
+  document.body.classList.remove("auth-locked");
+}
+
+async function fetchMe() {
+  try {
+    const token = getToken();
+    const res = await fetch("/api/auth/me", {
+      credentials: "include",
+      headers: token ? { Authorization: "Bearer " + token } : {},
+    });
+    if (!res.ok) return null;
+    return (await res.json()).user;
+  } catch {
+    return null;
+  }
+}
+
+function setupRoleUi() {
+  const role = authState.user ? authState.user.role : "";
+  authEl("gymSelect").hidden = role !== "super_admin";
+  authEl("gymsBtn").hidden = role !== "super_admin";
+  authEl("staffBtn").hidden = !(role === "super_admin" || role === "gym_admin");
+  authEl("authUser").textContent = authState.user ? `${authState.user.email} · ${roleLabel(role)}` : "";
+}
+
+function renderGymSelect() {
+  const select = authEl("gymSelect");
+  select.innerHTML = authState.gyms
+    .map((gym) => `<option value="${gym.id}">${escapeHtml(gym.name)}${gym.status === "suspended" ? " (suspended)" : ""}</option>`)
+    .join("");
+  if (authState.gymId) select.value = authState.gymId;
+}
+
+async function loadGyms() {
+  try {
+    authState.gyms = await api("/api/gyms");
+  } catch {
+    authState.gyms = [];
+  }
+}
+
+async function reloadGymData() {
+  try {
+    await loadSettings();
+    await loadMembers();
+    render();
+    setView(state.activeView || "dashboard");
+  } catch (error) {
+    showToast(error.message || "Unable to load gym data");
+  }
+}
+
+async function startApp() {
+  if (!authState.gymId) return;
+  if (!appStarted) {
+    appStarted = true;
+    await init();
+  } else {
+    await reloadGymData();
+  }
+}
+
+async function applyAuthedUser(user) {
+  authState.user = user;
+  hideLogin();
+  authEl("authBar").hidden = false;
+  setupRoleUi();
+
+  if (user.role === "super_admin") {
+    await loadGyms();
+    const stored = localStorage.getItem(ACTIVE_GYM_KEY) || "";
+    authState.gymId = authState.gyms.some((gym) => gym.id === stored)
+      ? stored
+      : authState.gyms[0]
+        ? authState.gyms[0].id
+        : "";
+    renderGymSelect();
+    if (!authState.gymId) {
+      showToast("Create your first gym to get started.");
+      openGyms();
+      return;
+    }
+  } else {
+    authState.gymId = user.tenantId || (user.gym && user.gym.id) || "";
+  }
+  await startApp();
+}
+
+function openGyms() {
+  renderGymsList();
+  authEl("gymFormError").hidden = true;
+  authEl("gymsDialog").showModal();
+}
+
+function renderGymsList() {
+  const list = authEl("gymsList");
+  if (!authState.gyms.length) {
+    list.innerHTML = `<p class="auth-list-empty">No gyms yet. Create one above.</p>`;
+    return;
+  }
+  list.innerHTML = authState.gyms
+    .map(
+      (gym) => `
+        <div class="auth-list-row">
+          <div><strong>${escapeHtml(gym.name)}</strong><small> /checkin/${escapeHtml(gym.slug)}${gym.status === "suspended" ? " · suspended" : ""}</small></div>
+          <div style="display:flex; gap:6px;">
+            <button class="auth-chip" data-select-gym="${gym.id}" type="button">Manage</button>
+            <button class="auth-chip${gym.status === "suspended" ? "" : " danger"}" data-toggle-gym="${gym.id}" data-status="${gym.status}" type="button">${gym.status === "suspended" ? "Activate" : "Suspend"}</button>
+          </div>
+        </div>`,
+    )
+    .join("");
+
+  list.querySelectorAll("[data-select-gym]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      authState.gymId = btn.getAttribute("data-select-gym");
+      localStorage.setItem(ACTIVE_GYM_KEY, authState.gymId);
+      renderGymSelect();
+      authEl("gymsDialog").close();
+      await startApp();
+    }),
+  );
+  list.querySelectorAll("[data-toggle-gym]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-toggle-gym");
+      const next = btn.getAttribute("data-status") === "suspended" ? "active" : "suspended";
+      try {
+        await api(`/api/gyms/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: next }) });
+        await loadGyms();
+        renderGymSelect();
+        renderGymsList();
+      } catch (error) {
+        showToast(error.message);
+      }
+    }),
+  );
+}
+
+async function onCreateGym(event) {
+  event.preventDefault();
+  const errorEl = authEl("gymFormError");
+  errorEl.hidden = true;
+  const payload = {
+    gymName: authEl("newGymName").value.trim(),
+    slug: authEl("newGymSlug").value.trim(),
+    adminEmail: authEl("newGymAdminEmail").value.trim(),
+    adminPassword: authEl("newGymAdminPassword").value,
+    adminName: authEl("newGymAdminName").value.trim(),
+  };
+  try {
+    const result = await api("/api/gyms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    authEl("createGymForm").reset();
+    await loadGyms();
+    authState.gymId = result.gym.id;
+    localStorage.setItem(ACTIVE_GYM_KEY, authState.gymId);
+    renderGymSelect();
+    renderGymsList();
+    showToast(`Gym "${result.gym.name}" created.`);
+    if (!appStarted) {
+      authEl("gymsDialog").close();
+      await startApp();
+    }
+  } catch (error) {
+    errorEl.textContent = error.message;
+    errorEl.hidden = false;
+  }
+}
+
+async function openStaff() {
+  authEl("staffFormError").hidden = true;
+  authEl("staffDialog").showModal();
+  await loadStaff();
+}
+
+async function loadStaff() {
+  const list = authEl("staffList");
+  try {
+    const staff = await api("/api/staff");
+    list.innerHTML = staff.length
+      ? staff
+          .map((u) => `<div class="auth-list-row"><div><strong>${escapeHtml(u.name || u.email)}</strong><small> ${escapeHtml(u.email)} · ${roleLabel(u.role)}</small></div></div>`)
+          .join("")
+      : `<p class="auth-list-empty">No staff yet.</p>`;
+  } catch (error) {
+    list.innerHTML = `<p class="auth-list-empty">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function onCreateStaff(event) {
+  event.preventDefault();
+  const errorEl = authEl("staffFormError");
+  errorEl.hidden = true;
+  try {
+    await api("/api/staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: authEl("newStaffName").value.trim(),
+        email: authEl("newStaffEmail").value.trim(),
+        password: authEl("newStaffPassword").value,
+        role: authEl("newStaffRole").value,
+      }),
+    });
+    authEl("createStaffForm").reset();
+    await loadStaff();
+    showToast("Staff account created.");
+  } catch (error) {
+    errorEl.textContent = error.message;
+    errorEl.hidden = false;
+  }
+}
+
+function bindAuthEvents() {
+  authEl("loginForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const errorEl = authEl("loginError");
+    const submit = authEl("loginSubmit");
+    errorEl.hidden = true;
+    submit.disabled = true;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEl("loginEmail").value.trim(), password: authEl("loginPassword").value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Login failed");
+      setToken(data.token);
+      authEl("loginPassword").value = "";
+      await applyAuthedUser(data.user);
+    } catch (error) {
+      errorEl.textContent = error.message;
+      errorEl.hidden = false;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  authEl("logoutBtn").addEventListener("click", async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // ignore network errors on logout
+    }
+    clearToken();
+    showLogin();
+  });
+
+  authEl("gymSelect").addEventListener("change", async (event) => {
+    authState.gymId = event.target.value;
+    localStorage.setItem(ACTIVE_GYM_KEY, authState.gymId);
+    await startApp();
+  });
+
+  authEl("gymsBtn").addEventListener("click", openGyms);
+  authEl("gymsClose").addEventListener("click", () => authEl("gymsDialog").close());
+  authEl("staffBtn").addEventListener("click", openStaff);
+  authEl("staffClose").addEventListener("click", () => authEl("staffDialog").close());
+  authEl("createGymForm").addEventListener("submit", onCreateGym);
+  authEl("createStaffForm").addEventListener("submit", onCreateStaff);
+}
+
+async function bootAuth() {
+  bindAuthEvents();
+  const user = await fetchMe();
+  if (!user) {
+    showLogin();
+    return;
+  }
+  await applyAuthedUser(user);
+}
+
+bootAuth();

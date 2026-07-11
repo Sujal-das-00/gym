@@ -1,4 +1,4 @@
-const CACHE_NAME = "gym-pwa-v1";
+const CACHE_NAME = "gym-pwa-v2";
 const APP_SHELL = [
   "/",
   "/admin",
@@ -33,26 +33,21 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === "navigate" || request.destination === "document") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match("/admin")),
-    );
-    return;
-  }
+  const isNavigation = request.mode === "navigate" || request.destination === "document";
+  const isAppShell = APP_SHELL.includes(url.pathname) || url.pathname.startsWith("/icons/");
+  if (!isNavigation && !isAppShell) return;
 
-  if (APP_SHELL.includes(url.pathname) || url.pathname.startsWith("/icons/")) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+  // Network-first: always serve the freshest HTML/JS/CSS when online so code
+  // changes take effect immediately, and fall back to cache only when offline.
+  // (A cache-first shell would pin stale script.js and silently break the app
+  // after every deploy.)
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
-      })),
-    );
-  }
+      })
+      .catch(() => caches.match(request).then((cached) => cached || caches.match("/admin"))),
+  );
 });

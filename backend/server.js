@@ -1,3 +1,7 @@
+// Load .env from the project root before any config module reads process.env,
+// so DB_USER/DB_PASSWORD/etc. are populated no matter which directory we launch from.
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+
 const { PORT } = require("./src/config/constants");
 const { createApp } = require("./src/app");
 const { setModelMode } = require("./src/models");

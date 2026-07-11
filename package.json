@@ -13,6 +13,7 @@
     "check": "find backend -name '*.js' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check && node --check admin-frontend/script.js && node --check checkin-frontend/checkin.js"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "mysql2": "^3.22.5",
     "qrcode": "^1.5.4"

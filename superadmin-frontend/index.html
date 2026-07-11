@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Super Admin :: Control Panel</title>
+  <style>
+    /* Deliberately minimal, 1990s-style: system fonts, gray desktop, beveled
+       boxes. No frameworks, no external assets. */
+    * { box-sizing: border-box; }
+    body {
+      background: #008080;
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 16px;
+      margin: 0;
+      padding: 16px;
+    }
+    a { color: #0000ee; }
+    h1, h2, h3 { font-family: Arial, Helvetica, sans-serif; margin: 0 0 8px; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 18px; border-bottom: 2px solid #808080; padding-bottom: 4px; }
+    hr { border: 0; border-top: 1px solid #808080; margin: 16px 0; }
+
+    .window {
+      background: #c0c0c0;
+      border: 2px outset #ffffff;
+      max-width: 900px;
+      margin: 0 auto 16px;
+      padding: 0;
+    }
+    .titlebar {
+      background: #000080;
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: bold;
+      padding: 4px 8px;
+    }
+    .window-body { padding: 12px 16px; }
+
+    fieldset { border: 2px groove #fff; margin: 12px 0; padding: 10px 12px; }
+    legend { font-family: Arial, Helvetica, sans-serif; font-weight: bold; padding: 0 4px; }
+    label { display: block; margin: 6px 0 2px; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+    input, select {
+      font-family: "Courier New", monospace;
+      font-size: 14px;
+      padding: 3px 4px;
+      border: 2px inset #fff;
+      background: #fff;
+      width: 100%;
+      max-width: 320px;
+    }
+    button {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      padding: 3px 12px;
+      border: 2px outset #fff;
+      background: #c0c0c0;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:active { border-style: inset; }
+    button.link { border: 0; background: transparent; color: #0000ee; text-decoration: underline; padding: 0; margin: 0; }
+
+    table { border-collapse: collapse; width: 100%; background: #fff; margin-top: 8px; font-size: 14px; }
+    th, td { border: 1px solid #808080; padding: 4px 8px; text-align: left; }
+    th { background: #000080; color: #fff; font-family: Arial, Helvetica, sans-serif; }
+    tr:nth-child(even) td { background: #eee; }
+
+    .status-active { color: #006600; font-weight: bold; }
+    .status-disabled, .status-suspended { color: #cc0000; font-weight: bold; }
+    .msg { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 6px 8px; margin: 8px 0; }
+    .msg.error { background: #ffe0e0; border: 1px solid #cc0000; color: #900; }
+    .msg.ok { background: #e0ffe0; border: 1px solid #006600; color: #060; }
+    .muted { color: #555; font-size: 12px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== LOGIN ===================== -->
+  <div class="window" id="loginView" style="max-width:420px;">
+    <div class="titlebar">Super Admin &mdash; Sign In</div>
+    <div class="window-body">
+      <p class="muted">Restricted area. Platform owner access only.</p>
+      <div class="msg error" id="loginError" hidden></div>
+      <form id="loginForm" autocomplete="off">
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" name="email" type="email" required />
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" name="password" type="password" required />
+        <br />
+        <button type="submit">Log In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL ===================== -->
+  <div id="panelView" hidden>
+    <div class="window">
+      <div class="titlebar">Super Admin &mdash; Control Panel</div>
+      <div class="window-body">
+        <div class="topbar">
+          <h1>Platform Control Panel</h1>
+          <div>
+            <span class="muted" id="whoami"></span>
+            <button type="button" id="logoutBtn">Log Out</button>
+          </div>
+        </div>
+        <div class="msg ok" id="globalMsg" hidden></div>
+      </div>
+    </div>
+
+    <!-- Gyms -->
+    <div class="window">
+      <div class="titlebar">Gyms (Tenants)</div>
+      <div class="window-body">
+        <table id="gymsTable">
+          <thead>
+            <tr><th>Name</th><th>Check-in slug</th><th>Status</th><th>Action</th></tr>
+          </thead>
+          <tbody id="gymsBody"></tbody>
+        </table>
+
+        <fieldset>
+          <legend>Create a new gym (with its first admin)</legend>
+          <div class="msg error" id="gymError" hidden></div>
+          <form id="gymForm" autocomplete="off">
+            <label>Gym name</label>
+            <input name="gymName" required />
+            <label>First admin name</label>
+            <input name="adminName" />
+            <label>First admin email</label>
+            <input name="adminEmail" type="email" required />
+            <label>First admin password</label>
+            <input name="adminPassword" type="password" required />
+            <br />
+            <button type="submit">Create Gym</button>
+          </form>
+        </fieldset>
+      </div>
+    </div>
+
+    <!-- Admin users -->
+    <div class="window">
+      <div class="titlebar">Admin Accounts</div>
+      <div class="window-body">
+        <table id="adminsTable">
+          <thead>
+            <tr><th>Gym</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr>
+          </thead>
+          <tbody id="adminsBody"></tbody>
+        </table>
+
+        <fieldset>
+          <legend>Add an admin user</legend>
+          <div class="msg error" id="adminError" hidden></div>
+          <form id="adminForm" autocomplete="off">
+            <label>Gym</label>
+            <select name="tenantId" id="adminGymSelect" required></select>
+            <label>Name</label>
+            <input name="name" />
+            <label>Email</label>
+            <input name="email" type="email" required />
+            <label>Password</label>
+            <input name="password" type="password" required />
+            <label>Role</label>
+            <select name="role">
+              <option value="gym_admin">Gym Admin</option>
+              <option value="staff">Staff</option>
+            </select>
+            <br />
+            <button type="submit">Add Admin</button>
+          </form>
+        </fieldset>
+      </div>
+    </div>
+
+    <p class="muted" style="text-align:center;">Super Admin Console &middot; sessions are separate from the regular admin panel.</p>
+  </div>
+
+  <script src="/superadmin/superadmin.js"></script>
+</body>
+</html>

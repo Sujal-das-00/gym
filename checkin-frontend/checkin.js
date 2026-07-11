@@ -16,7 +16,13 @@ const memberPhone = document.querySelector("#memberPhone");
 const historyCount = document.querySelector("#historyCount");
 const historyList = document.querySelector("#historyList");
 
-const saved = localStorage.getItem("gym-checkin-id") || "";
+// The gym is identified by the URL slug, e.g. /checkin/nova-fitness.
+const slug = decodeURIComponent((location.pathname.replace(/^\/checkin\/?/, "").split(/[/?#]/)[0] || "").trim());
+const apiBase = slug ? `/api/public/${encodeURIComponent(slug)}` : "";
+
+// Namespace the saved member id per gym so different gyms don't overwrite each other.
+const savedKey = slug ? `gym-checkin-id:${slug}` : "gym-checkin-id";
+const saved = localStorage.getItem(savedKey) || "";
 input.value = saved;
 
 todayLabel.textContent = new Intl.DateTimeFormat("en-IN", {
@@ -136,7 +142,8 @@ function renderMember(member, history = []) {
 
 async function loadBranding() {
   try {
-    const res = await fetch("/api/settings");
+    const res = await fetch(`${apiBase}/settings`);
+    if (!res.ok) throw new Error("branding unavailable");
     const settings = await res.json();
     applyTheme(settings.theme || {});
     gymName.textContent = settings.gymName || "Gym Check-in";
@@ -154,7 +161,7 @@ async function loadBranding() {
 async function loadHistory(identifier) {
   if (!identifier) return;
   try {
-    const res = await fetch(`/api/checkin/history?identifier=${encodeURIComponent(identifier)}`);
+    const res = await fetch(`${apiBase}/checkin/history?identifier=${encodeURIComponent(identifier)}`);
     const data = await res.json();
     if (!res.ok) return;
     renderMember(data.member, data.history || []);
@@ -167,14 +174,14 @@ async function checkIn(identifier) {
   button.disabled = true;
   button.textContent = "Checking in...";
   try {
-    const res = await fetch("/api/checkin", {
+    const res = await fetch(`${apiBase}/checkin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Check-in failed");
-    localStorage.setItem("gym-checkin-id", identifier);
+    localStorage.setItem(savedKey, identifier);
     show("ok", data.duplicate ? `Already checked in today, ${data.member.name}.` : `Welcome, ${data.member.name}. Check-in recorded.`);
     renderMember(data.member, data.history || []);
   } finally {
@@ -196,12 +203,21 @@ form.addEventListener("submit", async (event) => {
 });
 
 forget.addEventListener("click", () => {
-  localStorage.removeItem("gym-checkin-id");
+  localStorage.removeItem(savedKey);
   input.value = "";
   memberPanel.hidden = true;
   memberStatus.textContent = "Ready";
   show("ok", "Saved ID removed from this phone.");
 });
 
-loadBranding();
-if (saved) loadHistory(saved);
+if (!slug) {
+  // No gym in the URL — the check-in link must include the gym slug (/checkin/<gym>).
+  gymName.textContent = "Choose your gym";
+  gymIntro.textContent = "This check-in link is missing your gym. Please use the QR code or link your gym gave you.";
+  button.disabled = true;
+  input.disabled = true;
+  show("err", "No gym selected. Open your gym's check-in link (e.g. /checkin/your-gym).");
+} else {
+  loadBranding();
+  if (saved) loadHistory(saved);
+}

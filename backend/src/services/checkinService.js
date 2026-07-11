@@ -2,37 +2,37 @@ const { todayKey } = require("../utils/date");
 const { publicMember } = require("../utils/member");
 const { repo } = require("../models");
 
-async function checkInMember(identifier) {
-  const member = await repo().findMember(identifier);
+async function checkInMember(gymId, identifier) {
+  const member = await repo().findMember(gymId, identifier);
   if (!member) return null;
 
   const date = todayKey();
-  await repo().setMemberAttendance(member.id, date, true);
+  await repo().setMemberAttendance(gymId, member.id, date, true);
   const existing = await repo().findCheckinForDate(member.id, date);
-  const freshMember = await repo().getMemberById(member.id);
+  const freshMember = await repo().getMemberById(gymId, member.id);
 
   if (existing) {
     return {
       member: publicMember(freshMember),
       checkin: existing,
       duplicate: true,
-      revision: await repo().getAttendanceRevision(),
+      revision: await repo().getAttendanceRevision(gymId),
       history: await repo().memberCheckinHistory(member),
     };
   }
 
-  const checkin = await repo().createCheckin(member, date);
+  const checkin = await repo().createCheckin(gymId, member, date);
   return {
-    member: publicMember(await repo().getMemberById(member.id)),
+    member: publicMember(await repo().getMemberById(gymId, member.id)),
     checkin,
     duplicate: false,
-    revision: await repo().getAttendanceRevision(),
+    revision: await repo().getAttendanceRevision(gymId),
     history: await repo().memberCheckinHistory(member),
   };
 }
 
-async function getMemberHistory(identifier) {
-  const member = await repo().findMember(identifier);
+async function getMemberHistory(gymId, identifier) {
+  const member = await repo().findMember(gymId, identifier);
   if (!member) return null;
   return {
     member: publicMember(member),

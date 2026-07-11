@@ -42,14 +42,14 @@ function firstBillingPeriodKey(member, settings) {
   return start; // 30-days / custom-days cycles are keyed by the exact start date
 }
 
-async function createMember(payload) {
-  const settings = await repo().getSettings();
+async function createMember(gymId, payload) {
+  const settings = await repo().getSettings(gymId);
   const member = mergeMemberPayload(null, payload);
   member.id = crypto.randomUUID();
   // Snapshot the collection timing on the member so it stays stable if the gym default changes later.
   if (!member.collectionTiming) member.collectionTiming = settings.defaultCollectionTiming;
 
-  const saved = await repo().saveMember(member);
+  const saved = await repo().saveMember(gymId, member);
 
   // "Collect at join" means the joining term is paid upfront — record that payment so the
   // next due date lands one cycle later instead of showing the join period as already due.
@@ -64,18 +64,18 @@ async function createMember(payload) {
         billingPeriod: periodKey,
       },
     ]);
-    return publicMember(await repo().getMemberById(saved.id));
+    return publicMember(await repo().getMemberById(gymId, saved.id));
   }
 
   return publicMember(saved);
 }
 
-async function updateMember(id, payload) {
-  const existing = await repo().getMemberById(id);
+async function updateMember(gymId, id, payload) {
+  const existing = await repo().getMemberById(gymId, id);
   if (!existing) return null;
   const member = mergeMemberPayload(existing, payload);
   member.id = id;
-  return publicMember(await repo().saveMember(member));
+  return publicMember(await repo().saveMember(gymId, member));
 }
 
 module.exports = {

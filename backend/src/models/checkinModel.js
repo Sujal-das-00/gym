@@ -19,7 +19,7 @@ async function findCheckinForDate(memberId, date) {
   return rows[0] ? mapCheckinRow(rows[0]) : null;
 }
 
-async function createCheckin(member, date) {
+async function createCheckin(gymId, member, date) {
   const checkin = {
     id: crypto.randomUUID(),
     memberId: member.id,
@@ -31,24 +31,24 @@ async function createCheckin(member, date) {
   };
 
   await exec(
-    `INSERT INTO checkins (id, member_id, gym_id, member_name, phone, checkin_date, checkin_time)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [checkin.id, checkin.memberId, checkin.gymId, checkin.memberName, checkin.phone, checkin.date, checkin.time],
+    `INSERT INTO checkins (id, member_id, tenant_id, gym_id, member_name, phone, checkin_date, checkin_time)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [checkin.id, checkin.memberId, gymId, checkin.gymId, checkin.memberName, checkin.phone, checkin.date, checkin.time],
   );
 
   return checkin;
 }
 
-async function importCheckin(member, source) {
+async function importCheckin(gymId, member, source) {
   await exec(
-    `INSERT IGNORE INTO checkins (id, member_id, gym_id, member_name, phone, checkin_date, checkin_time)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [source.id || crypto.randomUUID(), member.id, member.gymId, member.name, member.phone, toDateKey(source.date), source.time || nowIso()],
+    `INSERT IGNORE INTO checkins (id, member_id, tenant_id, gym_id, member_name, phone, checkin_date, checkin_time)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [source.id || crypto.randomUUID(), member.id, gymId, member.gymId, member.name, member.phone, toDateKey(source.date), source.time || nowIso()],
   );
 }
 
-async function getCheckinsByDate(date) {
-  const rows = await query("SELECT * FROM checkins WHERE checkin_date = ? ORDER BY checkin_time DESC", [date]);
+async function getCheckinsByDate(gymId, date) {
+  const rows = await query("SELECT * FROM checkins WHERE tenant_id = ? AND checkin_date = ? ORDER BY checkin_time DESC", [gymId, date]);
   return rows.map(mapCheckinRow);
 }
 

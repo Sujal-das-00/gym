@@ -5,6 +5,7 @@ const PROJECT_ROOT = path.resolve(BACKEND_ROOT, "..");
 
 const PORT = Number(process.env.PORT || 5051);
 const ADMIN_DIR = path.join(PROJECT_ROOT, "admin-frontend");
+const SUPERADMIN_DIR = path.join(PROJECT_ROOT, "superadmin-frontend");
 const CHECKIN_DIR = path.join(PROJECT_ROOT, "checkin-frontend");
 const ICONS_DIR = path.join(PROJECT_ROOT, "icons");
 const DATA_DIR = path.join(BACKEND_ROOT, "data");
@@ -35,6 +36,7 @@ module.exports = {
   PORT,
   PROJECT_ROOT,
   ADMIN_DIR,
+  SUPERADMIN_DIR,
   CHECKIN_DIR,
   ICONS_DIR,
   DATA_DIR,
