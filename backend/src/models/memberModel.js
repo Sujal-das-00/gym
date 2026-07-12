@@ -5,9 +5,10 @@ const { mapPaymentRow } = require("./paymentModel");
 
 async function hydrateMember(row) {
   if (!row) return null;
-  const [attendanceRows, paymentRows] = await Promise.all([
+  const [attendanceRows, paymentRows, expiredCheckinRows] = await Promise.all([
     query("SELECT attendance_date FROM attendance WHERE member_id = ? ORDER BY attendance_date", [row.id]),
     query("SELECT * FROM payments WHERE member_id = ? ORDER BY payment_date, created_at", [row.id]),
+    query("SELECT checkin_date FROM checkins WHERE member_id = ? AND expired = 1 ORDER BY checkin_date", [row.id]),
   ]);
 
   return normalizeMember({
@@ -24,6 +25,7 @@ async function hydrateMember(row) {
     photo: row.photo,
     createdAt: row.created_at,
     attendance: attendanceRows.map((item) => toDateKey(item.attendance_date)),
+    expiredCheckins: expiredCheckinRows.map((item) => toDateKey(item.checkin_date)),
     payments: paymentRows.map(mapPaymentRow),
   });
 }

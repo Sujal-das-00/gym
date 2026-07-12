@@ -45,6 +45,12 @@ function normalizeHolidayDates(value) {
   return [...new Set(dates)].sort();
 }
 
+function toBool(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "string") return !["false", "0", "no"].includes(value.toLowerCase());
+  return Boolean(Number(value) || value === true);
+}
+
 function normalizeSettings(settings = {}) {
   const mode = ["month-start", "30-days", "custom-days"].includes(settings.billingCycleMode)
     ? settings.billingCycleMode
@@ -60,6 +66,7 @@ function normalizeSettings(settings = {}) {
     billingCycleMode: mode,
     customBillingDays: Math.max(1, Math.round(Number(settings.customBillingDays || DEFAULT_SETTINGS.customBillingDays))),
     defaultCollectionTiming,
+    allowExpiredCheckin: toBool(settings.allowExpiredCheckin, DEFAULT_SETTINGS.allowExpiredCheckin),
     weeklyHolidays: normalizeWeeklyHolidays(settings.weeklyHolidays),
     holidayDates: normalizeHolidayDates(settings.holidayDates),
     theme: normalizeTheme(settings.theme),
@@ -73,6 +80,7 @@ function mapSettingsRow(row) {
     billingCycleMode: row?.billing_cycle_mode,
     customBillingDays: row?.custom_billing_days,
     defaultCollectionTiming: row?.default_collection_timing,
+    allowExpiredCheckin: row?.allow_expired_checkin,
     weeklyHolidays: fromJson(row?.weekly_holidays, DEFAULT_SETTINGS.weeklyHolidays),
     holidayDates: fromJson(row?.holiday_dates, DEFAULT_SETTINGS.holidayDates),
     theme: fromJson(row?.theme, DEFAULT_SETTINGS.theme),

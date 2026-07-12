@@ -414,16 +414,17 @@ function placeFormat(modules, reserved, level, maskIndex) {
   const bits = bchFormat((EC_FORMAT_BITS[level] << 3) | maskIndex);
   const get = (i) => (bits >>> i) & 1;
 
-  // Around top-left finder.
-  for (let i = 0; i <= 5; i += 1) modules[8][i] = get(i);
-  modules[8][7] = get(6);
+  // Around top-left finder: bits 0-5 down column 8, corner cells, then bits 9-14 along row 8.
+  for (let i = 0; i <= 5; i += 1) modules[i][8] = get(i);
+  modules[7][8] = get(6);
   modules[8][8] = get(7);
-  modules[7][8] = get(8);
-  for (let i = 9; i <= 14; i += 1) modules[14 - i][8] = get(i);
+  modules[8][7] = get(8);
+  for (let i = 9; i <= 14; i += 1) modules[8][14 - i] = get(i);
 
-  // Around the other two finders.
-  for (let i = 0; i <= 7; i += 1) modules[size - 1 - i][8] = get(i);
-  for (let i = 8; i <= 14; i += 1) modules[8][size - 15 + i] = get(i);
+  // Second copy: bits 0-7 along row 8 under the top-right finder, bits 8-14 down column 8
+  // beside the bottom-left finder (the dark module at [size-8][8] stays untouched).
+  for (let i = 0; i <= 7; i += 1) modules[8][size - 1 - i] = get(i);
+  for (let i = 8; i <= 14; i += 1) modules[size - 15 + i][8] = get(i);
 }
 
 function placeVersionInfo(modules, version) {

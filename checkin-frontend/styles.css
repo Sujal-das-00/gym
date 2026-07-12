@@ -220,6 +220,14 @@ button:disabled {
   color: var(--red);
 }
 
+/* Checked in, but the membership has expired — amber renewal reminder. */
+.result-box.warn {
+  display: block;
+  border: 1px solid #f2dca8;
+  background: #fdf6e4;
+  color: #9a6c07;
+}
+
 .member-panel {
   margin-top: 16px;
   border-top: 1px solid var(--line);
@@ -311,6 +319,21 @@ button:disabled {
   margin-top: 2px;
   color: var(--muted);
   font-size: .82rem;
+}
+
+.history-row.expired {
+  border-color: color-mix(in srgb, var(--red) 28%, var(--line));
+  border-left-color: var(--red);
+  background: color-mix(in srgb, var(--red) 4%, #fff);
+}
+
+.history-row.expired strong {
+  color: var(--red);
+}
+
+.history-row.expired em {
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .history-row em {

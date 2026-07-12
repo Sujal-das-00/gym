@@ -343,6 +343,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 }
 .attendance-row.is-present { border-color: #b9dfc7; background: #fbfffc; }
 .attendance-row.is-pending { border-left: 4px solid #d8ded8; }
+.attendance-row.is-expired { border-color: #f0cac5; background: #fffafa; border-left: 4px solid var(--red); }
 .attendance-member-copy { min-width: 0; }
 .attendance-row h3 { margin: 0 0 2px; font-size: .98rem; }
 .attendance-row p { margin: 0; color: var(--muted); font-size: .84rem; }
@@ -359,6 +360,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 }
 .attendance-status.present { background: var(--green-soft); color: var(--green); }
 .attendance-status.pending { background: #eef2ef; color: var(--muted); }
+.attendance-status.expired { background: var(--red-soft); color: var(--red); }
 .attendance-actions { display: flex; justify-content: flex-end; }
 .attendance-confirm-actions { display: flex; gap: 8px; }
 .attendance-button {
@@ -512,6 +514,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 .chart-day.present { background: var(--green); }
 .chart-day.absent { background: var(--red-soft); border: 1px solid #f0cac5; }
 .chart-day.holiday { background: var(--gold-soft); border: 1px solid #f2dca8; }
+.chart-day.expired { background: var(--red); }
 .history-date-list {
   display: grid;
   gap: 8px;
@@ -536,6 +539,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 .history-date-row strong.present { background: var(--green-soft); color: var(--green); }
 .history-date-row strong.absent { background: var(--red-soft); color: var(--red); }
 .history-date-row strong.holiday { background: var(--gold-soft); color: var(--gold); }
+.history-date-row strong.expired { background: var(--red); color: #fff; }
+.expired-flag { color: var(--red); font-style: normal; font-weight: 800; }
+.history-stat-grid article.expired-stat { border-color: #f0cac5; background: #fffafa; }
+.history-stat-grid article.expired-stat strong { color: var(--red); }
 
 
 .billing-card-grid {

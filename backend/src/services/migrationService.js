@@ -147,8 +147,21 @@ async function tightenConstraints() {
   }
 }
 
+async function ensureFeatureColumns() {
+  if (!(await columnExists("gym_settings", "allow_expired_checkin"))) {
+    await tryRaw(
+      "ALTER TABLE gym_settings ADD COLUMN allow_expired_checkin TINYINT(1) NOT NULL DEFAULT 1 AFTER default_collection_timing",
+      "gym_settings.allow_expired_checkin",
+    );
+  }
+  if (!(await columnExists("checkins", "expired"))) {
+    await tryRaw("ALTER TABLE checkins ADD COLUMN expired TINYINT(1) NOT NULL DEFAULT 0 AFTER checkin_time", "checkins.expired");
+  }
+}
+
 async function runMigrations() {
   await ensureTenantColumns();
+  await ensureFeatureColumns();
 
   const needsDefault =
     (await query("SELECT 1 FROM members WHERE tenant_id IS NULL OR tenant_id = '' LIMIT 1")).length > 0 ||

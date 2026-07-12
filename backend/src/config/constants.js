@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = {
   billingCycleMode: "30-days",
   customBillingDays: 25,
   defaultCollectionTiming: "at-join",
+  allowExpiredCheckin: true,
   weeklyHolidays: [0],
   holidayDates: [],
   theme: {

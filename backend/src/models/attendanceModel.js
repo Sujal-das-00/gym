@@ -34,7 +34,7 @@ async function memberCheckinHistory(member, limit = 12) {
   // ("Incorrect arguments to mysqld_stmt_execute"), so inline a validated integer.
   const safeLimit = Math.max(1, Math.min(500, Math.trunc(Number(limit)) || 12));
   const rows = await query(
-    `SELECT a.attendance_date, c.checkin_time, c.id AS checkin_id
+    `SELECT a.attendance_date, c.checkin_time, c.id AS checkin_id, c.expired
      FROM attendance a
      LEFT JOIN checkins c ON c.member_id = a.member_id AND c.checkin_date = a.attendance_date
      WHERE a.member_id = ?
@@ -46,6 +46,7 @@ async function memberCheckinHistory(member, limit = 12) {
     date: toDateKey(row.attendance_date),
     time: row.checkin_time || "",
     source: row.checkin_id ? "qr" : "manual",
+    expired: Boolean(row.expired),
   }));
 }
 

@@ -39,6 +39,7 @@ const state = {
     billingCycleMode: "30-days",
     customBillingDays: 25,
     defaultCollectionTiming: "at-join",
+    allowExpiredCheckin: true,
     weeklyHolidays: [0],
     holidayDates: [],
     theme: {
@@ -123,6 +124,7 @@ const els = {
   customBillingDaysInput: document.querySelector("#customBillingDaysInput"),
   billingCycleInputs: document.querySelectorAll("input[name='billingCycleMode']"),
   defaultCollectionTimingInputs: document.querySelectorAll("input[name='defaultCollectionTiming']"),
+  allowExpiredCheckinInputs: document.querySelectorAll("input[name='allowExpiredCheckin']"),
   collectionTimingInputs: document.querySelectorAll("input[name='collectionTiming']"),
   weeklyHolidayInputs: document.querySelectorAll("input[name='weeklyHoliday']"),
   holidayDateInput: document.querySelector("#holidayDateInput"),
@@ -614,7 +616,8 @@ async function loadCheckinConfig() {
   }
   const checkinUrl = state.checkinConfig.checkinUrl || state.checkinConfig.localUrl + "/checkin";
   els.checkinUrlText.textContent = checkinUrl;
-  const qrSrc = "/api/qr?url=" + encodeURIComponent(checkinUrl);
+  // v=2 busts browser caches holding the old (unscannable) QR rendering.
+  const qrSrc = "/api/qr?v=2&url=" + encodeURIComponent(checkinUrl);
   if (els.checkinQrImage.getAttribute("src") !== qrSrc) {
     els.checkinQrImage.src = qrSrc;
   }
@@ -1028,6 +1031,9 @@ function renderBrand() {
   els.defaultCollectionTimingInputs.forEach((input) => {
     input.checked = input.value === getDefaultCollectionTiming();
   });
+  els.allowExpiredCheckinInputs.forEach((input) => {
+    input.checked = input.value === (state.settings.allowExpiredCheckin === false ? "deny" : "allow");
+  });
   renderHolidaySettings();
 
   [els.brandLogo, els.settingsLogoPreview].forEach((node) => {
@@ -1395,14 +1401,17 @@ function getHistoryRows(member) {
   if (!member) return [];
   const { start, end } = getHistoryRange();
   const attendance = new Set(member.attendance || []);
+  const expiredCheckins = new Set(member.expiredCheckins || []);
   return daysBetween(start, end).map((day) => {
     const holiday = isHoliday(day);
     const present = attendance.has(day);
+    const expired = present && expiredCheckins.has(day);
     return {
       date: day,
-      status: holiday ? "holiday" : present ? "present" : "absent",
+      status: holiday ? "holiday" : expired ? "expired" : present ? "present" : "absent",
       present,
       holiday,
+      expired,
     };
   });
 }
@@ -1410,6 +1419,8 @@ function getHistoryRows(member) {
 function filterHistoryRows(rows) {
   const status = state.historyStatusFilter;
   if (status === "all") return rows;
+  // "present" includes expired check-ins — the member was in the gym either way.
+  if (status === "present") return rows.filter((row) => row.present && !row.holiday);
   return rows.filter((row) => row.status === status);
 }
 
@@ -1430,13 +1441,14 @@ function renderHistory() {
           const rows = getHistoryRows(member);
           const present = rows.filter((row) => row.present).length;
           const holidays = rows.filter((row) => row.holiday).length;
+          const expired = rows.filter((row) => row.expired).length;
           return `
             <button class="history-member-card ${member.id === state.selectedHistoryMemberId ? "active" : ""}" data-id="${member.id}" type="button">
               ${photoMarkup(member)}
               <div>
                 <h3>${escapeHtml(member.name)}</h3>
                 <p>${escapeHtml(member.phone)} · ${escapeHtml(member.gymId || member.id || "")}</p>
-                <span>${present} present · ${holidays} holidays</span>
+                <span>${present} present · ${holidays} holidays${expired ? ` · <em class="expired-flag">${expired} expired</em>` : ""}</span>
               </div>
             </button>
           `;
@@ -1466,6 +1478,7 @@ function renderHistoryReport(member) {
   const present = rows.filter((row) => row.present).length;
   const holidays = rows.filter((row) => row.holiday).length;
   const absent = rows.filter((row) => row.status === "absent").length;
+  const expiredVisits = rows.filter((row) => row.expired).length;
   const workingDays = rows.length - holidays;
   const rate = workingDays ? Math.round((present / workingDays) * 100) : 0;
 
@@ -1483,6 +1496,7 @@ function renderHistoryReport(member) {
       <article><span>Absent</span><strong>${absent}</strong></article>
       <article><span>Holidays</span><strong>${holidays}</strong></article>
       <article><span>Attendance rate</span><strong>${rate}%</strong></article>
+      ${expiredVisits ? `<article class="expired-stat"><span>Expired check-ins</span><strong>${expiredVisits}</strong></article>` : ""}
     </div>
     <div class="attendance-chart" aria-label="Attendance chart">
       ${rows
@@ -1558,6 +1572,7 @@ function renderAttendanceSheet() {
         })
         .map((member) => {
           const present = hasAttendance(member, selectedDate);
+          const expired = present && (member.expiredCheckins || []).includes(selectedDate);
           const confirmRemoval = state.pendingAttendanceRemovalId === member.id && present;
           const actionMarkup = present
             ? confirmRemoval
@@ -1570,17 +1585,17 @@ function renderAttendanceSheet() {
               : `<button class="attendance-button correction" data-action="request-remove" data-id="${member.id}" type="button">Mark absent</button>`
             : `<button class="attendance-button mark-present" data-action="mark-present" data-id="${member.id}" type="button">Mark present</button>`;
           return `
-            <article class="attendance-row ${present ? "is-present" : "is-pending"}">
+            <article class="attendance-row ${present ? (expired ? "is-present is-expired" : "is-present") : "is-pending"}">
               ${photoMarkup(member)}
               <div class="attendance-member-copy">
                 <h3>${escapeHtml(member.name)}</h3>
                 <p>${escapeHtml(member.phone)}</p>
               </div>
               <div class="attendance-status-cell">
-                <span class="attendance-status ${present ? "present" : "pending"}">
-                  ${present ? "Checked in" : "Not checked in"}
+                <span class="attendance-status ${present ? (expired ? "expired" : "present") : "pending"}">
+                  ${present ? (expired ? "Checked in — expired" : "Checked in") : "Not checked in"}
                 </span>
-                ${present ? `<small>Use absent only for a correction.</small>` : `<small>No attendance saved for this date.</small>`}
+                ${expired ? `<small>Membership had expired at check-in. Collect the renewal.</small>` : present ? `<small>Use absent only for a correction.</small>` : `<small>No attendance saved for this date.</small>`}
               </div>
               <div class="attendance-actions">
                 ${actionMarkup}
@@ -1892,12 +1907,45 @@ function closeMemberDialog() {
   state.stagedPhoto = "";
 }
 
-function readPhoto(file) {
+function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+// Downscale and re-encode in the browser before upload: the host rejects request
+// bodies over ~1MB, and full-resolution photos also make uploads painfully slow.
+async function readPhoto(file, maxDimension = 1024, quality = 0.8) {
+  const dataUrl = await readFileAsDataUrl(file);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      let out = "";
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      out = canvas.toDataURL("image/webp", quality);
+      if (!out.startsWith("data:image/webp")) {
+        // Browser can't encode webp: keep transparency for logo-like sources, else use jpeg on white.
+        if (["image/png", "image/webp", "image/gif", "image/svg+xml"].includes(file.type)) {
+          out = canvas.toDataURL("image/png");
+        } else {
+          ctx.globalCompositeOperation = "destination-over";
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          out = canvas.toDataURL("image/jpeg", quality);
+        }
+      }
+      resolve(out.length < dataUrl.length ? out : dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl); // not decodable here; the server will validate it
+    img.src = dataUrl;
   });
 }
 
@@ -1913,7 +1961,7 @@ async function handlePhotoChange(event) {
 async function handleLogoChange(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  state.settings.logo = await readPhoto(file);
+  state.settings.logo = await readPhoto(file, 512);
   try {
     await saveSettingsRecord();
     renderBrand();
@@ -1929,6 +1977,7 @@ async function saveGymSettings(event) {
   state.settings.billingCycleMode = [...els.billingCycleInputs].find((input) => input.checked)?.value || "month-start";
   state.settings.customBillingDays = Math.max(1, Math.round(Number(els.customBillingDaysInput.value || 25)));
   state.settings.defaultCollectionTiming = [...els.defaultCollectionTimingInputs].find((input) => input.checked)?.value === "fixed-day" ? "fixed-day" : "at-join";
+  state.settings.allowExpiredCheckin = [...els.allowExpiredCheckinInputs].find((input) => input.checked)?.value !== "deny";
   state.settings.weeklyHolidays = [...els.weeklyHolidayInputs]
     .filter((input) => input.checked)
     .map((input) => Number(input.value))
@@ -1947,6 +1996,9 @@ async function saveGymSettings(event) {
     await saveSettingsRecord();
     applyTheme();
     renderBrand();
+    // Billing cycle / collection timing changed: recompute due dates everywhere
+    // (member cards, dashboard stats, payments), not just the detail modal.
+    render();
     showToast("Settings saved");
   } catch (error) {
     showToast(error.message);

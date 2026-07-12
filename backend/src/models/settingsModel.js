@@ -10,11 +10,12 @@ async function saveSettings(gymId, settings) {
   const normalized = normalizeSettings(settings);
   await exec(
     `INSERT INTO gym_settings
-       (tenant_id, gym_name, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, weekly_holidays, holiday_dates, theme)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (tenant_id, gym_name, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, allow_expired_checkin, weekly_holidays, holiday_dates, theme)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        gym_name = VALUES(gym_name), logo = VALUES(logo), billing_cycle_mode = VALUES(billing_cycle_mode),
        custom_billing_days = VALUES(custom_billing_days), default_collection_timing = VALUES(default_collection_timing),
+       allow_expired_checkin = VALUES(allow_expired_checkin),
        weekly_holidays = VALUES(weekly_holidays), holiday_dates = VALUES(holiday_dates), theme = VALUES(theme)`,
     [
       gymId,
@@ -23,6 +24,7 @@ async function saveSettings(gymId, settings) {
       normalized.billingCycleMode,
       normalized.customBillingDays,
       normalized.defaultCollectionTiming,
+      normalized.allowExpiredCheckin ? 1 : 0,
       JSON.stringify(normalized.weeklyHolidays),
       JSON.stringify(normalized.holidayDates),
       JSON.stringify(normalized.theme),

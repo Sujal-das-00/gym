@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS gym_settings (
   billing_cycle_mode ENUM('month-start', '30-days', 'custom-days') NOT NULL DEFAULT '30-days',
   custom_billing_days INT UNSIGNED NOT NULL DEFAULT 25,
   default_collection_timing ENUM('at-join', 'fixed-day') NOT NULL DEFAULT 'at-join',
+  allow_expired_checkin TINYINT(1) NOT NULL DEFAULT 1,
   weekly_holidays JSON NULL,
   holiday_dates JSON NULL,
   theme JSON NULL,
@@ -101,6 +102,8 @@ CREATE TABLE IF NOT EXISTS checkins (
   phone VARCHAR(30) NOT NULL,
   checkin_date DATE NOT NULL,
   checkin_time VARCHAR(32) NOT NULL,
+  -- 1 when the member's membership had already expired (renewal overdue) at check-in time.
+  expired TINYINT(1) NOT NULL DEFAULT 0,
   CONSTRAINT fk_checkins_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
   UNIQUE KEY uniq_checkin_member_date (member_id, checkin_date),
   INDEX idx_checkins_tenant_date (tenant_id, checkin_date),

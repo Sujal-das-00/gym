@@ -25,7 +25,7 @@
             <h1 id="gymName">Gym Check-in</h1>
           </div>
         </div>
-        <p id="gymIntro">Scan, enter your member ID or mobile number, and keep your attendance record updated.</p>
+        <p id="gymIntro">Enter your mobile number (or member ID) to check in and keep your attendance record updated.</p>
         <div class="checkin-summary">
           <div>
             <span>Today</span>
@@ -41,8 +41,8 @@
       <section class="checkin-card">
         <form id="checkinForm" class="checkin-form">
           <label>
-            Member ID or mobile
-            <input id="identifier" required autocomplete="off" inputmode="text" placeholder="GYM1001 or mobile" />
+            Mobile number or member ID
+            <input id="identifier" required autocomplete="tel" inputmode="text" placeholder="Your mobile number (or GYM1001)" />
           </label>
           <button type="submit" id="checkinButton">Check in</button>
         </form>

@@ -4,7 +4,7 @@ const { normalizeMember, normalizePhone, publicMember } = require("../utils/memb
 const { saveImageData } = require("./imageService");
 const { repo } = require("../models");
 
-function mergeMemberPayload(existing, payload) {
+async function mergeMemberPayload(existing, payload) {
   const source = {
     ...(existing || {}),
     gymId: String(payload.gymId || payload.id || existing?.gymId || existing?.id || "").trim().toUpperCase(),
@@ -20,7 +20,7 @@ function mergeMemberPayload(existing, payload) {
     startDate: String(payload.startDate || existing?.startDate || todayKey()),
     photo:
       payload.photo && payload.photo !== existing?.photo
-        ? saveImageData(payload.photo, "member")
+        ? await saveImageData(payload.photo, "member")
         : String(existing?.photo || payload.photo || ""),
   };
 
@@ -44,7 +44,7 @@ function firstBillingPeriodKey(member, settings) {
 
 async function createMember(gymId, payload) {
   const settings = await repo().getSettings(gymId);
-  const member = mergeMemberPayload(null, payload);
+  const member = await mergeMemberPayload(null, payload);
   member.id = crypto.randomUUID();
   // Snapshot the collection timing on the member so it stays stable if the gym default changes later.
   if (!member.collectionTiming) member.collectionTiming = settings.defaultCollectionTiming;
@@ -73,7 +73,7 @@ async function createMember(gymId, payload) {
 async function updateMember(gymId, id, payload) {
   const existing = await repo().getMemberById(gymId, id);
   if (!existing) return null;
-  const member = mergeMemberPayload(existing, payload);
+  const member = await mergeMemberPayload(existing, payload);
   member.id = id;
   return publicMember(await repo().saveMember(gymId, member));
 }

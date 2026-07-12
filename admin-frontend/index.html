@@ -543,6 +543,25 @@
               <small class="custom-billing-days">This is the default for new members. You can change it per member while
                 adding them.</small>
             </fieldset>
+            <fieldset class="billing-cycle-settings">
+              <legend>Expired memberships</legend>
+              <label class="billing-cycle-option">
+                <input type="radio" name="allowExpiredCheckin" value="allow" />
+                <span>
+                  <strong>Allow check-in after expiry</strong>
+                  <small>Members whose renewal has lapsed can still check in. Those visits are flagged red in the
+                    attendance history so you can follow up.</small>
+                </span>
+              </label>
+              <label class="billing-cycle-option">
+                <input type="radio" name="allowExpiredCheckin" value="deny" />
+                <span>
+                  <strong>Block check-in after expiry</strong>
+                  <small>The check-in page shows "Membership expired — access denied" until the member renews. No
+                    attendance is recorded.</small>
+                </span>
+              </label>
+            </fieldset>
             <fieldset class="billing-cycle-settings holiday-settings">
               <legend>Gym holidays</legend>
               <small class="holiday-hint">Pick the weekdays your gym stays closed. Holidays are excluded from each

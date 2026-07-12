@@ -107,9 +107,9 @@ function displayTime(value) {
   }).format(date);
 }
 
-function renderMember(member, history = []) {
+function renderMember(member, history = [], status = "Checked in") {
   memberPanel.hidden = false;
-  memberStatus.textContent = "Checked in";
+  memberStatus.textContent = status;
   memberGymId.textContent = member.gymId || member.id || "Member";
   memberName.textContent = member.name || "Member";
   memberPhone.textContent = member.phone || "";
@@ -127,12 +127,12 @@ function renderMember(member, history = []) {
     ? history
         .map(
           (row) => `
-            <article class="history-row">
+            <article class="history-row${row.expired ? " expired" : ""}">
               <div>
                 <strong>${displayDate(row.date)}</strong>
                 <span>${displayTime(row.time)}</span>
               </div>
-              <em>${row.source === "qr" ? "Self check-in" : "Manual"}</em>
+              <em>${row.expired ? "Expired membership" : row.source === "qr" ? "Self check-in" : "Manual"}</em>
             </article>
           `,
         )
@@ -180,10 +180,21 @@ async function checkIn(identifier) {
       body: JSON.stringify({ identifier }),
     });
     const data = await res.json();
+    if (res.status === 403 && data.expired) {
+      // The gym blocks expired memberships: no attendance was recorded.
+      if (data.member) renderMember(data.member, data.history || [], "Membership expired");
+      show("err", data.error || "Membership expired — access denied. Please renew at the front desk.");
+      return;
+    }
     if (!res.ok) throw new Error(data.error || "Check-in failed");
     localStorage.setItem(savedKey, identifier);
-    show("ok", data.duplicate ? `Already checked in today, ${data.member.name}.` : `Welcome, ${data.member.name}. Check-in recorded.`);
-    renderMember(data.member, data.history || []);
+    if (data.expired) {
+      show("warn", `${data.member.name}, your membership has expired — please renew at the front desk. ${data.duplicate ? "Already checked in today." : "Check-in recorded."}`);
+      renderMember(data.member, data.history || [], "Checked in — expired");
+    } else {
+      show("ok", data.duplicate ? `Already checked in today, ${data.member.name}.` : `Welcome, ${data.member.name}. Check-in recorded.`);
+      renderMember(data.member, data.history || []);
+    }
   } finally {
     button.disabled = false;
     button.textContent = "Check in";

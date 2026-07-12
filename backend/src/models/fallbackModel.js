@@ -111,6 +111,7 @@ function mapCheckin(checkin) {
     phone: checkin.phone,
     date: toDateKey(checkin.date),
     time: checkin.time,
+    expired: Boolean(checkin.expired),
   };
 }
 
@@ -120,7 +121,7 @@ function findCheckinForDate(memberId, date) {
   return checkin ? mapCheckin(checkin) : null;
 }
 
-function createCheckin(member, date) {
+function createCheckin(member, date, expired = false) {
   const checkin = {
     id: crypto.randomUUID(),
     memberId: member.id,
@@ -129,6 +130,7 @@ function createCheckin(member, date) {
     phone: member.phone,
     date: toDateKey(date),
     time: nowIso(),
+    expired: Boolean(expired),
   };
   store.getState().checkins.push(checkin);
   store.persist();
@@ -154,6 +156,7 @@ function memberCheckinHistory(member, limit = 12) {
       date,
       time: checkinMap.get(date)?.time || "",
       source: checkinMap.has(date) ? "qr" : "manual",
+      expired: Boolean(checkinMap.get(date)?.expired),
     }));
 }
 

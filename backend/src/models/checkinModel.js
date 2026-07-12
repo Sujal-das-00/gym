@@ -11,6 +11,7 @@ function mapCheckinRow(row) {
     phone: row.phone,
     date: toDateKey(row.checkin_date),
     time: row.checkin_time,
+    expired: Boolean(row.expired),
   };
 }
 
@@ -19,7 +20,7 @@ async function findCheckinForDate(memberId, date) {
   return rows[0] ? mapCheckinRow(rows[0]) : null;
 }
 
-async function createCheckin(gymId, member, date) {
+async function createCheckin(gymId, member, date, expired = false) {
   const checkin = {
     id: crypto.randomUUID(),
     memberId: member.id,
@@ -28,12 +29,13 @@ async function createCheckin(gymId, member, date) {
     phone: member.phone,
     date,
     time: nowIso(),
+    expired: Boolean(expired),
   };
 
   await exec(
-    `INSERT INTO checkins (id, member_id, tenant_id, gym_id, member_name, phone, checkin_date, checkin_time)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [checkin.id, checkin.memberId, gymId, checkin.gymId, checkin.memberName, checkin.phone, checkin.date, checkin.time],
+    `INSERT INTO checkins (id, member_id, tenant_id, gym_id, member_name, phone, checkin_date, checkin_time, expired)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [checkin.id, checkin.memberId, gymId, checkin.gymId, checkin.memberName, checkin.phone, checkin.date, checkin.time, checkin.expired ? 1 : 0],
   );
 
   return checkin;
