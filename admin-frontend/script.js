@@ -1106,6 +1106,14 @@ function showToast(message) {
   }, 2200);
 }
 
+// Lock a button while its request is in flight: shows a spinner and blocks
+// repeat taps until the request settles.
+function setButtonBusy(button, busy) {
+  if (!button) return;
+  button.disabled = busy;
+  button.classList.toggle("is-busy", busy);
+}
+
 function hasAttendance(member, day) {
   return (member.attendance || []).includes(day);
 }
@@ -1206,6 +1214,8 @@ async function collectSelectedFees(event) {
     amount: Number(member.fee),
   }));
   const collectedCount = payments.length;
+  if (els.confirmFeeCollection?.disabled) return;
+  setButtonBusy(els.confirmFeeCollection, true);
   try {
     const saved = await api("/api/members/" + encodeURIComponent(member.id) + "/payments", {
       method: "POST",
@@ -1219,6 +1229,8 @@ async function collectSelectedFees(event) {
     showToast("Collected " + collectedCount + " " + getPeriodUnitLabel(member) + (collectedCount === 1 ? "" : "s") + " from " + saved.name);
   } catch (error) {
     showToast(error.message);
+  } finally {
+    setButtonBusy(els.confirmFeeCollection, false);
   }
 }
 
@@ -1308,13 +1320,14 @@ function renderPayments() {
           const paid = isPaidThisPeriod(member);
           const total = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
           return `
-            <button class="payment-customer-card ${member.id === state.selectedPaymentMemberId ? "active" : ""}" data-id="${member.id}" type="button">
+            <button class="payment-customer-card ${member.id === state.selectedPaymentMemberId ? "active" : ""} ${paid ? "is-paid" : "is-pending"}" data-id="${member.id}" type="button">
               ${photoMarkup(member)}
               <div>
                 <h3>${escapeHtml(member.name)}</h3>
-                <p>${payments.length} payments · ${currency(total)}</p>
-                <span>${getMembershipLabel(member)} · ${paid ? "Paid" : "Pending"}</span>
+                <p class="customer-phone">${escapeHtml(member.phone)}</p>
+                <span>${getMembershipLabel(member)} · <em class="customer-filtered">${payments.length} filtered ${payments.length === 1 ? "payment" : "payments"}</em></span>
               </div>
+              <strong class="customer-amount">${currency(total)}</strong>
             </button>
           `;
         })
@@ -1338,16 +1351,17 @@ function renderPaymentCustomerDetail(member) {
   const payments = [...memberPaymentsInRange(member)].reverse();
   const paid = isPaidThisPeriod(member);
   els.paymentCustomerDetail.innerHTML = `
-    <div class="payment-detail-head">
+    <div class="payment-detail-head ${paid ? "is-paid" : "is-pending"}">
       ${photoMarkup(member)}
       <div>
         <h3>${escapeHtml(member.name)}</h3>
-        <p>${escapeHtml(member.phone)} · ${currency(member.fee)} · ${getMembershipLabel(member)} · ${payments.length} filtered payments</p>
+        <p>${getMembershipLabel(member)} · <span class="payment-status ${paid ? "paid" : "pending"}">${paid ? "✓ Paid" : "⏳ Pending"}</span></p>
       </div>
-      <button class="collect-fee-button compact-collect" data-id="${member.id}" type="button" ${getUnpaidPeriods(member).length ? "" : "disabled"}>
-        ${getUnpaidPeriods(member).length ? "Add payment" : "No pending dues"}
-      </button>
+      <strong class="payment-detail-amount">${currency(member.fee)}</strong>
     </div>
+    <button class="collect-fee-button" data-id="${member.id}" type="button" ${getUnpaidPeriods(member).length ? "" : "disabled"}>
+      ${getUnpaidPeriods(member).length ? "Add payment" : "No pending dues"}
+    </button>
     <div class="payment-history-list">
       ${payments.length
         ? payments
@@ -1645,8 +1659,8 @@ function renderTrainers() {
       emptyTitle.textContent = "No matching trainers";
       emptyCopy.textContent = "Try another search or status filter.";
     } else {
-      emptyTitle.textContent = "No trainers yet";
-      emptyCopy.textContent = "Add your first trainer profile with contact details, specialty, shift, and status.";
+      emptyTitle.textContent = "No trainers found";
+      emptyCopy.textContent = "It looks like you haven't added any trainers yet. Use the \"Add trainer\" button below to populate your roster.";
     }
   }
 }
@@ -1680,7 +1694,7 @@ function renderTrainerAttendance() {
           `;
         })
         .join("")
-    : `<p class="history-empty">Add trainers first, then manual attendance will appear here.</p>`;
+    : ``;
 }
 
 function renderMembers() {
@@ -1696,20 +1710,26 @@ function renderMembers() {
       ].join("");
 
       return `
-        <article class="member-card">
+        <article class="member-card ${isOverdue(member) ? "is-overdue" : isPaidThisPeriod(member) ? "is-paid" : "is-pending"}">
           <button class="member-card-main" data-id="${member.id}" type="button">
             ${photoMarkup(member)}
             <div>
               <h3>${escapeHtml(member.name)}</h3>
-              <p>${escapeHtml(member.phone)} · ${currency(member.fee)} · ${getMembershipLabel(member)}</p>
-              <p>${escapeHtml(member.address)}</p>
-              <p>Trainer: ${escapeHtml(getTrainerName(member.trainerId))}</p>
-              <div class="member-badges">${badges}</div>
+              <p class="member-phone">${escapeHtml(member.phone)}</p>
+              <p class="member-address">${escapeHtml(member.address)}</p>
+              <p class="member-trainer">Trainer: ${escapeHtml(getTrainerName(member.trainerId))}</p>
             </div>
+            <div class="member-badges">${badges}</div>
           </button>
-          <button class="member-whatsapp-action" data-reminder-id="${member.id}" type="button" ${getUnpaidPeriods(member).length ? "" : "disabled"}>
-            WhatsApp reminder
-          </button>
+          <div class="member-card-foot">
+            <div class="member-fee">
+              <strong>${currency(member.fee)}</strong>
+              <span>${getMembershipLabel(member)}</span>
+            </div>
+            <button class="member-whatsapp-action" data-reminder-id="${member.id}" type="button" ${getUnpaidPeriods(member).length ? "" : "disabled"}>
+              WhatsApp reminder
+            </button>
+          </div>
         </article>
       `;
     })
@@ -1920,6 +1940,9 @@ async function saveGymSettings(event) {
       return theme;
     }, {}),
   );
+  const submitButton = els.settingsForm.querySelector('button[type="submit"]');
+  if (submitButton?.disabled) return;
+  setButtonBusy(submitButton, true);
   try {
     await saveSettingsRecord();
     applyTheme();
@@ -1927,6 +1950,8 @@ async function saveGymSettings(event) {
     showToast("Settings saved");
   } catch (error) {
     showToast(error.message);
+  } finally {
+    setButtonBusy(submitButton, false);
   }
 }
 
@@ -1950,6 +1975,9 @@ async function saveMember(event) {
   };
 
   const wasEditing = Boolean(state.editingId);
+  const submitButton = els.memberForm.querySelector('button[type="submit"]');
+  if (submitButton?.disabled) return;
+  setButtonBusy(submitButton, true);
   try {
     const saved = await saveMemberRecord(payload);
     if (wasEditing) {
@@ -1964,14 +1992,18 @@ async function saveMember(event) {
     showToast(wasEditing ? "Member updated" : "Member added");
   } catch (error) {
     showToast(error.message);
+  } finally {
+    setButtonBusy(submitButton, false);
   }
 }
 
 async function deleteCurrentMember() {
   if (!state.editingId) return;
+  if (els.deleteMember?.disabled) return;
   const member = state.members.find((item) => item.id === state.editingId);
   const confirmed = confirm("Delete " + (member?.name || "this member") + "?");
   if (!confirmed) return;
+  setButtonBusy(els.deleteMember, true);
   try {
     await api("/api/members/" + encodeURIComponent(state.editingId), { method: "DELETE" });
     state.members = state.members.filter((item) => item.id !== state.editingId);
@@ -1984,6 +2016,8 @@ async function deleteCurrentMember() {
     showToast("Member deleted");
   } catch (error) {
     showToast(error.message);
+  } finally {
+    setButtonBusy(els.deleteMember, false);
   }
 }
 
@@ -2519,6 +2553,9 @@ async function onCreateGym(event) {
     adminPassword: authEl("newGymAdminPassword").value,
     adminName: authEl("newGymAdminName").value.trim(),
   };
+  const submitButton = authEl("createGymSubmit");
+  if (submitButton?.disabled) return;
+  setButtonBusy(submitButton, true);
   try {
     const result = await api("/api/gyms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     authEl("createGymForm").reset();
@@ -2535,6 +2572,8 @@ async function onCreateGym(event) {
   } catch (error) {
     errorEl.textContent = error.message;
     errorEl.hidden = false;
+  } finally {
+    setButtonBusy(submitButton, false);
   }
 }
 
@@ -2562,6 +2601,9 @@ async function onCreateStaff(event) {
   event.preventDefault();
   const errorEl = authEl("staffFormError");
   errorEl.hidden = true;
+  const submitButton = authEl("createStaffForm").querySelector('button[type="submit"]');
+  if (submitButton?.disabled) return;
+  setButtonBusy(submitButton, true);
   try {
     await api("/api/staff", {
       method: "POST",
@@ -2579,6 +2621,8 @@ async function onCreateStaff(event) {
   } catch (error) {
     errorEl.textContent = error.message;
     errorEl.hidden = false;
+  } finally {
+    setButtonBusy(submitButton, false);
   }
 }
 
@@ -2588,7 +2632,7 @@ function bindAuthEvents() {
     const errorEl = authEl("loginError");
     const submit = authEl("loginSubmit");
     errorEl.hidden = true;
-    submit.disabled = true;
+    setButtonBusy(submit, true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -2605,7 +2649,7 @@ function bindAuthEvents() {
       errorEl.textContent = error.message;
       errorEl.hidden = false;
     } finally {
-      submit.disabled = false;
+      setButtonBusy(submit, false);
     }
   });
 

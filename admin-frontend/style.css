@@ -291,7 +291,7 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 .panel-head p { margin-bottom: 0; color: var(--muted); font-size: .86rem; }
 .compact { margin-bottom: 10px; }
 
-.toast { position: fixed; top: 16px; left: 50%; z-index: 20; transform: translate(-50%, -120%); width: min(92vw, 420px); border: 1px solid #b9dfc7; border-radius: 8px; background: #f0fbf4; color: var(--green); padding: 12px 14px; box-shadow: var(--shadow); font-weight: 850; opacity: 0; transition: transform 180ms ease, opacity 180ms ease; }
+.toast { position: fixed; top: 16px; left: 50%; z-index: 20; transform: translate(-50%, -120%); width: min(92vw, 420px); border: 1px solid #b9dfc7; border-radius: 8px; background: #f0fbf4; color: var(--green); padding: 12px 14px; box-shadow: var(--shadow); font-weight: 850; opacity: 0; pointer-events: none; transition: transform 180ms ease, opacity 180ms ease; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
 .date-picker, .search-box, .settings-form label, .photo-field label, .form-grid label, .logo-upload {
@@ -397,6 +397,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
   font-size: .8rem;
   font-weight: 850;
 }
+
+/* Caption-less search field bottom-aligns with the neighbouring date/status fields. */
+.history-filters label:has(> input[type="search"]) { align-content: end; }
 .history-filters select {
   width: 100%;
   min-height: 46px;
@@ -954,7 +957,68 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
 .eyebrow { margin: 0 0 4px; color: var(--green); font-size: .76rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
 .icon-button { flex: 0 0 auto; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 1.5rem; line-height: 1; }
 .photo-field { display: grid; grid-template-columns: 84px 1fr; gap: 14px; align-items: center; margin-bottom: 14px; }
-#photoPreview, #trainerPhotoPreview { width: 84px; height: 84px; }
+.photo-preview-box {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--green-soft);
+  display: grid;
+  place-items: center;
+}
+.photo-preview-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--green) 45%, var(--line));
+}
+.photo-placeholder { color: color-mix(in srgb, var(--green) 70%, transparent); font-size: 1.9rem; line-height: 1; }
+#photoPreview, #trainerPhotoPreview { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
+.photo-field label { gap: 0; min-width: 0; }
+.photo-field label span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: .86rem;
+  font-weight: 850;
+  text-align: center;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.photo-field label span::before {
+  content: "photo_camera";
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1;
+  margin-right: 6px;
+  vertical-align: -2px;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.photo-field label:active span { background: color-mix(in srgb, var(--green) 22%, var(--green-soft)); }
+.photo-field label:focus-within span { border-color: var(--green); box-shadow: 0 0 0 3px rgba(17,120,74,.12); }
+.photo-field input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  min-height: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .form-grid .wide { grid-column: 1 / -1; }
 .form-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
@@ -1229,3 +1293,523 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
     transition: none !important;
   }
 }
+
+/* =========================================================================
+   App-only UI — applied ONLY when launched as an installed PWA (html.pwa).
+   In a normal browser tab the .pwa class is absent, so the website is
+   unchanged. Set from an inline <head> script before first paint.
+   ========================================================================= */
+
+/* Bottom tab bar is hidden everywhere by default (website + desktop). */
+.app-tabbar { display: none; }
+
+html.pwa {
+  /* Native-app touch feel: no blue tap flash, no rubber-band overscroll. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+html.pwa body { overscroll-behavior-y: none; }
+
+/* Already installed — the "Install app" prompt is redundant inside the app. */
+html.pwa #installAppButton { display: none !important; }
+
+/* Hide the topbar date pill inside the installed app. */
+html.pwa .date-pill { display: none !important; }
+
+@media (max-width: 900px) {
+  /* Fixed bottom navigation — the signature "this is an app" element. */
+  html.pwa .app-tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    gap: 2px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), #ffffff);
+    -webkit-backdrop-filter: saturate(1.4) blur(12px);
+    backdrop-filter: saturate(1.4) blur(12px);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 22px rgba(5, 30, 21, 0.1);
+  }
+
+  html.pwa .app-tabbar .tab-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 52px;
+    padding: 4px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.1;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, transform 120ms ease;
+  }
+
+  html.pwa .app-tabbar .tab-link .tab-ico {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  html.pwa .app-tabbar .tab-link:active { transform: scale(0.92); }
+
+  html.pwa .app-tabbar .tab-link.active {
+    color: var(--green);
+    background: var(--green-soft);
+  }
+
+  /* Keep scrollable content clear of the fixed tab bar. */
+  html.pwa .main-content {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  /* The drawer scrolls behind the tab bar too — pad it so the account footer
+     (email/role + Log out) isn't hidden under the fixed tab bar. */
+  html.pwa .sidebar {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- Payments + attendance history: mobile-reference filter card ---- */
+.history-filters {
+  grid-template-columns: 1.6fr 1fr 1fr 1.2fr;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafcf9;
+  padding: 14px;
+}
+.history-filters label > span {
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.history-filters input[type="search"] {
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236d776f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.8-4.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px 18px;
+}
+
+.payment-list-head {
+  grid-area: list-head;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+}
+.payment-list-head .subhead {
+  margin: 0;
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.payment-filter-pill {
+  display: none;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: .72rem;
+  font-weight: 850;
+  padding: 5px 11px;
+  white-space: nowrap;
+}
+/* Pure-CSS "filters active" detection: non-empty search, a chosen date
+   (min/max on the inputs make :in-range apply), or a non-default status. */
+.billing-panel:has(#paymentSearch:not(:placeholder-shown)) .payment-filter-pill,
+.billing-panel:has(#paymentStartDate:in-range) .payment-filter-pill,
+.billing-panel:has(#paymentEndDate:in-range) .payment-filter-pill,
+.billing-panel:has(#paymentStatusFilter option:checked:not([value="all"])) .payment-filter-pill {
+  display: inline-flex;
+}
+
+.payment-workspace {
+  grid-template-columns: minmax(260px, 380px) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "list-head detail"
+    "list      detail";
+  gap: 12px 16px;
+}
+.payment-workspace .payment-customer-grid { grid-area: list; }
+.payment-workspace .payment-customer-detail { grid-area: detail; }
+
+.payment-customer-card {
+  position: relative;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 12px;
+}
+.payment-customer-card h3 { margin: 0 0 2px; font-size: 1.02rem; }
+.payment-customer-card .customer-phone { margin: 0; color: var(--muted); font-size: .8rem; }
+.payment-customer-card .customer-phone::before {
+  content: "call";
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-size: 1em;
+  line-height: 1;
+  margin-right: 4px;
+  vertical-align: -2px;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.payment-customer-card span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+.payment-customer-card .customer-filtered {
+  font-style: normal;
+  color: var(--green);
+  font-weight: 850;
+}
+.payment-customer-card .customer-amount {
+  align-self: center;
+  font-size: 1.06rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+/* Paid / pending status dot pinned to the avatar corner. */
+.payment-customer-card::after,
+.payment-detail-head::after {
+  content: "";
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--gold);
+}
+.payment-customer-card::after { left: 8px; top: calc(50% + 17px); }
+.payment-detail-head::after { left: -3px; top: calc(50% + 17px); }
+.payment-customer-card.is-paid::after,
+.payment-detail-head.is-paid::after { background: var(--green); }
+
+.payment-customer-detail {
+  display: grid;
+  gap: 12px;
+  border-radius: 12px;
+  border-left: 4px solid var(--green);
+  padding: 14px;
+  box-shadow: 0 10px 26px rgba(16, 31, 24, 0.05);
+}
+.payment-detail-head {
+  position: relative;
+  grid-template-columns: auto 1fr auto;
+  margin-bottom: 0;
+}
+.payment-detail-head h3 { margin: 0 0 3px; font-size: 1.16rem; }
+.payment-detail-head p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: .84rem;
+}
+.payment-status { font-weight: 850; }
+.payment-status.pending { color: var(--gold); }
+.payment-status.paid { color: var(--green); }
+.payment-detail-amount {
+  color: var(--green);
+  font-size: 1.2rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.payment-customer-detail .collect-fee-button {
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: .98rem;
+}
+
+.payment-history-list { gap: 10px; }
+.payment-history-row {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.payment-history-row > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.payment-history-row strong { font-size: 1rem; }
+.payment-history-row > div > span { color: var(--ink); font-weight: 700; font-size: .9rem; }
+.payment-history-row > span { color: var(--muted); font-size: .82rem; }
+
+@media (max-width: 760px) {
+  .history-filters { grid-template-columns: 1fr 1fr; padding: 12px; }
+  /* Search (first) and status (last) span the row; From/To sit side by side. */
+  .history-filters label:first-child,
+  .history-filters label:last-child { grid-column: 1 / -1; }
+
+  /* Reference order: "Customers (N)" header, expanded detail card, then list. */
+  .payment-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "list-head"
+      "detail"
+      "list";
+  }
+  .payment-customer-grid { max-height: none; overflow: visible; padding-right: 0; }
+}
+
+/* ---- Attendance history: minimal mobile-reference layout ---- */
+.date-pill::before {
+  content: "calendar_month";
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-size: 1.1em;
+  line-height: 1;
+  margin-right: 8px;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+#exportAttendanceCsv::before { content: "⬇"; font-size: .9em; }
+
+.attendance-history .subhead {
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.history-member-card { border-radius: 12px; }
+
+@media (max-width: 760px) {
+  /* The app bar and page title already say "Attendance History" —
+     drop the third copy and keep a single compact row: label + Export CSV. */
+  .attendance-history .panel-head { grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+  .attendance-history .panel-head h2 { display: none; }
+  .attendance-history .panel-head p { margin: 0; font-size: .84rem; }
+  .attendance-history .panel-head .primary-action { padding: 0 14px; }
+}
+
+/* ---- Members view: mobile-reference redesign ---- */
+#searchInput {
+  padding-left: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236d776f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.8-4.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  background-size: 18px 18px;
+}
+.action-panel { align-items: center; }
+
+.filter-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: .84rem;
+}
+.tab::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.tab[data-filter="all"]::before { display: none; }
+.tab[data-filter="overdue"]::before { background: var(--red); }
+.tab[data-filter="paid"]::before { background: var(--green); }
+.tab[data-filter="present"]::before { background: var(--blue); }
+.tab.active::before { background: #fff; }
+
+.member-card { border-radius: 12px; gap: 12px; }
+.member-card-main {
+  position: relative;
+  grid-template-columns: 58px 1fr auto;
+  align-items: start;
+}
+.member-card h3 { font-size: 1.06rem; }
+.member-card .member-phone,
+.member-card .member-address,
+.member-card .member-trainer { margin: 0 0 2px; font-size: .84rem; }
+.member-card .member-phone::before,
+.member-card .member-address::before {
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-size: 1em;
+  line-height: 1;
+  margin-right: 4px;
+  vertical-align: -2px;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.member-card .member-phone::before { content: "call"; }
+.member-card .member-address::before { content: "location_on"; }
+.member-card .member-trainer { font-size: .78rem; }
+
+/* Paid / overdue / pending status dot on the avatar corner. */
+.member-card-main::after {
+  content: "";
+  position: absolute;
+  left: 46px;
+  top: 46px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--gold);
+}
+.member-card.is-overdue .member-card-main::after { background: var(--red); }
+.member-card.is-paid .member-card-main::after { background: var(--green); }
+
+.member-badges {
+  margin-top: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.member-badges .badge {
+  text-transform: uppercase;
+  font-size: .68rem;
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+
+.member-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.member-fee strong {
+  display: block;
+  color: var(--green);
+  font-size: 1.12rem;
+  font-weight: 900;
+}
+.member-fee span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 800;
+}
+.member-whatsapp-action {
+  width: auto;
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: .84rem;
+  white-space: nowrap;
+}
+.member-whatsapp-action::before { content: "💬 "; font-size: .9em; }
+
+/* ---- Trainers view: mobile-reference redesign ---- */
+#trainerSearch {
+  padding-left: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236d776f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.8-4.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  background-size: 18px 18px;
+}
+.trainer-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 850;
+}
+.trainer-toolbar label > span {
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trainer-summary article { position: relative; border-radius: 12px; }
+.trainer-summary article::after {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-size: 1.1rem;
+  line-height: 1;
+  letter-spacing: normal;
+  opacity: .7;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.trainer-summary article:nth-child(1)::after { content: "exercise"; }
+.trainer-summary article:nth-child(2)::after { content: "person_check"; }
+.trainer-summary article:nth-child(3)::after { content: "asterisk"; }
+.trainer-summary article:nth-child(4)::after { content: "person_check"; }
+.trainer-summary span { padding-right: 28px; }
+.trainer-summary strong { font-size: 1.9rem; line-height: 1.15; }
+
+/* Empty states across views: dashed placeholder card, like the reference. */
+.empty-state {
+  border: 1.5px dashed color-mix(in srgb, var(--muted) 40%, var(--line));
+  border-radius: 14px;
+  padding: 36px 18px;
+}
+.empty-state h3 { font-size: 1.15rem; }
+.empty-avatar { border-radius: 14px; }
+
+@media (max-width: 760px) {
+  .trainer-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Mobile/tablet: the topbar date pill spans the full row. */
+@media (max-width: 900px) {
+  .topbar, .topbar-actions { display: grid; align-items: stretch; }
+  .date-pill { width: 100%; }
+}
+
+/* ---- Material Symbols helpers ---- */
+.material-symbols-outlined {
+  font-size: 1.25em;
+  line-height: 1;
+  vertical-align: -0.22em;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.material-symbols-outlined.filled { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+
+/* Mobile: the app bar already names the view, so hide the topbar
+   title + subtitle (VIEW_COPY text) and keep only the actions row. */
+@media (max-width: 900px) {
+  .topbar > div:first-child { display: none; }
+}
+
+/* Utility: force full width on mobile only (app-bar breakpoint). */
+@media (max-width: 900px) {
+  .wmb-100 { width: 100% !important; }
+}
+
+/* ---- Busy buttons: spinner while a save/delete request is in flight ---- */
+button.is-busy { pointer-events: none; opacity: .75; }
+button.is-busy::before {
+  content: "";
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: button-spin .6s linear infinite;
+}
+@keyframes button-spin { to { transform: rotate(360deg); } }
