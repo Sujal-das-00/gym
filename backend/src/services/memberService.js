@@ -34,6 +34,28 @@ async function mergeMemberPayload(existing, payload) {
   return normalizeMember(source);
 }
 
+// Reject a save that would reuse another member's phone number or gym code,
+// with a message that names who already has it. The DB unique keys still back
+// this up (race safety); this check exists to give a human-readable error.
+async function assertUniqueMember(gymId, member) {
+  if (member.phone) {
+    const byPhone = await repo().findMember(gymId, member.phone);
+    if (byPhone && byPhone.id !== member.id) {
+      const error = new Error(
+        `This mobile number is already registered to ${byPhone.name} (${byPhone.gymId})`,
+      );
+      error.status = 409;
+      throw error;
+    }
+  }
+  const byCode = await repo().findMember(gymId, member.gymId);
+  if (byCode && byCode.id !== member.id) {
+    const error = new Error(`Gym ID ${member.gymId} is already used by ${byCode.name}`);
+    error.status = 409;
+    throw error;
+  }
+}
+
 // The billing period a member's start date falls into (the term they join on).
 function firstBillingPeriodKey(member, settings) {
   const start = String(member.startDate || todayKey()).slice(0, 10);
@@ -48,6 +70,7 @@ async function createMember(gymId, payload) {
   member.id = crypto.randomUUID();
   // Snapshot the collection timing on the member so it stays stable if the gym default changes later.
   if (!member.collectionTiming) member.collectionTiming = settings.defaultCollectionTiming;
+  await assertUniqueMember(gymId, member);
 
   const saved = await repo().saveMember(gymId, member);
 
@@ -75,6 +98,7 @@ async function updateMember(gymId, id, payload) {
   if (!existing) return null;
   const member = await mergeMemberPayload(existing, payload);
   member.id = id;
+  await assertUniqueMember(gymId, member);
   return publicMember(await repo().saveMember(gymId, member));
 }
 

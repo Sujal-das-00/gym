@@ -1,8 +1,18 @@
 const crypto = require("crypto");
 const { nowIso, toDateKey, todayKey } = require("./date");
 
+// Canonical phone form: digits only, without the Indian trunk/country prefixes,
+// so "+91 98765 43210", "919876543210", "09876543210" and "9876543210" are all
+// the same number. Applied on save AND on lookup so the same number written a
+// different way can never register twice or miss a check-in match.
+// Keep in sync with normalizePhone in admin-frontend/script.js.
 function normalizePhone(phone) {
-  return String(phone || "").replace(/\D/g, "");
+  let digits = String(phone || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (digits.length > 10 && digits.startsWith("91")) {
+    const rest = digits.slice(2).replace(/^0+/, "");
+    if (rest.length === 10) digits = rest;
+  }
+  return digits;
 }
 
 function normalizeMember(member) {

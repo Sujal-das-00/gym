@@ -1,6 +1,6 @@
 const { exec, query } = require("../config/database");
 const { toDateKey } = require("../utils/date");
-const { normalizeMember } = require("../utils/member");
+const { normalizeMember, normalizePhone } = require("../utils/member");
 const { mapPaymentRow } = require("./paymentModel");
 
 async function hydrateMember(row) {
@@ -42,7 +42,7 @@ async function getMemberById(gymId, id) {
 
 async function findMember(gymId, identifier) {
   const value = String(identifier || "").trim();
-  const phone = String(value).replace(/\D/g, "");
+  const phone = normalizePhone(value) || value;
   const rows = await query(
     "SELECT * FROM members WHERE tenant_id = ? AND (LOWER(id) = LOWER(?) OR LOWER(gym_id) = LOWER(?) OR phone = ?) LIMIT 1",
     [gymId, value, value, phone],

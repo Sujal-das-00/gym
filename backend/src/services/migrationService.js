@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { exec, query, raw } = require("../config/database");
 const { DEFAULT_SETTINGS } = require("../config/constants");
+const { normalizePhone } = require("../utils/member");
 const { slugify } = require("../utils/slug");
 
 async function columnExists(table, column) {
@@ -159,9 +160,27 @@ async function ensureFeatureColumns() {
   }
 }
 
+// Re-write stored phone numbers in the canonical form (no +91/91/0 prefix) so
+// lookups and duplicate checks match rows saved before normalization existed.
+// If two rows collapse to the same number, the (tenant, phone) unique key
+// rejects the update — leave that row as-is and let the admin resolve it.
+async function normalizeStoredPhones() {
+  const rows = await query("SELECT id, phone FROM members");
+  for (const row of rows) {
+    const normalized = normalizePhone(row.phone);
+    if (!normalized || normalized === row.phone) continue;
+    try {
+      await exec("UPDATE members SET phone = ? WHERE id = ?", [normalized, row.id]);
+    } catch (error) {
+      console.warn(`Phone normalization skipped for member ${row.id} (${row.phone}): ${error.message}`);
+    }
+  }
+}
+
 async function runMigrations() {
   await ensureTenantColumns();
   await ensureFeatureColumns();
+  await normalizeStoredPhones();
 
   const needsDefault =
     (await query("SELECT 1 FROM members WHERE tenant_id IS NULL OR tenant_id = '' LIMIT 1")).length > 0 ||

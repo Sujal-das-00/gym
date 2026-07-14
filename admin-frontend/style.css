@@ -329,6 +329,17 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 }
 .attendance-summary strong { font-size: 1rem; }
 .attendance-summary span { color: var(--muted); font-weight: 750; }
+.attendance-holiday-note {
+  margin: 0 0 12px;
+  border: 1px solid #f2dca8;
+  border-radius: 8px;
+  background: var(--gold-soft);
+  padding: 12px 14px;
+  color: var(--gold);
+  font-weight: 750;
+  font-size: .88rem;
+  line-height: 1.4;
+}
 .attendance-list { display: grid; gap: 10px; }
 .attendance-row {
   display: grid;
@@ -1073,6 +1084,11 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
   border-color: var(--green);
   background: linear-gradient(145deg, var(--green), color-mix(in srgb, var(--green) 72%, #ffffff));
   color: #fff;
+}
+.day-cell.holiday {
+  border-color: #f2dca8;
+  background: var(--gold-soft);
+  color: var(--gold);
 }
 .day-cell.today {
   outline: 3px solid color-mix(in srgb, var(--blue) 22%, transparent);
@@ -1820,3 +1836,107 @@ button.is-busy::before {
   animation: button-spin .6s linear infinite;
 }
 @keyframes button-spin { to { transform: rotate(360deg); } }
+/* ---- Expense tracker (Earnings & Expenses view) ---- */
+#financeNet.is-negative { color: var(--red); }
+
+.finance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.finance-head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.finance-ledger { display: grid; gap: 10px; }
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  text-align: left;
+}
+.ledger-row:hover { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+
+.ledger-ico {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  flex: none;
+}
+.ledger-row.is-earning .ledger-ico { background: var(--green-soft); color: var(--green); }
+.ledger-row.is-expense .ledger-ico { background: var(--red-soft); color: var(--red); }
+
+.ledger-copy { min-width: 0; display: grid; gap: 2px; }
+.ledger-copy strong {
+  font-size: .95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ledger-copy > span { color: var(--muted); font-size: .78rem; }
+
+.ledger-amount { white-space: nowrap; font-size: .95rem; }
+.ledger-row.is-earning .ledger-amount { color: var(--green); }
+.ledger-row.is-expense .ledger-amount { color: var(--red); }
+
+.finance-overdue-list { display: grid; gap: 10px; }
+
+.finance-overdue-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--red) 22%, var(--line));
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--panel), var(--red-soft));
+}
+.finance-overdue-row .member-photo,
+.finance-overdue-row .avatar-fallback { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; }
+
+.finance-overdue-copy { min-width: 0; }
+.finance-overdue-copy h3 {
+  margin: 0;
+  font-size: .95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.finance-overdue-copy p { margin: 2px 0 0; color: var(--muted); font-size: .78rem; }
+
+.finance-overdue-actions { display: grid; justify-items: end; gap: 6px; }
+.finance-overdue-actions strong { color: var(--red); white-space: nowrap; }
+.finance-overdue-actions .secondary-action { padding: 6px 14px; }
+
+@media (max-width: 1060px) {
+  .finance-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .finance-filters { grid-template-columns: 1fr 1fr; }
+  .finance-head-actions { width: 100%; }
+  .finance-head-actions .primary-action,
+  .finance-head-actions .secondary-action { flex: 1 1 auto; justify-content: center; }
+}
+
+@media (max-width: 520px) {
+  .ledger-row { padding: 10px 12px; gap: 10px; }
+  .ledger-ico { width: 32px; height: 32px; border-radius: 10px; }
+  .finance-overdue-row { grid-template-columns: auto minmax(0, 1fr); }
+  .finance-overdue-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+}

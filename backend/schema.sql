@@ -110,6 +110,20 @@ CREATE TABLE IF NOT EXISTS checkins (
   INDEX idx_checkins_time (checkin_time)
 );
 
+-- Gym expenses (trainer payments, rent, equipment, misc). One row per expense,
+-- scoped to the tenant. Earnings are derived from the payments table.
+CREATE TABLE IF NOT EXISTS expenses (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  category VARCHAR(40) NOT NULL DEFAULT 'other',
+  title VARCHAR(160) NOT NULL DEFAULT '',
+  amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  expense_date DATE NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_expenses_tenant_date (tenant_id, expense_date),
+  CONSTRAINT fk_expenses_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS payments (
   id CHAR(36) NOT NULL PRIMARY KEY,
   member_id CHAR(36) NOT NULL,

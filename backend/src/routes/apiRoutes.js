@@ -3,6 +3,7 @@ const appController = require("../controllers/appController");
 const attendanceController = require("../controllers/attendanceController");
 const authController = require("../controllers/authController");
 const checkinController = require("../controllers/checkinController");
+const expenseController = require("../controllers/expenseController");
 const memberController = require("../controllers/memberController");
 const publicController = require("../controllers/publicController");
 const settingsController = require("../controllers/settingsController");
@@ -46,6 +47,11 @@ router.post("/members", asyncHandler(memberController.postMember));
 router.put("/members/:id", asyncHandler(memberController.putMember));
 router.delete("/members/:id", asyncHandler(memberController.deleteMember));
 router.post("/members/:id/payments", asyncHandler(memberController.addPayments));
+
+router.get("/expenses", asyncHandler(expenseController.listExpenses));
+router.post("/expenses", asyncHandler(expenseController.postExpense));
+router.put("/expenses/:id", asyncHandler(expenseController.putExpense));
+router.delete("/expenses/:id", asyncHandler(expenseController.deleteExpense));
 
 router.post("/attendance", asyncHandler(attendanceController.setAttendance));
 router.get("/attendance/status", asyncHandler(attendanceController.getAttendanceStatus));

@@ -74,6 +74,8 @@
         <p>Billing</p>
         <button class="nav-link" data-view="payments" type="button"><span
             class="material-symbols-outlined">payments</span>Payments</button>
+        <button class="nav-link" data-view="expenses" type="button"><span
+            class="material-symbols-outlined">account_balance_wallet</span>Expense Tracker</button>
         <p>Settings</p>
         <button class="nav-link" data-view="settings" type="button"><span
             class="material-symbols-outlined">settings</span>Settings</button>
@@ -203,6 +205,7 @@
             <strong id="selectedDatePresent">0 checked in</strong>
             <span id="selectedDateLabel"></span>
           </div>
+          <p class="attendance-holiday-note" id="attendanceHolidayNote" hidden></p>
           <div class="attendance-list" id="attendanceList"></div>
           <div class="empty-state compact-empty" id="attendanceEmpty">
             <div class="empty-avatar">+</div>
@@ -437,6 +440,89 @@
             <div id="paymentCustomerDetail" class="payment-customer-detail"></div>
           </div>
         </section>
+      </section>
+
+      <section class="view" data-view-panel="expenses">
+        <section class="stats-grid finance-stats" aria-label="Finance summary">
+          <article class="stat-card paid">
+            <div class="stat-icon"><span class="material-symbols-outlined" style="font-size: 1.4rem;">savings</span>
+            </div>
+            <span>Collected</span>
+            <strong id="financeCollected">₹0</strong>
+            <small id="financeCollectedCount">0 payments</small>
+          </article>
+          <article class="stat-card due">
+            <div class="stat-icon"><span class="material-symbols-outlined" style="font-size: 1.4rem;">shopping_cart</span>
+            </div>
+            <span>Expenses</span>
+            <strong id="financeExpenses">₹0</strong>
+            <small id="financeExpensesCount">0 expenses</small>
+          </article>
+          <article class="stat-card total">
+            <div class="stat-icon"><span class="material-symbols-outlined" style="font-size: 1.4rem;">account_balance</span>
+            </div>
+            <span>Net Balance</span>
+            <strong id="financeNet">₹0</strong>
+            <small id="financeNetHint">Collected minus expenses</small>
+          </article>
+          <article class="stat-card attend">
+            <div class="stat-icon"><span class="material-symbols-outlined" style="font-size: 1.4rem;">person_alert</span>
+            </div>
+            <span>Overdue Dues</span>
+            <strong id="financeOverdueAmount">₹0</strong>
+            <small id="financeOverdueCount">0 members overdue</small>
+          </article>
+        </section>
+
+        <div class="finance-grid">
+          <section class="panel finance-ledger-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Earnings &amp; Expenses</h2>
+                <p id="financeRangeLabel">All records</p>
+              </div>
+              <div class="finance-head-actions">
+                <button class="secondary-action" id="exportFinanceCsv" type="button">Export CSV</button>
+                <button class="primary-action" id="openAddExpense" type="button"><span>+</span> Add expense</button>
+              </div>
+            </div>
+            <div class="history-filters finance-filters">
+              <label>
+                <span>From</span>
+                <input id="financeStartDate" type="date" min="2000-01-01" max="2099-12-31" />
+              </label>
+              <label>
+                <span>To</span>
+                <input id="financeEndDate" type="date" min="2000-01-01" max="2099-12-31" />
+              </label>
+              <label>
+                <span>Type</span>
+                <select id="financeTypeFilter">
+                  <option value="all">Earnings + expenses</option>
+                  <option value="earning">Earnings only</option>
+                  <option value="expense">Expenses only</option>
+                </select>
+              </label>
+              <label>
+                <span>Category</span>
+                <select id="financeCategoryFilter">
+                  <option value="all">All categories</option>
+                </select>
+              </label>
+            </div>
+            <div class="finance-ledger" id="financeLedger"></div>
+          </section>
+
+          <section class="panel finance-overdue-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Overdue members</h2>
+                <p id="financeOverdueLabel">Members with pending dues.</p>
+              </div>
+            </div>
+            <div class="finance-overdue-list" id="financeOverdueList"></div>
+          </section>
+        </div>
       </section>
 
       <section class="view" data-view-panel="settings">
@@ -771,6 +857,50 @@
     </form>
   </dialog>
 
+
+  <dialog class="member-dialog" id="expenseDialog">
+    <form class="member-form" id="expenseForm" method="dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Expense tracker</p>
+          <h2 id="expenseDialogTitle">Add expense</h2>
+        </div>
+        <button class="icon-button" id="closeExpenseDialog" aria-label="Close" type="button">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          Category
+          <select id="expenseCategoryInput" name="category">
+            <option value="trainer-payment">Trainer payment</option>
+            <option value="rent">Rent</option>
+            <option value="equipment">Equipment</option>
+            <option value="utilities">Utilities (electricity, water)</option>
+            <option value="maintenance">Maintenance &amp; repairs</option>
+            <option value="miscellaneous">Miscellaneous</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          Amount
+          <input id="expenseAmountInput" name="amount" type="number" min="1" step="1" required inputmode="numeric" />
+        </label>
+        <label>
+          Date
+          <input id="expenseDateInput" name="date" type="date" required />
+        </label>
+        <label class="wide">
+          Description
+          <input id="expenseTitleInput" name="title" placeholder="e.g. October rent, treadmill repair, trainer salary" />
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button class="secondary-action" id="deleteExpense" type="button">Delete</button>
+        <button class="primary-action" type="submit">Save expense</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="fee-dialog" id="feeDialog">
     <form class="fee-dialog-panel" id="feeCollectionForm" method="dialog">
@@ -1127,7 +1257,7 @@
     }
   </style>
 
-  <script src="/admin/script.js?v=9"></script>
+  <script src="/admin/script.js?v=12"></script>
   <script>
     (() => {
       const installButton = document.getElementById("installAppButton");

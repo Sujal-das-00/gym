@@ -8,20 +8,22 @@ function getAllMembers() {
   return store.getState().members.map(publicMember).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getMemberById(id) {
+// Member functions mirror memberModel's (gymId, ...) signatures; the JSON
+// fallback is single-tenant, so gymId is accepted and ignored.
+function getMemberById(gymId, id) {
   return publicMember(store.getState().members.find((member) => member.id === id) || null);
 }
 
-function findMember(identifier) {
+function findMember(gymId, identifier) {
   const value = String(identifier || "").trim().toLowerCase();
   const phone = normalizePhone(value);
   const member = store.getState().members.find((item) => {
-    return String(item.id || "").toLowerCase() === value || String(item.gymId || "").toLowerCase() === value || normalizePhone(item.phone) === phone;
+    return String(item.id || "").toLowerCase() === value || String(item.gymId || "").toLowerCase() === value || (phone && normalizePhone(item.phone) === phone);
   });
   return publicMember(member || null);
 }
 
-function saveMember(member) {
+function saveMember(gymId, member) {
   const normalized = normalizeMember(member);
   const rows = store.getState().members;
   const duplicate = rows.find((item) => item.id !== normalized.id && (item.gymId === normalized.gymId || normalizePhone(item.phone) === normalized.phone));
@@ -37,7 +39,7 @@ function saveMember(member) {
   return publicMember(normalized);
 }
 
-function deleteMember(id) {
+function deleteMember(gymId, id) {
   const rows = store.getState().members;
   const before = rows.length;
   store.getState().members = rows.filter((member) => member.id !== id);
@@ -102,6 +104,36 @@ function addPayments(member, payments = []) {
   store.persist();
 }
 
+// Expense functions mirror expenseModel's (gymId, ...) signatures; the JSON
+// fallback is single-tenant, so gymId is accepted and ignored.
+function getAllExpenses() {
+  return [...(store.getState().expenses || [])].sort(
+    (a, b) => String(b.date).localeCompare(String(a.date)),
+  );
+}
+
+function getExpenseById(gymId, id) {
+  return (store.getState().expenses || []).find((expense) => expense.id === id) || null;
+}
+
+function saveExpense(gymId, expense) {
+  store.getState().expenses ||= [];
+  const rows = store.getState().expenses;
+  const index = rows.findIndex((item) => item.id === expense.id);
+  if (index >= 0) rows[index] = expense;
+  else rows.push(expense);
+  store.persist();
+  return expense;
+}
+
+function deleteExpense(gymId, id) {
+  const rows = store.getState().expenses || [];
+  const before = rows.length;
+  store.getState().expenses = rows.filter((expense) => expense.id !== id);
+  store.persist();
+  return { affectedRows: before === store.getState().expenses.length ? 0 : 1 };
+}
+
 function mapCheckin(checkin) {
   return {
     id: checkin.id,
@@ -164,14 +196,18 @@ module.exports = {
   addPayments,
   attendanceStatusRows,
   createCheckin,
+  deleteExpense,
   deleteMember,
   findCheckinForDate,
   findMember,
+  getAllExpenses,
   getAllMembers,
   getAttendanceRevision,
   getCheckinsByDate,
+  getExpenseById,
   getMemberById,
   getSettings,
+  saveExpense,
   memberCheckinHistory,
   saveMember,
   saveSettings,

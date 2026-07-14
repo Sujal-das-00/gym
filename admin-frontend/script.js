@@ -30,9 +30,21 @@ function clearToken() {
   }
 }
 
+// Keep in sync with EXPENSE_CATEGORIES in backend/src/utils/expense.js.
+const EXPENSE_CATEGORIES = [
+  { value: "trainer-payment", label: "Trainer payment" },
+  { value: "rent", label: "Rent" },
+  { value: "equipment", label: "Equipment" },
+  { value: "utilities", label: "Utilities" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "miscellaneous", label: "Miscellaneous" },
+  { value: "other", label: "Other" },
+];
+
 const state = {
   members: [],
   trainers: [],
+  expenses: [],
   settings: {
     gymName: "Gym Admin",
     logo: "",
@@ -56,6 +68,9 @@ const state = {
   search: "",
   editingId: null,
   editingTrainerId: null,
+  editingExpenseId: null,
+  financeTypeFilter: "all",
+  financeCategoryFilter: "all",
   detailId: null,
   stagedPhoto: "",
   stagedTrainerPhoto: "",
@@ -156,6 +171,7 @@ const els = {
   selectedDatePresent: document.querySelector("#selectedDatePresent"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
   attendanceList: document.querySelector("#attendanceList"),
+  attendanceHolidayNote: document.querySelector("#attendanceHolidayNote"),
   attendanceHistoryLabel: document.querySelector("#attendanceHistoryLabel"),
   attendanceHistoryList: document.querySelector("#attendanceHistoryList"),
   attendanceEmpty: document.querySelector("#attendanceEmpty"),
@@ -251,6 +267,33 @@ const els = {
   refreshCheckins: document.querySelector("#refreshCheckins"),
   checkinFeed: document.querySelector("#checkinFeed"),
   checkinFeedCount: document.querySelector("#checkinFeedCount"),
+  financeCollected: document.querySelector("#financeCollected"),
+  financeCollectedCount: document.querySelector("#financeCollectedCount"),
+  financeExpenses: document.querySelector("#financeExpenses"),
+  financeExpensesCount: document.querySelector("#financeExpensesCount"),
+  financeNet: document.querySelector("#financeNet"),
+  financeNetHint: document.querySelector("#financeNetHint"),
+  financeOverdueAmount: document.querySelector("#financeOverdueAmount"),
+  financeOverdueCount: document.querySelector("#financeOverdueCount"),
+  financeRangeLabel: document.querySelector("#financeRangeLabel"),
+  financeStartDate: document.querySelector("#financeStartDate"),
+  financeEndDate: document.querySelector("#financeEndDate"),
+  financeTypeFilter: document.querySelector("#financeTypeFilter"),
+  financeCategoryFilter: document.querySelector("#financeCategoryFilter"),
+  financeLedger: document.querySelector("#financeLedger"),
+  financeOverdueLabel: document.querySelector("#financeOverdueLabel"),
+  financeOverdueList: document.querySelector("#financeOverdueList"),
+  openAddExpense: document.querySelector("#openAddExpense"),
+  exportFinanceCsv: document.querySelector("#exportFinanceCsv"),
+  expenseDialog: document.querySelector("#expenseDialog"),
+  expenseForm: document.querySelector("#expenseForm"),
+  expenseDialogTitle: document.querySelector("#expenseDialogTitle"),
+  closeExpenseDialog: document.querySelector("#closeExpenseDialog"),
+  expenseCategoryInput: document.querySelector("#expenseCategoryInput"),
+  expenseAmountInput: document.querySelector("#expenseAmountInput"),
+  expenseDateInput: document.querySelector("#expenseDateInput"),
+  expenseTitleInput: document.querySelector("#expenseTitleInput"),
+  deleteExpense: document.querySelector("#deleteExpense"),
 };
 
 function todayKey() {
@@ -287,6 +330,18 @@ function isHoliday(dayKey) {
   if (getHolidayDates().includes(key)) return true;
   const day = parseDateKey(key).getDay();
   return getWeeklyHolidays().includes(day);
+}
+
+// Why a date is a holiday, for banners: "" when it isn't one.
+function holidayReason(dayKey) {
+  const key = String(dayKey || "").slice(0, 10);
+  if (getHolidayDates().includes(key)) return "marked as a holiday in Settings";
+  const date = parseDateKey(key);
+  if (getWeeklyHolidays().includes(date.getDay())) {
+    const weekday = new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(date);
+    return `every ${weekday} is a weekly holiday in Settings`;
+  }
+  return "";
 }
 
 function renderHolidaySettings() {
@@ -382,6 +437,10 @@ async function loadMembers() {
   migratePaymentMonths();
   ensureMemberGymIds();
   ensureMemberTrainerFields();
+}
+
+async function loadExpenses() {
+  state.expenses = await api("/api/expenses");
 }
 
 function normalizeTrainer(trainer = {}) {
@@ -526,8 +585,16 @@ function ensureMemberGymIds() {
   if (changed) persistAllMembers();
 }
 
+// Canonical phone form — digits only without the +91/91/0 prefixes, so every
+// way of writing the same number compares equal.
+// Keep in sync with normalizePhone in backend/src/utils/member.js.
 function normalizePhone(phone) {
-  return String(phone || "").replace(/\D/g, "");
+  let digits = String(phone || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (digits.length > 10 && digits.startsWith("91")) {
+    const rest = digits.slice(2).replace(/^0+/, "");
+    if (rest.length === 10) digits = rest;
+  }
+  return digits;
 }
 
 function findLocalMemberByQr(row) {
@@ -816,6 +883,12 @@ function getBillingPeriodLabel(periodKey, member = null) {
   if (member && getMembershipType(member) === "package") {
     return formatBillingPeriodRange(periodKey, getPackageMonths(member));
   }
+  // "Collect after the period" bills fall due at the END of each period, so name
+  // them by that due date — join 10 Jul on a 10-day cycle → first bill "20 Jul",
+  // not "10 Jul" (the period's start), which reads as billing from the join day.
+  if (member && getCollectionTiming(member) === "fixed-day") {
+    return displayDate(localDateKey(periodEndDate(member, periodKey)));
+  }
   if (String(periodKey || "").length === 7) return monthLabelFromKey(periodKey);
   return displayDate(periodKey);
 }
@@ -865,9 +938,22 @@ function getPaidPeriodSet(member) {
   return new Set((member.payments || []).map(getPaymentPeriodKey).filter(Boolean));
 }
 
+// Periods the member can actually be billed for right now. "Collect at join"
+// members pay in advance, so a period is billable from the day it starts (join
+// 1 Jul on a 20-day cycle → 3 payable cycles by day 40). "Collect after the
+// period" members train first and pay at the end, so a period only becomes
+// billable once it has fully ended (same member → 2 payable cycles by day 40;
+// the in-progress third cycle is not owed yet).
+function getBillablePeriodKeys(member) {
+  const periods = getBillingPeriodKeys(member);
+  if (getCollectionTiming(member) !== "fixed-day") return periods;
+  const today = todayKey();
+  return periods.filter((period) => localDateKey(periodEndDate(member, period)) <= today);
+}
+
 function getUnpaidPeriods(member) {
   const paidPeriods = getPaidPeriodSet(member);
-  return getBillingPeriodKeys(member).filter((period) => !paidPeriods.has(period));
+  return getBillablePeriodKeys(member).filter((period) => !paidPeriods.has(period));
 }
 
 function periodStartDate(periodKey) {
@@ -920,19 +1006,31 @@ function getDueDateKey(member) {
 }
 
 function isPaidThisPeriod(member) {
-  const periods = getBillingPeriodKeys(member);
+  // For "collect after the period" members the latest billable period is the
+  // last one that has ended — the in-progress one is not owed yet.
+  const periods = getBillablePeriodKeys(member);
   const currentPeriod = periods[periods.length - 1];
   return Boolean(currentPeriod && getPaidPeriodSet(member).has(currentPeriod));
 }
 
-function isOverdue(member) {
+// Unpaid periods that are already due (past their collection point) — the ones
+// that make a member count as overdue and add up to the amount they owe.
+function getDueUnpaidPeriods(member) {
   const unpaid = getUnpaidPeriods(member);
   if (getCollectionTiming(member) === "fixed-day") {
     // Only overdue once a period has fully ended without payment; the in-progress period is not yet due.
     const today = todayKey();
-    return unpaid.some((period) => localDateKey(periodEndDate(member, period)) < today);
+    return unpaid.filter((period) => localDateKey(periodEndDate(member, period)) < today);
   }
-  return unpaid.some((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
+  return unpaid.filter((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
+}
+
+function getOverdueAmount(member) {
+  return getDueUnpaidPeriods(member).length * Number(member.fee || 0);
+}
+
+function isOverdue(member) {
+  return getDueUnpaidPeriods(member).length > 0;
 }
 
 function isPresentToday(member) {
@@ -958,6 +1056,7 @@ const VIEW_COPY = {
   history: ["Attendance History", "Review attendance records for any selected date."],
   members: ["Members", "Search, edit, and manage all registered members."],
   payments: ["Payment History", "Review customer-wise payment records."],
+  expenses: ["Expense Tracker", "Track every expense and earning of the gym in one ledger."],
   trainers: ["Trainers", "Manage trainer profiles, specialties, shifts, and contact details."],
   settings: ["Settings", "Update your gym profile and logo."],
 };
@@ -1161,7 +1260,7 @@ function openFeeDialog(memberId) {
   if (!member) return;
   const unpaidPeriods = getUnpaidPeriods(member);
   state.collectingMemberId = member.id;
-  const currentPeriod = getBillingPeriodKeys(member).at(-1);
+  const currentPeriod = getBillablePeriodKeys(member).at(-1);
   state.selectedBillingPeriods = currentPeriod && unpaidPeriods.includes(currentPeriod) ? [currentPeriod] : unpaidPeriods.slice(0, 1);
   if (!state.selectedBillingPeriods.length && unpaidPeriods.length) state.selectedBillingPeriods = [unpaidPeriods[0]];
   renderFeeDialog();
@@ -1389,6 +1488,264 @@ function renderPaymentCustomerDetail(member) {
 }
 
 
+/* ---------------------------------------------------------------------------
+ * Expense tracker: gym earnings (collected payments) vs expenses in one ledger,
+ * plus overdue dues so pending money is visible next to the money spent.
+ * ------------------------------------------------------------------------- */
+function expenseCategoryLabel(value) {
+  if (value === "membership-fee") return "Membership fee";
+  return EXPENSE_CATEGORIES.find((category) => category.value === value)?.label || "Other";
+}
+
+function renderFinanceCategoryOptions() {
+  if (!els.financeCategoryFilter) return;
+  els.financeCategoryFilter.innerHTML =
+    `<option value="all">All categories</option>` +
+    `<option value="membership-fee">Membership fees</option>` +
+    EXPENSE_CATEGORIES.map((category) => `<option value="${category.value}">${escapeHtml(category.label)}</option>`).join("");
+  els.financeCategoryFilter.value = state.financeCategoryFilter;
+}
+
+function getFinanceRange() {
+  return {
+    start: els.financeStartDate?.value || "",
+    end: els.financeEndDate?.value || "",
+  };
+}
+
+function inFinanceRange(date) {
+  const { start, end } = getFinanceRange();
+  if (start && date < start) return false;
+  if (end && date > end) return false;
+  return true;
+}
+
+// Every money movement in the selected range: collected member payments come in
+// as earnings, recorded expenses go out. Newest first.
+function getLedgerEntries() {
+  const entries = [];
+  state.members.forEach((member) => {
+    (member.payments || []).forEach((payment) => {
+      entries.push({
+        type: "earning",
+        id: payment.id,
+        memberId: member.id,
+        date: toDateKey(payment.date),
+        amount: Number(payment.amount || 0),
+        title: member.name,
+        category: "membership-fee",
+        detail: getBillingPeriodLabel(getPaymentPeriodKey(payment), member),
+      });
+    });
+  });
+  state.expenses.forEach((expense) => {
+    entries.push({
+      type: "expense",
+      id: expense.id,
+      date: toDateKey(expense.date),
+      amount: Number(expense.amount || 0),
+      title: expense.title || expenseCategoryLabel(expense.category),
+      category: expense.category,
+      detail: expenseCategoryLabel(expense.category),
+    });
+  });
+  return entries.filter((entry) => inFinanceRange(entry.date)).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function filterLedgerEntries(entries) {
+  return entries.filter((entry) => {
+    if (state.financeTypeFilter !== "all" && entry.type !== state.financeTypeFilter) return false;
+    if (state.financeCategoryFilter !== "all" && entry.category !== state.financeCategoryFilter) return false;
+    return true;
+  });
+}
+
+function getOverdueRows() {
+  return state.members
+    .map((member) => ({
+      member,
+      periods: getDueUnpaidPeriods(member).length,
+      amount: getOverdueAmount(member),
+    }))
+    .filter((row) => row.periods > 0)
+    .sort((a, b) => b.amount - a.amount || a.member.name.localeCompare(b.member.name));
+}
+
+function renderFinance() {
+  if (!els.financeLedger) return;
+  const entries = getLedgerEntries();
+  const earnings = entries.filter((entry) => entry.type === "earning");
+  const expenses = entries.filter((entry) => entry.type === "expense");
+  const earnedTotal = earnings.reduce((sum, entry) => sum + entry.amount, 0);
+  const expenseTotal = expenses.reduce((sum, entry) => sum + entry.amount, 0);
+  const net = earnedTotal - expenseTotal;
+  const overdueRows = getOverdueRows();
+  const overdueTotal = overdueRows.reduce((sum, row) => sum + row.amount, 0);
+
+  els.financeCollected.textContent = currency(earnedTotal);
+  els.financeCollectedCount.textContent = `${earnings.length} payment${earnings.length === 1 ? "" : "s"} received`;
+  els.financeExpenses.textContent = currency(expenseTotal);
+  els.financeExpensesCount.textContent = `${expenses.length} expense${expenses.length === 1 ? "" : "s"} recorded`;
+  els.financeNet.textContent = (net < 0 ? "−" : "") + currency(Math.abs(net));
+  els.financeNet.classList.toggle("is-negative", net < 0);
+  els.financeNetHint.textContent = net < 0 ? "Spending more than collected" : "Collected minus expenses";
+  els.financeOverdueAmount.textContent = currency(overdueTotal);
+  els.financeOverdueCount.textContent = `${overdueRows.length} member${overdueRows.length === 1 ? "" : "s"} overdue`;
+
+  const { start, end } = getFinanceRange();
+  els.financeRangeLabel.textContent = start || end
+    ? `${start ? displayDate(start) : "Beginning"} to ${end ? displayDate(end) : "today"}`
+    : "All records";
+
+  const visible = filterLedgerEntries(entries);
+  els.financeLedger.innerHTML = visible.length
+    ? visible
+        .map((entry) => {
+          const sign = entry.type === "expense" ? "−" : "+";
+          const dataAttr = entry.type === "expense" ? `data-expense-id="${entry.id}"` : `data-member-id="${entry.memberId}"`;
+          return `
+            <button class="ledger-row ${entry.type === "expense" ? "is-expense" : "is-earning"}" ${dataAttr} type="button">
+              <span class="ledger-ico" aria-hidden="true">
+                <span class="material-symbols-outlined">${entry.type === "expense" ? "arrow_outward" : "south_west"}</span>
+              </span>
+              <span class="ledger-copy">
+                <strong>${escapeHtml(entry.title)}</strong>
+                <span>${escapeHtml(entry.detail)} · ${displayDate(entry.date)}</span>
+              </span>
+              <strong class="ledger-amount">${sign} ${currency(entry.amount)}</strong>
+            </button>
+          `;
+        })
+        .join("")
+    : `<p class="history-empty">No earnings or expenses match these filters. Use "Add expense" to record rent, trainer payments, or anything else.</p>`;
+
+  els.financeOverdueLabel.textContent = overdueRows.length
+    ? `${overdueRows.length} member${overdueRows.length === 1 ? "" : "s"} owe ${currency(overdueTotal)} in total.`
+    : "Members with pending dues.";
+  els.financeOverdueList.innerHTML = overdueRows.length
+    ? overdueRows
+        .map(
+          ({ member, periods, amount }) => `
+            <article class="finance-overdue-row">
+              ${photoMarkup(member)}
+              <div class="finance-overdue-copy">
+                <h3>${escapeHtml(member.name)}</h3>
+                <p>${periods} unpaid ${getPeriodUnitLabel(member)}${periods === 1 ? "" : "s"} · due since ${displayDate(getDueDateKey(member))}</p>
+              </div>
+              <div class="finance-overdue-actions">
+                <strong>${currency(amount)}</strong>
+                <button class="secondary-action" data-collect-id="${member.id}" type="button">Collect</button>
+              </div>
+            </article>
+          `,
+        )
+        .join("")
+    : `<p class="history-empty">No overdue members. Every collected payment shows up in the ledger as an earning.</p>`;
+}
+
+function openExpenseDialog(expense = null) {
+  state.editingExpenseId = expense?.id || null;
+  els.expenseDialogTitle.textContent = expense ? "Edit expense" : "Add expense";
+  els.expenseCategoryInput.value = expense?.category || "trainer-payment";
+  els.expenseAmountInput.value = expense?.amount || "";
+  els.expenseDateInput.value = expense?.date || todayKey();
+  els.expenseTitleInput.value = expense?.title || "";
+  els.deleteExpense.style.display = expense ? "inline-block" : "none";
+  els.expenseDialog.showModal();
+}
+
+function closeExpenseDialogBox() {
+  els.expenseDialog.close();
+  els.expenseForm.reset();
+  state.editingExpenseId = null;
+}
+
+async function submitExpense(event) {
+  event.preventDefault();
+  const payload = {
+    category: els.expenseCategoryInput.value,
+    amount: Number(els.expenseAmountInput.value),
+    date: els.expenseDateInput.value || todayKey(),
+    title: els.expenseTitleInput.value.trim(),
+  };
+  if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+    showToast("Enter an amount greater than zero");
+    return;
+  }
+  const wasEditing = Boolean(state.editingExpenseId);
+  const submitButton = els.expenseForm.querySelector('button[type="submit"]');
+  if (submitButton?.disabled) return;
+  setButtonBusy(submitButton, true);
+  try {
+    const saved = await api(
+      wasEditing ? "/api/expenses/" + encodeURIComponent(state.editingExpenseId) : "/api/expenses",
+      {
+        method: wasEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    state.expenses = wasEditing
+      ? state.expenses.map((expense) => (expense.id === saved.id ? saved : expense))
+      : [saved, ...state.expenses];
+    closeExpenseDialogBox();
+    renderFinance();
+    showToast(wasEditing ? "Expense updated" : "Expense recorded");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
+}
+
+async function deleteCurrentExpense() {
+  if (!state.editingExpenseId || els.deleteExpense?.disabled) return;
+  const expense = state.expenses.find((item) => item.id === state.editingExpenseId);
+  const confirmed = confirm(`Delete this ${currency(expense?.amount || 0)} expense?`);
+  if (!confirmed) return;
+  setButtonBusy(els.deleteExpense, true);
+  try {
+    await api("/api/expenses/" + encodeURIComponent(state.editingExpenseId), { method: "DELETE" });
+    state.expenses = state.expenses.filter((item) => item.id !== state.editingExpenseId);
+    closeExpenseDialogBox();
+    renderFinance();
+    showToast("Expense deleted");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    setButtonBusy(els.deleteExpense, false);
+  }
+}
+
+function exportFinanceCsv() {
+  const entries = filterLedgerEntries(getLedgerEntries());
+  if (!entries.length) {
+    showToast("No records to export");
+    return;
+  }
+  const csvRows = [
+    ["Date", "Type", "Category", "Description", "Amount"],
+    ...entries.map((entry) => [
+      displayDate(entry.date),
+      entry.type === "expense" ? "Expense" : "Earning",
+      expenseCategoryLabel(entry.category),
+      entry.title,
+      (entry.type === "expense" ? -entry.amount : entry.amount).toString(),
+    ]),
+  ];
+  const csv = csvRows
+    .map((row) => row.map((cell) => '"' + String(cell).replaceAll('"', '""') + '"').join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "gym-earnings-expenses.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast("CSV exported");
+}
+
 function getHistoryRange() {
   const fallback = getDefaultHistoryRange();
   return {
@@ -1556,6 +1913,14 @@ function renderAttendanceSheet() {
 
   els.selectedDatePresent.textContent = `${presentMembers.length} checked in`;
   els.selectedDateLabel.textContent = `${notCheckedInCount} pending | ${displayDate(selectedDate)}`;
+
+  if (els.attendanceHolidayNote) {
+    const reason = holidayReason(selectedDate);
+    els.attendanceHolidayNote.hidden = !reason;
+    els.attendanceHolidayNote.textContent = reason
+      ? `🌴 ${displayDate(selectedDate)} is a gym holiday — ${reason}. Check-ins are still recorded if the gym opens.`
+      : "";
+  }
 
   const noAttendanceMatches = state.members.length > 0 && attendanceMembers.length === 0;
   els.attendanceEmpty.classList.toggle("show", state.members.length === 0);
@@ -1774,6 +2139,7 @@ function render() {
   renderTrainers();
   renderFees();
   renderPayments();
+  renderFinance();
   renderHistory();
   if (state.detailId) renderDetail();
 }
@@ -2124,7 +2490,10 @@ function getLastPaymentText(member) {
 function sendReminder(memberId = state.detailId) {
   const member = state.members.find((item) => item.id === memberId);
   if (!member || !getUnpaidPeriods(member).length) return;
-  const phone = member.phone.replace(/\D/g, "");
+  // wa.me needs the full international number; stored numbers are the bare
+  // 10-digit local form, so put the Indian country code back for the link.
+  const digits = normalizePhone(member.phone);
+  const phone = digits.length === 10 ? "91" + digits : digits;
   const message = encodeURIComponent(
     `Hello ${member.name}, your gym fee of ${currency(member.fee)} is due on ${displayDate(
       getDueDateKey(member),
@@ -2150,6 +2519,9 @@ function renderCalendar(member) {
     const key = localDateKey(new Date(year, month, day));
     const classes = ["day-cell"];
     if (attendance.has(key)) classes.push("present");
+    // Holiday shading follows the Settings panel (weekly days + specific dates);
+    // a check-in on a holiday still renders as present.
+    else if (isHoliday(key)) classes.push("holiday");
     if (key === today) classes.push("today");
     return `<button class="${classes.join(" ")}" data-day="${key}" type="button">${day}</button>`;
   }).join("");
@@ -2305,6 +2677,38 @@ function bindEvents() {
     if (button && !button.disabled) openFeeDialog(button.dataset.id);
   });
 
+  els.openAddExpense.addEventListener("click", () => openExpenseDialog());
+  els.closeExpenseDialog.addEventListener("click", closeExpenseDialogBox);
+  els.expenseForm.addEventListener("submit", submitExpense);
+  els.deleteExpense.addEventListener("click", deleteCurrentExpense);
+  els.exportFinanceCsv.addEventListener("click", exportFinanceCsv);
+  els.financeStartDate.addEventListener("change", renderFinance);
+  els.financeEndDate.addEventListener("change", renderFinance);
+  els.financeTypeFilter.addEventListener("change", (event) => {
+    state.financeTypeFilter = event.target.value;
+    renderFinance();
+  });
+  els.financeCategoryFilter.addEventListener("change", (event) => {
+    state.financeCategoryFilter = event.target.value;
+    renderFinance();
+  });
+  els.financeLedger.addEventListener("click", (event) => {
+    const expenseRow = event.target.closest("[data-expense-id]");
+    if (expenseRow) {
+      const expense = state.expenses.find((item) => item.id === expenseRow.dataset.expenseId);
+      if (expense) openExpenseDialog(expense);
+      return;
+    }
+    const earningRow = event.target.closest("[data-member-id]");
+    if (earningRow && state.members.some((member) => member.id === earningRow.dataset.memberId)) {
+      openDetail(earningRow.dataset.memberId);
+    }
+  });
+  els.financeOverdueList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-collect-id]");
+    if (button) openFeeDialog(button.dataset.collectId);
+  });
+
   els.attendanceList.addEventListener("click", (event) => {
     const button = event.target.closest(".attendance-button");
     if (!button) return;
@@ -2412,11 +2816,17 @@ async function init() {
   const defaultHistoryRange = getDefaultHistoryRange();
   els.historyStartDate.value = defaultHistoryRange.start;
   els.historyEndDate.value = defaultHistoryRange.end;
+  if (els.financeStartDate) els.financeStartDate.value = defaultHistoryRange.start;
+  if (els.financeEndDate) els.financeEndDate.value = defaultHistoryRange.end;
+  renderFinanceCategoryOptions();
   bindEvents();
   loadTrainers();
   try {
     await loadSettings();
     await loadMembers();
+    await loadExpenses().catch(() => {
+      state.expenses = [];
+    });
     render();
     setView("dashboard");
   } catch (error) {
@@ -2501,6 +2911,9 @@ async function reloadGymData() {
   try {
     await loadSettings();
     await loadMembers();
+    await loadExpenses().catch(() => {
+      state.expenses = [];
+    });
     render();
     setView(state.activeView || "dashboard");
   } catch (error) {

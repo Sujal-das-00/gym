@@ -1,4 +1,4 @@
-const CACHE_NAME = "gym-pwa-v2";
+const CACHE_NAME = "gym-pwa-v6";
 const APP_SHELL = [
   "/",
   "/admin",

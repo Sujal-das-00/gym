@@ -1,5 +1,6 @@
 const attendanceModel = require("./attendanceModel");
 const checkinModel = require("./checkinModel");
+const expenseModel = require("./expenseModel");
 const fallbackModel = require("./fallbackModel");
 const memberModel = require("./memberModel");
 const paymentModel = require("./paymentModel");
@@ -20,6 +21,7 @@ function repo() {
   return {
     ...attendanceModel,
     ...checkinModel,
+    ...expenseModel,
     ...memberModel,
     ...paymentModel,
     ...settingsModel,

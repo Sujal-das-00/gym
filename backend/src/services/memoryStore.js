@@ -9,6 +9,7 @@ const state = {
   settings: normalizeSettings(DEFAULT_SETTINGS),
   members: [],
   checkins: [],
+  expenses: [],
   attendanceRevision: 0,
 };
 
@@ -16,6 +17,7 @@ function normalizeLoaded(data = {}) {
   state.settings = normalizeSettings(data.settings || DEFAULT_SETTINGS);
   state.members = Array.isArray(data.members) ? data.members : [];
   state.checkins = Array.isArray(data.checkins) ? data.checkins : [];
+  state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
   state.attendanceRevision = Number(data.attendanceRevision || 0);
 }
 
