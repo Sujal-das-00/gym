@@ -79,12 +79,15 @@
         <p>Settings</p>
         <button class="nav-link" data-view="settings" type="button"><span
             class="material-symbols-outlined">settings</span>Settings</button>
+        <p>Support</p>
+        <button class="nav-link" data-view="help" type="button"><span
+            class="material-symbols-outlined">help</span>Need Help</button>
       </nav>
 
-      <div class="support-card">
+      <button class="support-card" data-view="help" type="button">
         <strong>Need help?</strong>
-        <span>Contact support</span>
-      </div>
+        <span>Video tutorials &amp; step-by-step guide</span>
+      </button>
 
       <!-- Auth: account bar, docked in the sidebar on all screen sizes
              (below the support card on desktop, drawer footer on mobile). -->
@@ -681,6 +684,56 @@
           </form>
         </section>
       </section>
+
+      <section class="view" data-view-panel="help">
+        <div class="help-tabs" role="tablist" aria-label="Help sections">
+          <button class="help-tab active" data-help-tab="hi" type="button" role="tab" aria-selected="true">
+            <span class="material-symbols-outlined">smart_display</span>Hindi Tutorials
+          </button>
+          <button class="help-tab" data-help-tab="en" type="button" role="tab" aria-selected="false">
+            <span class="material-symbols-outlined">smart_display</span>English Tutorials
+          </button>
+          <button class="help-tab" data-help-tab="guide" type="button" role="tab" aria-selected="false">
+            <span class="material-symbols-outlined">menu_book</span>Guide &amp; FAQ
+          </button>
+        </div>
+
+        <section class="panel help-panel" data-help-section="hi">
+          <div class="panel-head compact">
+            <div>
+              <h2>हिंदी वीडियो ट्यूटोरियल</h2>
+              <p>किसी भी वीडियो पर टैप करें और उसे यहीं देखें। ये प्लेलिस्ट क्रम में लगे हैं — शुरुआत से देखें।</p>
+            </div>
+          </div>
+          <div class="video-grid" id="helpVideosHi"></div>
+        </section>
+
+        <section class="panel help-panel" data-help-section="en" hidden>
+          <div class="panel-head compact">
+            <div>
+              <h2>English Video Tutorials</h2>
+              <p>Tap any video to play it right here. The clips follow the playlist order — start from the top.</p>
+            </div>
+          </div>
+          <div class="video-grid" id="helpVideosEn"></div>
+        </section>
+
+        <section class="panel help-panel" data-help-section="guide" hidden>
+          <div class="panel-head compact guide-head">
+            <div>
+              <h2 data-guide-title>Text Guide &amp; FAQ</h2>
+              <p data-guide-sub>How to use each section, when to use it, and how to set it up for your gym.</p>
+            </div>
+            <div class="lang-toggle" role="group" aria-label="Guide language">
+              <button class="lang-btn active" data-help-lang="en" type="button" aria-pressed="true">English</button>
+              <button class="lang-btn" data-help-lang="hi" type="button" aria-pressed="false">हिंदी</button>
+            </div>
+          </div>
+          <div class="guide-list" id="helpGuideList"></div>
+          <h3 class="faq-heading" data-faq-heading>Frequently asked questions</h3>
+          <div class="guide-list faq-list" id="helpFaqList"></div>
+        </section>
+      </section>
     </main>
 
     <!-- App-only bottom tab bar (shown when launched as an installed PWA) -->
@@ -1032,6 +1085,12 @@
       </div>
     </form>
     <div class="auth-list" id="staffList"></div>
+  </dialog>
+
+  <dialog class="video-dialog" id="videoDialog" aria-label="Video tutorial">
+    <button class="video-dialog-close" id="videoDialogClose" aria-label="Close video" type="button">×</button>
+    <div class="video-dialog-frame" id="videoDialogFrame"></div>
+    <p class="video-dialog-label" id="videoDialogLabel"></p>
   </dialog>
 
   <style>

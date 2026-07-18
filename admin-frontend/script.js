@@ -3,7 +3,7 @@ const TRAINERS_STORAGE_KEY = "gym-admin-trainers-v1";
 const AUTH_TOKEN_KEY = "gym-admin-token";
 
 // The session cookie is HttpOnly, but some setups don't deliver it back (opening
-// the app on a different host than you logged in on — localhost vs 127.0.0.1 —
+// the app on a different host than you logged in on   localhost vs 127.0.0.1  
 // SameSite, or Secure over http). We keep the JWT here too and send it as a
 // Bearer header, which the backend accepts as an equivalent to the cookie.
 function getToken() {
@@ -18,7 +18,7 @@ function setToken(token) {
   try {
     if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
   } catch {
-    // localStorage unavailable (private mode) — cookie auth still applies.
+    // localStorage unavailable (private mode)   cookie auth still applies.
   }
 }
 
@@ -585,7 +585,7 @@ function ensureMemberGymIds() {
   if (changed) persistAllMembers();
 }
 
-// Canonical phone form — digits only without the +91/91/0 prefixes, so every
+// Canonical phone form   digits only without the +91/91/0 prefixes, so every
 // way of writing the same number compares equal.
 // Keep in sync with normalizePhone in backend/src/utils/member.js.
 function normalizePhone(phone) {
@@ -884,7 +884,7 @@ function getBillingPeriodLabel(periodKey, member = null) {
     return formatBillingPeriodRange(periodKey, getPackageMonths(member));
   }
   // "Collect after the period" bills fall due at the END of each period, so name
-  // them by that due date — join 10 Jul on a 10-day cycle → first bill "20 Jul",
+  // them by that due date   join 10 Jul on a 10-day cycle → first bill "20 Jul",
   // not "10 Jul" (the period's start), which reads as billing from the join day.
   if (member && getCollectionTiming(member) === "fixed-day") {
     return displayDate(localDateKey(periodEndDate(member, periodKey)));
@@ -972,7 +972,7 @@ function periodEndDate(member, periodKey) {
   return end;
 }
 
-// Date after the last generated period — i.e. when the next, not-yet-started period begins.
+// Date after the last generated period   i.e. when the next, not-yet-started period begins.
 function nextPeriodStartDate(member) {
   const start = parseDateKey(member.startDate);
   const count = getBillingPeriodKeys(member).length;
@@ -1007,13 +1007,13 @@ function getDueDateKey(member) {
 
 function isPaidThisPeriod(member) {
   // For "collect after the period" members the latest billable period is the
-  // last one that has ended — the in-progress one is not owed yet.
+  // last one that has ended   the in-progress one is not owed yet.
   const periods = getBillablePeriodKeys(member);
   const currentPeriod = periods[periods.length - 1];
   return Boolean(currentPeriod && getPaidPeriodSet(member).has(currentPeriod));
 }
 
-// Unpaid periods that are already due (past their collection point) — the ones
+// Unpaid periods that are already due (past their collection point)   the ones
 // that make a member count as overdue and add up to the amount they owe.
 function getDueUnpaidPeriods(member) {
   const unpaid = getUnpaidPeriods(member);
@@ -1059,6 +1059,7 @@ const VIEW_COPY = {
   expenses: ["Expense Tracker", "Track every expense and earning of the gym in one ledger."],
   trainers: ["Trainers", "Manage trainer profiles, specialties, shifts, and contact details."],
   settings: ["Settings", "Update your gym profile and logo."],
+  help: ["Need Help", "Video tutorials in Hindi & English, plus a step-by-step text guide."],
 };
 
 function openDrawer() {
@@ -1111,6 +1112,509 @@ function setView(view) {
   }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ---------------------------------------------------------------------------
+ * Need Help view: Hindi + English video tutorials, and a bilingual text guide
+ * that explains how/when to use every section and how to configure it.
+ * Video IDs are in playlist order; edit the arrays to add/replace clips.
+ * ------------------------------------------------------------------------- */
+const HELP_VIDEOS = {
+  hi: [
+    "kJXSpjgrGl8", "wOcj_oj4e5U", "RGDDi0VK1n4", "bCDzyT6r88c", "0LG7Cy5_WUU",
+    "rUk_rUHzm1w", "431vcdrpdJM", "4MwMe1_gHfU", "SzuNqvxuCsY", "qL_luF56NxI",
+  ],
+  en: [
+    "wAyRPe5MnWs", "JJUd74MImwk", "F5Yvjwk2y0k", "IbRn_dhzLu8", "PLPzr2_JF8E",
+    "UhkA6SyKWQo", "srUNRxxDg70", "8ChNKDJLnYA", "ueazXm8nysE", "TepIMumzUD8",
+  ],
+};
+
+const HELP_VIDEO_LABEL = {
+  hi: (i) => `हिंदी ट्यूटोरियल   भाग ${i}`,
+  en: (i) => `English Tutorial   Part ${i}`,
+};
+
+const HELP_GUIDE = [
+  {
+    icon: "dashboard",
+    en: {
+      title: "Dashboard",
+      when: "Open this first every day for a one-glance picture of your gym.",
+      how: [
+        "The top cards show total members, overdue fees, members paid this month, who is present today, and active trainers.",
+        "Activity Summary gives you this month's visits, attendance rate and active members.",
+        "Use the Quick Actions buttons to jump straight into the daily tasks.",
+      ],
+      tip: "Nothing to set up here   it updates automatically as you add members and mark attendance.",
+    },
+    hi: {
+      title: "डैशबोर्ड",
+      when: "हर दिन सबसे पहले इसे खोलें   एक नज़र में पूरे जिम की स्थिति दिखती है।",
+      how: [
+        "ऊपर के कार्ड दिखाते हैं: कुल सदस्य, बकाया फीस, इस महीने भुगतान कर चुके सदस्य, आज कौन उपस्थित है, और सक्रिय ट्रेनर।",
+        "Activity Summary इस महीने की विज़िट, उपस्थिति दर और सक्रिय सदस्य दिखाता है।",
+        "Quick Actions बटनों से सीधे रोज़ के कामों में जाएँ।",
+      ],
+      tip: "यहाँ कुछ सेट करने की ज़रूरत नहीं   जैसे-जैसे आप सदस्य जोड़ते और उपस्थिति दर्ज करते हैं, यह अपने आप अपडेट होता है।",
+    },
+  },
+  {
+    icon: "person_add",
+    en: {
+      title: "Add Member",
+      when: "Whenever a new person joins your gym.",
+      how: [
+        "Tap “Add member” (top-right or in the sidebar).",
+        "Fill in name, phone, plan/fees and the join date.",
+        "Choose whether they pay now (at join) or at the end of the period   this defaults to your Settings choice but you can change it for this member.",
+        "Save. The member now appears in Members and on the Dashboard counts.",
+      ],
+      tip: "Enter the correct join date   the whole billing/renewal schedule is calculated from it.",
+    },
+    hi: {
+      title: "सदस्य जोड़ें",
+      when: "जब भी कोई नया व्यक्ति आपके जिम में शामिल हो।",
+      how: [
+        "“Add member” पर टैप करें (ऊपर-दाएँ या साइडबार में)।",
+        "नाम, फ़ोन, प्लान/फीस और जॉइन तिथि भरें।",
+        "चुनें कि सदस्य अभी भुगतान करेगा (जॉइन पर) या अवधि के अंत में   यह आपकी Settings की सेटिंग से आता है, पर इस सदस्य के लिए बदला जा सकता है।",
+        "सेव करें। अब सदस्य Members और डैशबोर्ड की गिनती में दिखेगा।",
+      ],
+      tip: "सही जॉइन तिथि डालें   पूरी बिलिंग/रिन्यूअल की गणना इसी से होती है।",
+    },
+  },
+  {
+    icon: "groups_3",
+    en: {
+      title: "Members",
+      when: "To find, edit, renew or deactivate a member and view their history.",
+      how: [
+        "Search by name or phone number.",
+        "Tap a member to open their details   fees paid/pending, plan, and attendance.",
+        "From there you can collect a fee, edit the plan, or mark the member inactive.",
+      ],
+      tip: "Members with dues are highlighted so you can follow up quickly.",
+    },
+    hi: {
+      title: "सदस्य",
+      when: "किसी सदस्य को ढूँढने, बदलने, रिन्यू करने या निष्क्रिय करने और उसका इतिहास देखने के लिए।",
+      how: [
+        "नाम या फ़ोन नंबर से खोजें।",
+        "किसी सदस्य पर टैप करें   भुगतान/बकाया, प्लान और उपस्थिति दिखती है।",
+        "वहीं से फीस लें, प्लान बदलें, या सदस्य को निष्क्रिय करें।",
+      ],
+      tip: "बकाया वाले सदस्य हाइलाइट होते हैं ताकि आप जल्दी फॉलो-अप कर सकें।",
+    },
+  },
+  {
+    icon: "productivity",
+    en: {
+      title: "Mark Attendance",
+      when: "When you record attendance yourself at the front desk.",
+      how: [
+        "Pick a date (defaults to today).",
+        "Tap Present / Absent for each member.",
+        "The count updates on the Dashboard instantly.",
+      ],
+      tip: "Days you mark as holidays in Settings are left out of each member's attendance rate.",
+    },
+    hi: {
+      title: "उपस्थिति दर्ज करें",
+      when: "जब आप खुद डेस्क पर उपस्थिति दर्ज करते हैं।",
+      how: [
+        "तिथि चुनें (डिफ़ॉल्ट आज की होती है)।",
+        "हर सदस्य के लिए Present / Absent टैप करें।",
+        "गिनती डैशबोर्ड पर तुरंत अपडेट हो जाती है।",
+      ],
+      tip: "Settings में जिन दिनों को छुट्टी बनाया है, वे उपस्थिति दर की गणना से हट जाते हैं।",
+    },
+  },
+  {
+    icon: "qr_code_scanner",
+    en: {
+      title: "QR Check-in",
+      when: "When you want members to mark their own attendance by scanning a QR at the desk.",
+      how: [
+        "Open QR Check-in and show the screen (or print the QR) at your entrance.",
+        "Members scan it with their phone and are marked present automatically.",
+        "The live list shows who has just checked in.",
+      ],
+      tip: "The “Expired memberships” setting decides whether a lapsed member is allowed to check in here.",
+    },
+    hi: {
+      title: "QR चेक-इन",
+      when: "जब आप चाहें कि सदस्य डेस्क पर QR स्कैन करके खुद उपस्थिति लगाएँ।",
+      how: [
+        "QR Check-in खोलें और स्क्रीन दिखाएँ (या QR प्रिंट करके प्रवेश द्वार पर लगाएँ)।",
+        "सदस्य अपने फ़ोन से स्कैन करते हैं और अपने-आप उपस्थित हो जाते हैं।",
+        "लाइव सूची में दिखता है कि अभी-अभी किसने चेक-इन किया।",
+      ],
+      tip: "“Expired memberships” सेटिंग तय करती है कि समाप्त सदस्यता वाला सदस्य यहाँ चेक-इन कर सकता है या नहीं।",
+    },
+  },
+  {
+    icon: "calendar_month",
+    en: {
+      title: "Attendance History",
+      when: "To review who came on any date or over a date range.",
+      how: [
+        "Choose a start and end date.",
+        "Browse the records for that period.",
+        "Visits flagged in red are members who checked in after their membership had expired (only if you allow that).",
+      ],
+      tip: "Use it to spot irregular members and follow up on renewals.",
+    },
+    hi: {
+      title: "उपस्थिति इतिहास",
+      when: "किसी भी तारीख या तारीख-सीमा में कौन आया, यह देखने के लिए।",
+      how: [
+        "शुरू और अंत की तिथि चुनें।",
+        "उस अवधि के रिकॉर्ड देखें।",
+        "लाल निशान वाली विज़िट वे सदस्य हैं जिन्होंने सदस्यता समाप्त होने के बाद चेक-इन किया (केवल तभी जब आपने इसकी अनुमति दी हो)।",
+      ],
+      tip: "अनियमित सदस्यों को पहचानने और रिन्यूअल के लिए फॉलो-अप में यह उपयोगी है।",
+    },
+  },
+  {
+    icon: "payments",
+    en: {
+      title: "Payments",
+      when: "To review customer-wise payment records and outstanding dues.",
+      how: [
+        "Open Payments to see the payment history per customer.",
+        "Open a customer to see which periods are paid and which are pending.",
+        "Collect a pending fee directly from the member's detail screen.",
+      ],
+      tip: "If a member paid but still shows overdue, open their detail and confirm the correct period was collected.",
+    },
+    hi: {
+      title: "भुगतान",
+      when: "ग्राहक-वार भुगतान रिकॉर्ड और बकाया देखने के लिए।",
+      how: [
+        "Payments खोलें   हर ग्राहक का भुगतान इतिहास दिखता है।",
+        "किसी ग्राहक को खोलें   कौन-सी अवधि भुगतान हो चुकी और कौन-सी बाकी है, यह दिखता है।",
+        "बकाया फीस सीधे सदस्य के विवरण से लें।",
+      ],
+      tip: "अगर कोई सदस्य भुगतान कर चुका है पर फिर भी बकाया दिख रहा है, तो उसका विवरण खोलकर देखें कि सही अवधि की फीस ली गई है।",
+    },
+  },
+  {
+    icon: "account_balance_wallet",
+    en: {
+      title: "Expense Tracker",
+      when: "To keep every expense and earning of the gym in one ledger.",
+      how: [
+        "Add an entry with amount, category and date.",
+        "Use the date range to review totals for a period.",
+        "Categories help you see where money is going.",
+      ],
+      tip: "Record cash-in and cash-out here to keep your gym's profit picture accurate.",
+    },
+    hi: {
+      title: "खर्च ट्रैकर",
+      when: "जिम के हर खर्च और कमाई को एक ही जगह रखने के लिए।",
+      how: [
+        "राशि, श्रेणी और तिथि के साथ एक एंट्री जोड़ें।",
+        "किसी अवधि का कुल देखने के लिए तारीख-सीमा चुनें।",
+        "श्रेणियों से पता चलता है कि पैसा कहाँ जा रहा है।",
+      ],
+      tip: "आय और खर्च दोनों यहाँ दर्ज करें ताकि जिम का लाभ सही दिखे।",
+    },
+  },
+  {
+    icon: "exercise",
+    en: {
+      title: "Trainers",
+      when: "To manage trainer profiles   specialties, shifts and contact details.",
+      how: [
+        "Add a trainer with name, specialty, shift and phone.",
+        "Edit any trainer to update their details.",
+        "Mark a trainer active or inactive; active trainers are counted on the Dashboard.",
+      ],
+      tip: "Keep trainer contacts here so any staff member can reach them.",
+    },
+    hi: {
+      title: "ट्रेनर",
+      when: "ट्रेनर की प्रोफ़ाइल   विशेषज्ञता, शिफ्ट और संपर्क   संभालने के लिए।",
+      how: [
+        "नाम, विशेषज्ञता, शिफ्ट और फ़ोन के साथ ट्रेनर जोड़ें।",
+        "किसी ट्रेनर को एडिट करके विवरण अपडेट करें।",
+        "ट्रेनर को सक्रिय/निष्क्रिय करें; सक्रिय ट्रेनर डैशबोर्ड पर गिने जाते हैं।",
+      ],
+      tip: "ट्रेनर के संपर्क यहाँ रखें ताकि कोई भी स्टाफ उन तक पहुँच सके।",
+    },
+  },
+  {
+    icon: "settings",
+    en: {
+      title: "Settings   set the app up for your gym",
+      when: "Set this up once when you start, and revisit when your rules change.",
+      how: [
+        "<b>Gym name &amp; logo:</b> shown across the app and on the member check-in page   upload your logo for branding.",
+        "<b>App colours:</b> match the app to your brand colours.",
+        "<b>Billing cycle:</b> pick how you charge   1st of every month, a rolling 30-day membership, or a custom number of days (e.g. 25).",
+        "<b>Payment collection:</b> “Collect at join (upfront)” marks the first term paid and sets the next due date; “Collect after the period” records the fee as due at the end of each period.",
+        "<b>Expired memberships:</b> allow lapsed members to still check in (visits flagged red), or block check-in until they renew.",
+        "<b>Gym holidays:</b> choose weekly closed days and add specific festival/event dates   these are excluded from every member's attendance rate.",
+      ],
+      tip: "Choose the billing cycle and collection timing that match how you already run your gym before adding members   it keeps every renewal date correct.",
+    },
+    hi: {
+      title: "सेटिंग्स   ऐप को अपने जिम के अनुसार सेट करें",
+      when: "शुरू में एक बार सेट करें, और जब आपके नियम बदलें तब दोबारा देखें।",
+      how: [
+        "<b>जिम का नाम और लोगो:</b> पूरे ऐप और सदस्य चेक-इन पेज पर दिखता है   ब्रांडिंग के लिए अपना लोगो अपलोड करें।",
+        "<b>ऐप के रंग:</b> ऐप को अपने ब्रांड के रंगों से मिलाएँ।",
+        "<b>बिलिंग साइकिल:</b> चुनें कि आप कैसे फीस लेते हैं   हर महीने की 1 तारीख, चलती हुई 30-दिन की सदस्यता, या अपने अनुसार दिन (जैसे 25)।",
+        "<b>भुगतान संग्रह:</b> “Collect at join (upfront)” पहली अवधि को भुगतान मानकर अगली देय तिथि तय करता है; “Collect after the period” हर अवधि की फीस अंत में देय के रूप में दर्ज करता है।",
+        "<b>समाप्त सदस्यता:</b> समाप्त सदस्यों को चेक-इन करने दें (विज़िट लाल दिखेगी), या रिन्यू करने तक चेक-इन रोक दें।",
+        "<b>जिम की छुट्टियाँ:</b> साप्ताहिक बंद दिन चुनें और खास त्योहार/इवेंट की तिथियाँ जोड़ें   ये हर सदस्य की उपस्थिति दर से हट जाती हैं।",
+      ],
+      tip: "सदस्य जोड़ने से पहले वही बिलिंग साइकिल और संग्रह समय चुनें जो आप पहले से इस्तेमाल करते हैं   इससे हर रिन्यूअल तिथि सही रहती है।",
+    },
+  },
+];
+
+const HELP_FAQ = {
+  en: [
+    {
+      q: "My gym collects the fee at the time of joining (upfront)   what setting should I turn on?",
+      a: "Go to <b>Settings → Payment collection</b> and choose <b>“Collect at join (upfront)”</b>. The member's first term is marked paid and the next payment is set to fall due one cycle later.",
+    },
+    {
+      q: "My gym collects the fee after the period (e.g. after 30 days)   what setting should I turn on?",
+      a: "Go to <b>Settings → Payment collection</b> and choose <b>“Collect after the period”</b>. Nothing is recorded at join; each period's fee falls due at the end of that period. (You can still override this for a single member while adding them.)",
+    },
+    {
+      q: "My gym's billing cycle is 30 days   what setting should I turn on?",
+      a: "Go to <b>Settings → Billing cycle</b> and choose <b>“30-day membership”</b>. Each member is billed every 30 days counted from their own start date.",
+    },
+    {
+      q: "My gym bills from the 1st day of every month   what setting should I turn on?",
+      a: "Go to <b>Settings → Billing cycle</b> and choose <b>“1st day of every month”</b>. Fees are due from the 1st, even for members who joined later in that month.",
+    },
+    {
+      q: "My gym runs on a custom cycle (e.g. 25 days)   what setting should I turn on?",
+      a: "Go to <b>Settings → Billing cycle</b>, choose <b>“Custom days”</b>, then enter your membership length in the “Custom membership days” box (for example 25).",
+    },
+    {
+      q: "I allow members to check in even after their membership expires   what setting should I turn on?",
+      a: "Go to <b>Settings → Expired memberships</b> and choose <b>“Allow check-in after expiry”</b>. Lapsed members can still check in and those visits are flagged red in the attendance history so you can follow up.",
+    },
+    {
+      q: "I do NOT allow check-in after expiry   what setting should I turn on?",
+      a: "Go to <b>Settings → Expired memberships</b> and choose <b>“Block check-in after expiry”</b>. The check-in page then shows “Membership expired   access denied” until the member renews, and no attendance is recorded.",
+    },
+    {
+      q: "A member paid but still shows as overdue   why?",
+      a: "Open the member's detail and check which period the payment was applied to. Collect the correct pending period from there and the overdue flag clears.",
+    },
+    {
+      q: "How do I add my gym's logo and colours?",
+      a: "Go to <b>Settings</b> → upload a logo and set the app colours. They appear across the app and on the member check-in page.",
+    },
+    {
+      q: "Why is a member's attendance rate higher than the days they came?",
+      a: "Holidays you set in <b>Settings → Gym holidays</b> are excluded from the count, so closed days don't lower anyone's rate.",
+    },
+    {
+      q: "What's the difference between marking attendance and QR check-in?",
+      a: "Mark Attendance is you tapping Present/Absent at the desk. QR Check-in lets members scan a QR and mark themselves present. You can use either or both.",
+    },
+  ],
+  hi: [
+    {
+      q: "मेरा जिम फीस जॉइन के समय (पहले/एडवांस) लेता है   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Payment collection</b> में जाकर <b>“Collect at join (upfront)”</b> चुनें। सदस्य की पहली अवधि भुगतान मानी जाएगी और अगला भुगतान एक साइकिल बाद देय होगा।",
+    },
+    {
+      q: "मेरा जिम फीस अवधि के बाद (जैसे 30 दिन बाद) लेता है   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Payment collection</b> में जाकर <b>“Collect after the period”</b> चुनें। जॉइन पर कुछ दर्ज नहीं होता; हर अवधि की फीस उस अवधि के अंत में देय होती है। (सदस्य जोड़ते समय इसे उस एक सदस्य के लिए बदला भी जा सकता है।)",
+    },
+    {
+      q: "मेरे जिम का बिलिंग साइकिल 30 दिन का है   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Billing cycle</b> में जाकर <b>“30-day membership”</b> चुनें। हर सदस्य को उसकी अपनी शुरू तिथि से हर 30 दिन पर बिल किया जाता है।",
+    },
+    {
+      q: "मेरा जिम हर महीने की 1 तारीख से बिल करता है   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Billing cycle</b> में जाकर <b>“1st day of every month”</b> चुनें। फीस हर महीने की 1 तारीख से देय होती है, भले सदस्य उस महीने बाद में जुड़ा हो।",
+    },
+    {
+      q: "मेरा जिम कस्टम साइकिल पर चलता है (जैसे 25 दिन)   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Billing cycle</b> में जाकर <b>“Custom days”</b> चुनें, फिर “Custom membership days” बॉक्स में अपनी सदस्यता की अवधि डालें (जैसे 25)।",
+    },
+    {
+      q: "मैं सदस्यता समाप्त होने के बाद भी चेक-इन की अनुमति देता हूँ   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Expired memberships</b> में जाकर <b>“Allow check-in after expiry”</b> चुनें। समाप्त सदस्य फिर भी चेक-इन कर सकते हैं और वे विज़िट उपस्थिति इतिहास में लाल दिखती हैं ताकि आप फॉलो-अप कर सकें।",
+    },
+    {
+      q: "मैं समाप्ति के बाद चेक-इन की अनुमति नहीं देता   कौन-सी सेटिंग चालू करूँ?",
+      a: "<b>Settings → Expired memberships</b> में जाकर <b>“Block check-in after expiry”</b> चुनें। तब चेक-इन पेज पर रिन्यू करने तक “Membership expired   access denied” दिखेगा और कोई उपस्थिति दर्ज नहीं होगी।",
+    },
+    {
+      q: "सदस्य ने भुगतान कर दिया पर फिर भी बकाया दिख रहा है   क्यों?",
+      a: "सदस्य का विवरण खोलें और देखें कि भुगतान किस अवधि पर लगा। वहीं से सही बकाया अवधि की फीस लें, बकाया का निशान हट जाएगा।",
+    },
+    {
+      q: "अपने जिम का लोगो और रंग कैसे जोड़ूँ?",
+      a: "<b>Settings</b> में लोगो अपलोड करें और ऐप के रंग सेट करें। ये पूरे ऐप और सदस्य चेक-इन पेज पर दिखेंगे।",
+    },
+    {
+      q: "किसी सदस्य की उपस्थिति दर उसके आने के दिनों से ज़्यादा क्यों दिखती है?",
+      a: "<b>Settings → Gym holidays</b> में सेट की गई छुट्टियाँ गिनती से हट जाती हैं, इसलिए बंद दिन किसी की दर कम नहीं करते।",
+    },
+    {
+      q: "उपस्थिति दर्ज करने और QR चेक-इन में क्या फर्क है?",
+      a: "Mark Attendance में आप डेस्क पर Present/Absent टैप करते हैं। QR Check-in में सदस्य QR स्कैन करके खुद उपस्थित होते हैं। आप कोई एक या दोनों इस्तेमाल कर सकते हैं।",
+    },
+  ],
+};
+
+const helpState = { lang: "en" };
+
+function renderHelpVideos() {
+  ["hi", "en"].forEach((lang) => {
+    const container = document.getElementById(lang === "hi" ? "helpVideosHi" : "helpVideosEn");
+    if (!container) return;
+    container.innerHTML = HELP_VIDEOS[lang]
+      .map((id, index) => {
+        const label = HELP_VIDEO_LABEL[lang](index + 1);
+        return `
+          <button class="video-card" type="button" data-yt="${id}" data-label="${escapeHtml(label)}">
+            <span class="video-thumb" style="background-image:url('https://i.ytimg.com/vi/${id}/hqdefault.jpg')">
+              <span class="video-play"><span class="material-symbols-outlined">play_arrow</span></span>
+            </span>
+            <span class="video-label">${escapeHtml(label)}</span>
+          </button>`;
+      })
+      .join("");
+  });
+}
+
+function playHelpVideo(card) {
+  const id = card.dataset.yt;
+  if (!id) return;
+  const label = card.dataset.label || "";
+  const dialog = document.getElementById("videoDialog");
+  const frame = document.getElementById("videoDialogFrame");
+  const labelEl = document.getElementById("videoDialogLabel");
+  if (!dialog || !frame) return;
+  frame.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0"
+    title="${escapeHtml(label)}" frameborder="0"
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  if (labelEl) labelEl.textContent = label;
+  if (typeof dialog.showModal === "function") dialog.showModal();
+}
+
+function renderHelpGuide() {
+  const lang = helpState.lang;
+  const list = document.getElementById("helpGuideList");
+  if (list) {
+    list.innerHTML = HELP_GUIDE.map((topic) => {
+      const t = topic[lang];
+      const steps = t.how.map((step) => `<li>${step}</li>`).join("");
+      const whenLabel = lang === "hi" ? "कब इस्तेमाल करें" : "When to use";
+      const howLabel = lang === "hi" ? "कैसे इस्तेमाल करें" : "How to use it";
+      const tipLabel = lang === "hi" ? "सुझाव" : "Tip";
+      return `
+        <details class="guide-item">
+          <summary>
+            <span class="guide-ico"><span class="material-symbols-outlined">${topic.icon}</span></span>
+            <span class="guide-title">${escapeHtml(t.title)}</span>
+            <span class="material-symbols-outlined guide-chevron">expand_more</span>
+          </summary>
+          <div class="guide-body">
+            <p class="guide-when"><strong>${whenLabel}:</strong> ${escapeHtml(t.when)}</p>
+            <p class="guide-sub-label">${howLabel}</p>
+            <ol>${steps}</ol>
+            <p class="guide-tip"><span class="material-symbols-outlined">lightbulb</span><span><strong>${tipLabel}:</strong> ${t.tip}</span></p>
+          </div>
+        </details>`;
+    }).join("");
+  }
+
+  const faq = document.getElementById("helpFaqList");
+  if (faq) {
+    faq.innerHTML = HELP_FAQ[lang]
+      .map(
+        (item) => `
+        <details class="guide-item faq-item">
+          <summary>
+            <span class="guide-title">${escapeHtml(item.q)}</span>
+            <span class="material-symbols-outlined guide-chevron">expand_more</span>
+          </summary>
+          <div class="guide-body"><p>${item.a}</p></div>
+        </details>`
+      )
+      .join("");
+  }
+
+  const titleEl = document.querySelector("[data-guide-title]");
+  const subEl = document.querySelector("[data-guide-sub]");
+  const faqHeading = document.querySelector("[data-faq-heading]");
+  if (lang === "hi") {
+    if (titleEl) titleEl.textContent = "टेक्स्ट गाइड और सामान्य सवाल";
+    if (subEl) subEl.textContent = "हर सेक्शन कैसे और कब इस्तेमाल करें, और अपने जिम के हिसाब से कैसे सेट करें।";
+    if (faqHeading) faqHeading.textContent = "अक्सर पूछे जाने वाले सवाल";
+  } else {
+    if (titleEl) titleEl.textContent = "Text Guide & FAQ";
+    if (subEl) subEl.textContent = "How to use each section, when to use it, and how to set it up for your gym.";
+    if (faqHeading) faqHeading.textContent = "Frequently asked questions";
+  }
+}
+
+function setupHelp() {
+  const helpPanel = document.querySelector('[data-view-panel="help"]');
+  if (!helpPanel) return;
+  renderHelpVideos();
+  renderHelpGuide();
+
+  helpPanel.querySelectorAll(".help-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.helpTab;
+      helpPanel.querySelectorAll(".help-tab").forEach((btn) => {
+        const active = btn === tab;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      helpPanel.querySelectorAll("[data-help-section]").forEach((section) => {
+        section.hidden = section.dataset.helpSection !== target;
+      });
+    });
+  });
+
+  helpPanel.querySelectorAll(".lang-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      helpState.lang = btn.dataset.helpLang;
+      helpPanel.querySelectorAll(".lang-btn").forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      renderHelpGuide();
+    });
+  });
+
+  helpPanel.addEventListener("click", (event) => {
+    const card = event.target.closest(".video-card[data-yt]");
+    if (card) playHelpVideo(card);
+  });
+
+  const videoDialog = document.getElementById("videoDialog");
+  const videoClose = document.getElementById("videoDialogClose");
+  if (videoDialog) {
+    // Empty the iframe on close so the video (and its audio) stops.
+    videoDialog.addEventListener("close", () => {
+      const frame = document.getElementById("videoDialogFrame");
+      if (frame) frame.innerHTML = "";
+    });
+    // Close when the dark backdrop area (the dialog element itself) is clicked.
+    videoDialog.addEventListener("click", (event) => {
+      if (event.target === videoDialog) videoDialog.close();
+    });
+    if (videoClose) videoClose.addEventListener("click", () => videoDialog.close());
+  }
 }
 
 function renderBrand() {
@@ -1776,7 +2280,7 @@ function getHistoryRows(member) {
 function filterHistoryRows(rows) {
   const status = state.historyStatusFilter;
   if (status === "all") return rows;
-  // "present" includes expired check-ins — the member was in the gym either way.
+  // "present" includes expired check-ins   the member was in the gym either way.
   if (status === "present") return rows.filter((row) => row.present && !row.holiday);
   return rows.filter((row) => row.status === status);
 }
@@ -1918,7 +2422,7 @@ function renderAttendanceSheet() {
     const reason = holidayReason(selectedDate);
     els.attendanceHolidayNote.hidden = !reason;
     els.attendanceHolidayNote.textContent = reason
-      ? `🌴 ${displayDate(selectedDate)} is a gym holiday — ${reason}. Check-ins are still recorded if the gym opens.`
+      ? `🌴 ${displayDate(selectedDate)} is a gym holiday   ${reason}. Check-ins are still recorded if the gym opens.`
       : "";
   }
 
@@ -1958,7 +2462,7 @@ function renderAttendanceSheet() {
               </div>
               <div class="attendance-status-cell">
                 <span class="attendance-status ${present ? (expired ? "expired" : "present") : "pending"}">
-                  ${present ? (expired ? "Checked in — expired" : "Checked in") : "Not checked in"}
+                  ${present ? (expired ? "Checked in   expired" : "Checked in") : "Not checked in"}
                 </span>
                 ${expired ? `<small>Membership had expired at check-in. Collect the renewal.</small>` : present ? `<small>Use absent only for a correction.</small>` : `<small>No attendance saved for this date.</small>`}
               </div>
@@ -2570,6 +3074,7 @@ function bindEvents() {
   els.viewTriggers.forEach((link) => {
     link.addEventListener("click", () => setView(link.dataset.view));
   });
+  setupHelp();
   els.emptyAddMember.addEventListener("click", () => openMemberDialog());
   els.openAddTrainer.addEventListener("click", () => openTrainerDialog());
   els.emptyAddTrainer.addEventListener("click", () => openTrainerDialog());
@@ -2746,7 +3251,7 @@ function bindEvents() {
       await navigator.clipboard.writeText(url);
       showToast("Check-in URL copied");
     } catch {
-      showToast("Copy failed — select the URL manually");
+      showToast("Copy failed   select the URL manually");
     }
   });
 
