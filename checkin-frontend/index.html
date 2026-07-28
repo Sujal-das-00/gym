@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#073f2d" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Gym Check-in" />
     <meta name="description" content="Quick member check-in for your gym." />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icons/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/favicon.png" />
     <link rel="icon" href="/icons/favicon.png" />
     <title>Gym Check-in</title>
     <link rel="stylesheet" href="/checkin/styles.css" />
@@ -47,6 +47,11 @@
           <button type="submit" id="checkinButton">Check in</button>
         </form>
         <button class="secondary" id="installAppButton" type="button" hidden>Install app</button>
+        <aside class="ios-install-guide" id="iosInstallGuide" hidden aria-label="Install on iPhone or iPad">
+          <strong>Install on iPhone or iPad</strong>
+          <span>In Safari, tap Share, then choose <b>Add to Home Screen</b>.</span>
+          <button type="button" class="ios-install-close" id="iosInstallClose" aria-label="Close install instructions">&times;</button>
+        </aside>
         <button class="secondary" id="forgetMe" type="button">Forget saved ID</button>
         <div id="result" class="result-box" role="status" aria-live="polite"></div>
 
@@ -92,6 +97,14 @@
         window.addEventListener("appinstalled", () => {
           installPrompt = null;
           installButton.hidden = true;
+        });
+
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const iosGuide = document.getElementById("iosInstallGuide");
+        if (isIos && !isInstalled()) iosGuide.hidden = false;
+        document.getElementById("iosInstallClose").addEventListener("click", () => {
+          iosGuide.hidden = true;
         });
       })();
 

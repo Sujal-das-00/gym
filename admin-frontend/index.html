@@ -17,7 +17,7 @@
       document.documentElement.classList.add("pwa");
     }
   </script>
-  <link rel="apple-touch-icon" href="/icons/favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/favicon.png" />
   <link rel="icon" href="/icons/favicon.png" />
   <title>Gym Admin Dashboard</title>
   <!-- Google Material Symbols icon font: <span class="material-symbols-outlined">payments</span> -->
@@ -115,6 +115,11 @@
           </button>
         </div>
       </header>
+      <aside class="ios-install-guide" id="iosInstallGuide" hidden aria-label="Install on iPhone or iPad">
+        <strong>Install on iPhone or iPad</strong>
+        <span>In Safari, tap Share, then choose <b>Add to Home Screen</b>.</span>
+        <button type="button" class="ios-install-close" id="iosInstallClose" aria-label="Close install instructions">&times;</button>
+      </aside>
 
       <section class="view active" data-view-panel="dashboard">
         <section class="stats-grid" aria-label="Gym summary">
@@ -1341,6 +1346,14 @@
       window.addEventListener("appinstalled", () => {
         installPrompt = null;
         installButton.hidden = true;
+      });
+
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const iosGuide = document.getElementById("iosInstallGuide");
+      if (isIos && !isInstalled()) iosGuide.hidden = false;
+      document.getElementById("iosInstallClose").addEventListener("click", () => {
+        iosGuide.hidden = true;
       });
     })();
 

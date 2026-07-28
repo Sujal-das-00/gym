@@ -198,6 +198,21 @@ button:disabled {
   color: var(--ink);
 }
 
+.ios-install-guide {
+  position: relative;
+  margin-top: 10px;
+  padding: 12px 42px 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 8%, #fff);
+  color: var(--ink);
+  font-size: .9rem;
+}
+.ios-install-guide[hidden] { display: none !important; }
+.ios-install-guide strong, .ios-install-guide span { display: block; }
+.ios-install-guide span { margin-top: 3px; color: var(--muted); }
+.ios-install-close { position: absolute; top: 7px; right: 8px; min-height: 32px; padding: 0 8px; border: 0; background: transparent; color: var(--muted); font-size: 1.45rem; line-height: 1; }
+
 .result-box {
   display: none;
   margin-top: 14px;
