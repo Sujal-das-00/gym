@@ -1,6 +1,6 @@
 {
-  "name": "Gym Admin",
-  "short_name": "GymAdmin",
+  "name": "Gym Boo",
+  "short_name": "Gym Boo",
   "description": "Manage gym members, attendance, fees, and check-ins from a mobile-friendly app.",
   "start_url": "/admin",
   "scope": "/",
