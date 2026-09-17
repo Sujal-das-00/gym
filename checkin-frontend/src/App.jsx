@@ -37,7 +37,9 @@ export default function App() {
   // the link it points at. It only pre-fills the field; the member still submits.
   const [scannedCode, setScannedCode] = useState(readCodeFromLocation);
   const { branding } = useGymBranding(slug);
-  const { canInstall, promptInstall } = useInstallPrompt();
+  // The gym name goes into the install prompt, so the installed icon is the
+  // member's own gym rather than a generic "Gym Check-in".
+  const { canInstall, promptInstall } = useInstallPrompt(branding.gymName);
   const checkin = useCheckin(slug);
   const account = useMemberAccount(slug);
   const push = usePushNotifications(slug, account.member?.id || "");
