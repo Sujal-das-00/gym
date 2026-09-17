@@ -1,4 +1,5 @@
 {
+  "id": "/admin",
   "name": "Gym Boo",
   "short_name": "Gym Boo",
   "description": "Manage gym members, attendance, fees, and check-ins from a mobile-friendly app.",
@@ -16,9 +17,9 @@
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.jpg",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpg",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

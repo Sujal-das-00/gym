@@ -2,7 +2,7 @@ const { createHttpError } = require("../utils/http");
 const { memberOutstanding } = require("../utils/billing");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
-const { pushAvailable, sendToSubscriptions } = require("./pushService");
+const { pushAvailable, pushDisabledReason, sendToSubscriptions } = require("./pushService");
 
 const AUDIENCES = ["all", "pending-fees", "selected"];
 const MAX_TITLE = 80;
@@ -76,6 +76,8 @@ async function feeReminderPreview(gymId) {
   const reachable = new Set(subscriptions.map((subscription) => subscription.memberId));
   return {
     available: pushAvailable(),
+    // "missing" | "invalid" | "" — lets the panel name the actual problem.
+    disabledReason: pushAvailable() ? "" : pushDisabledReason(),
     eligibleMembers: pending.length,
     reachableMembers: pending.filter((entry) => reachable.has(entry.member.id)).length,
     totalOutstanding: pending.reduce((sum, entry) => sum + entry.outstanding, 0),

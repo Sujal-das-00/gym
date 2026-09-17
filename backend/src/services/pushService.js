@@ -14,28 +14,48 @@ const MAX_TITLE = 80;
 const MAX_BODY = 300;
 
 let configured = null;
+// Why push is off, so the admin panel can tell "nobody set the keys" apart from
+// "the keys are set but wrong" — the second reads as the first otherwise, and
+// sends you hunting for a variable that is already there.
+let configuredReason = "";
 
 /**
  * Loads the VAPID keys into web-push once. Returns false (rather than throwing)
- * when they are missing, so the app still boots and serves everything else —
- * only the notification endpoints answer 503.
+ * when they are missing or malformed, so the app still boots and serves
+ * everything else — only the notification endpoints answer 503.
  */
 function pushReady() {
   if (configured !== null) return configured;
   const { publicKey, privateKey, subject } = pushConfig();
   if (!publicKey || !privateKey) {
+    configuredReason = "missing";
     console.warn("VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set — push notifications are disabled.");
     configured = false;
     return configured;
   }
   try {
+    // Throws unless the two are a real ECDSA P-256 pair (65 bytes public, 32
+    // private, base64url). A random string — the obvious guess, since
+    // JWT_SECRET is one — fails here, which is what this reason reports.
     webpush.setVapidDetails(subject, publicKey, privateKey);
     configured = true;
+    configuredReason = "";
   } catch (error) {
-    console.warn(`Invalid VAPID configuration — push notifications are disabled: ${error.message}`);
+    configuredReason = "invalid";
+    console.warn(
+      `Invalid VAPID configuration — push notifications are disabled: ${error.message}. ` +
+        'Generate a real key pair with: node -e "console.log(require(\'web-push\').generateVAPIDKeys())"',
+    );
     configured = false;
   }
   return configured;
+}
+
+// "" when push works, "missing" when the keys are unset, "invalid" when they are
+// set but are not a usable key pair.
+function pushDisabledReason() {
+  pushReady();
+  return configuredReason;
 }
 
 // The only half of the key pair a browser is ever given. The private key stays
@@ -128,6 +148,7 @@ async function sendToSubscriptions(subscriptions, payloadInput) {
 
 module.exports = {
   buildPayload,
+  pushDisabledReason,
   isPermanentFailure,
   publicVapidKey,
   pushAvailable,

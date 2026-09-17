@@ -164,15 +164,30 @@ export default function NotificationsView() {
   };
 
   if (unavailable) {
+    // "invalid" is the common trap: VAPID keys are an ECDSA P-256 pair, not a
+    // random secret like JWT_SECRET, so a hand-typed string sets the variables
+    // without enabling anything.
+    const invalidKeys = preview?.disabledReason === "invalid";
     return (
       <section className="panel">
         <div className="panel-head">
           <div>
             <h2>Push notifications are switched off</h2>
-            <p>
-              This server has no VAPID keys. Set <code>VAPID_PUBLIC_KEY</code> and{" "}
-              <code>VAPID_PRIVATE_KEY</code> in the environment and restart to enable notifications.
-            </p>
+            {invalidKeys ? (
+              <p>
+                <code>VAPID_PUBLIC_KEY</code> and <code>VAPID_PRIVATE_KEY</code> are set, but they are not a
+                valid key pair. They cannot be a random string — they must be a matched pair generated with{" "}
+                <code>node -e "console.log(require('web-push').generateVAPIDKeys())"</code>. Replace both
+                values and restart the server.
+              </p>
+            ) : (
+              <p>
+                This server has no VAPID keys. Generate a pair with{" "}
+                <code>node -e "console.log(require('web-push').generateVAPIDKeys())"</code>, set{" "}
+                <code>VAPID_PUBLIC_KEY</code> and <code>VAPID_PRIVATE_KEY</code> in the environment, and
+                restart.
+              </p>
+            )}
           </div>
         </div>
       </section>
