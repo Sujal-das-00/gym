@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* The member-app orange, as space-separated RGB channels so Tailwind's opacity
+       modifiers (bg-primary/20) and arbitrary shadows can both read them. */
+    --brand-primary: 248 106 16;
+    --brand-primary-hover: 224 91 6;
+    --brand-primary-tint: 255 247 237;
+    --brand-primary-fixed: 255 219 204;
+    --brand-on-primary-fixed: 83 29 0;
+  }
+
+  html,
+  body {
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+    background-color: theme("colors.background");
+    color: theme("colors.on-surface");
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 16px);
+  }
+}
+
+@layer utilities {
+  /* The viewfinder scanline sweeps between these two offsets; `animate-scanline`
+     comes from the keyframes in tailwind.config.js. */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

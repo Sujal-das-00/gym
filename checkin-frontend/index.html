@@ -1,118 +1,33 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#073f2d" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Gym Check-in" />
-    <meta name="description" content="Quick member check-in for your gym." />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/favicon.png" />
-    <link rel="icon" href="/icons/favicon.png" />
-    <title>Gym Check-in</title>
-    <link rel="stylesheet" href="/checkin/styles.css" />
-  </head>
-  <body class="checkin-body">
-    <main class="checkin-shell">
-      <section class="brand-panel" aria-label="Gym check-in">
-        <div class="brand-top">
-          <div class="brand-mark" id="brandMark">GA</div>
-          <div>
-            <p class="eyebrow">Member check-in</p>
-            <h1 id="gymName">Gym Check-in</h1>
-          </div>
-        </div>
-        <p id="gymIntro">Enter your mobile number (or member ID) to check in and keep your attendance record updated.</p>
-        <div class="checkin-summary">
-          <div>
-            <span>Today</span>
-            <strong id="todayLabel">--</strong>
-          </div>
-          <div>
-            <span>Status</span>
-            <strong id="memberStatus">Ready</strong>
-          </div>
-        </div>
-      </section>
+<html lang="en" class="light">
 
-      <section class="checkin-card">
-        <form id="checkinForm" class="checkin-form">
-          <label>
-            Mobile number or member ID
-            <input id="identifier" required autocomplete="tel" inputmode="text" placeholder="Your mobile number (or GYM1001)" />
-          </label>
-          <button type="submit" id="checkinButton">Check in</button>
-        </form>
-        <button class="secondary" id="installAppButton" type="button" hidden>Install app</button>
-        <aside class="ios-install-guide" id="iosInstallGuide" hidden aria-label="Install on iPhone or iPad">
-          <strong>Install on iPhone or iPad</strong>
-          <span>In Safari, tap Share, then choose <b>Add to Home Screen</b>.</span>
-          <button type="button" class="ios-install-close" id="iosInstallClose" aria-label="Close install instructions">&times;</button>
-        </aside>
-        <button class="secondary" id="forgetMe" type="button">Forget saved ID</button>
-        <div id="result" class="result-box" role="status" aria-live="polite"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f86a10" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Gym Check-in" />
+  <meta name="description" content="Quick member check-in for your gym." />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+  <link rel="icon" href="/icons/icon-192.svg" />
+  <title>Gym Check-in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet" />
+  <!-- Google Material Symbols icon font: <Icon name="qr_code_scanner" /> -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+</head>
 
-        <section class="member-panel" id="memberPanel" hidden>
-          <div class="member-head">
-            <img id="memberPhoto" alt="" />
-            <div>
-              <span id="memberGymId"></span>
-              <h2 id="memberName"></h2>
-              <p id="memberPhone"></p>
-            </div>
-          </div>
-          <div class="history-head">
-            <h3>Recent check-ins</h3>
-            <span id="historyCount">0 visits</span>
-          </div>
-          <div class="history-list" id="historyList"></div>
-        </section>
-      </section>
-    </main>
-    <script src="/checkin/checkin.js"></script>
-    <script>
-      (() => {
-        const installButton = document.getElementById("installAppButton");
-        let installPrompt;
+<body class="bg-background font-body-md text-on-surface pt-safe pb-safe min-h-screen flex flex-col antialiased">
+  <div id="root" class="flex-1 flex flex-col"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 
-        const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-
-        window.addEventListener("beforeinstallprompt", (event) => {
-          event.preventDefault();
-          installPrompt = event;
-          if (!isInstalled()) installButton.hidden = false;
-        });
-
-        installButton.addEventListener("click", async () => {
-          if (!installPrompt) return;
-          installPrompt.prompt();
-          await installPrompt.userChoice;
-          installPrompt = null;
-          installButton.hidden = true;
-        });
-
-        window.addEventListener("appinstalled", () => {
-          installPrompt = null;
-          installButton.hidden = true;
-        });
-
-        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
-          || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const iosGuide = document.getElementById("iosInstallGuide");
-        if (isIos && !isInstalled()) iosGuide.hidden = false;
-        document.getElementById("iosInstallClose").addEventListener("click", () => {
-          iosGuide.hidden = true;
-        });
-      })();
-
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/service-worker.js").catch(() => {});
-        });
-      }
-    </script>
-  </body>
 </html>

@@ -158,6 +158,45 @@ async function ensureFeatureColumns() {
   if (!(await columnExists("checkins", "expired"))) {
     await tryRaw("ALTER TABLE checkins ADD COLUMN expired TINYINT(1) NOT NULL DEFAULT 0 AFTER checkin_time", "checkins.expired");
   }
+  // One-off joining charge. Existing members keep 0 (no admission fee), which is
+  // also the default for gyms that don't charge one.
+  if (!(await columnExists("members", "admission_fee"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD COLUMN admission_fee DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER fee",
+      "members.admission_fee",
+    );
+  }
+  // Separates the admission-fee payment row from the membership-period rows, so
+  // an admission payment is never mistaken for a paid billing period. Existing
+  // payment rows are all membership payments, which is the column default.
+  if (!(await columnExists("payments", "kind"))) {
+    await tryRaw(
+      "ALTER TABLE payments ADD COLUMN kind ENUM('membership', 'admission') NOT NULL DEFAULT 'membership' AFTER amount",
+      "payments.kind",
+    );
+  }
+  // How a payment was collected. Existing rows stay NULL: the mode genuinely
+  // wasn't captured for them, and defaulting them to cash would invent data.
+  if (!(await columnExists("payments", "payment_mode"))) {
+    await tryRaw(
+      "ALTER TABLE payments ADD COLUMN payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL AFTER kind",
+      "payments.payment_mode",
+    );
+  }
+  if (!(await indexExists("payments", "idx_payments_member_kind"))) {
+    await tryRaw(
+      "ALTER TABLE payments ADD INDEX idx_payments_member_kind (member_id, kind)",
+      "add payments member/kind index",
+    );
+  }
+  // How an expense was paid out. Existing rows stay NULL for the same reason
+  // payments.payment_mode does: the mode wasn't captured for them.
+  if (!(await columnExists("expenses", "payment_mode"))) {
+    await tryRaw(
+      "ALTER TABLE expenses ADD COLUMN payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL AFTER expense_date",
+      "expenses.payment_mode",
+    );
+  }
 }
 
 // Re-write stored phone numbers in the canonical form (no +91/91/0 prefix) so

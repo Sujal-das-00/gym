@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { todayKey, toDateKey } = require("./date");
+const { normalizePaymentMode } = require("./member");
 
 // Keep in sync with EXPENSE_CATEGORIES in admin-frontend/script.js.
 const EXPENSE_CATEGORIES = [
@@ -20,6 +21,7 @@ function normalizeExpense(expense = {}) {
     title: String(expense.title || "").trim().slice(0, 160),
     amount: Number(expense.amount || 0),
     date: toDateKey(expense.date || todayKey()),
+    mode: normalizePaymentMode(expense.mode || expense.payment_mode) || null,
   };
 }
 

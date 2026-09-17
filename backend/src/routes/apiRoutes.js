@@ -9,6 +9,9 @@ const publicController = require("../controllers/publicController");
 const settingsController = require("../controllers/settingsController");
 const superRoutes = require("./superRoutes");
 const { authenticate, requireRole, resolveTenant } = require("../middleware/auth");
+const { authenticateMember } = require("../middleware/memberAuth");
+const { checkinThrottle } = require("../middleware/checkinThrottle");
+const { memberLoginThrottle } = require("../middleware/memberLoginThrottle");
 const { asyncHandler } = require("../utils/http");
 
 const router = express.Router();
@@ -24,8 +27,13 @@ router.get("/qr", appController.getQr);
 
 // --- Public, gym-scoped member check-in (no login; the slug picks the gym) ---
 router.get("/public/:slug/settings", asyncHandler(publicController.getPublicSettings));
-router.post("/public/:slug/checkin", asyncHandler(publicController.postPublicCheckin));
+router.post("/public/:slug/checkin", checkinThrottle, asyncHandler(publicController.postPublicCheckin));
 router.get("/public/:slug/checkin/history", asyncHandler(publicController.getPublicCheckinHistory));
+
+// --- Member "Account" login: gym_id (username) + phone (password) ---
+router.post("/public/:slug/account/login", memberLoginThrottle, asyncHandler(publicController.postAccountLogin));
+router.post("/public/:slug/account/logout", asyncHandler(publicController.postAccountLogout));
+router.get("/public/:slug/account/session", authenticateMember, asyncHandler(publicController.getAccountSession));
 
 // --- Super-admin panel (env-based login, own cookie, fully isolated) ---
 router.use("/super", superRoutes);
@@ -57,5 +65,6 @@ router.post("/attendance", asyncHandler(attendanceController.setAttendance));
 router.get("/attendance/status", asyncHandler(attendanceController.getAttendanceStatus));
 
 router.get("/checkins", asyncHandler(checkinController.listCheckins));
+router.get("/checkin/today", asyncHandler(checkinController.getTodayCode));
 
 module.exports = router;

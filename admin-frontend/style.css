@@ -486,18 +486,18 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 .paid-action { background: var(--blue); color: #fff; }
 .whatsapp-action { background: #25d366; color: #062d19; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .stat-card, .panel, .member-card, .detail-grid article, .payment-row {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: var(--shadow);
 }
-.stat-card { position: relative; min-height: 118px; padding: 18px 18px 16px 70px; overflow: hidden; }
-.stat-card span { display: block; color: var(--muted); font-size: .82rem; font-weight: 850; }
-.stat-card strong { display: block; margin-top: 7px; font-size: 2rem; line-height: 1; }
-.stat-card small { display: block; margin-top: 8px; color: var(--muted); }
-.stat-icon { position: absolute; top: 20px; left: 18px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-weight: 900; }
+.stat-card { position: relative; min-height: 96px; padding: 14px 14px 13px 56px; overflow: hidden; }
+.stat-card span { display: block; color: var(--muted); font-size: .74rem; font-weight: 850; line-height: 1.25; }
+.stat-card strong { display: block; margin-top: 5px; font-size: 1.6rem; line-height: 1; }
+.stat-card small { display: block; margin-top: 5px; color: var(--muted); font-size: .7rem; }
+.stat-icon { position: absolute; top: 14px; left: 13px; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-weight: 900; }
 .stat-card.total { background: linear-gradient(135deg, #f8fffb, #eef9f3); border-color: #cdebd9; }
 .stat-card.total .stat-icon { background: #d9f2e4; color: var(--green); }
 .stat-card.due { background: linear-gradient(135deg, #fff7f6, #fae9e7); border-color: #f0cac5; }
@@ -916,6 +916,29 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
   color: var(--green);
 }
 
+.fee-mode-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.fee-mode-field > span {
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.fee-mode-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 850;
+}
+
 .payment-customer-grid {
   display: grid;
   gap: 10px;
@@ -1266,6 +1289,7 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
 }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .form-grid .wide { grid-column: 1 / -1; }
+.field-hint { color: var(--muted); font-size: .72rem; font-weight: 700; line-height: 1.35; }
 .form-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
 .member-title { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
 .member-title p { margin-bottom: 0; color: var(--muted); }
@@ -1334,6 +1358,10 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
 .payment-row + .payment-row { margin-top: 8px; }
 .payment-row span { color: var(--muted); }
 
+
+@media (max-width: 1180px) {
+  .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 @media (max-width: 1060px) {
   .dashboard-grid { grid-template-columns: 1fr; }
@@ -1413,9 +1441,9 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
 @media (max-width: 520px) {
   .main-content { padding-left: 10px; padding-right: 10px; }
   .stats-grid { gap: 8px; }
-  .stat-card { min-height: 108px; padding: 14px 12px 12px 58px; }
-  .stat-icon { left: 12px; top: 16px; width: 34px; height: 34px; }
-  .stat-card strong { font-size: 1.55rem; }
+  .stat-card { min-height: 96px; padding: 13px 11px 11px 52px; }
+  .stat-icon { left: 11px; top: 14px; width: 30px; height: 30px; }
+  .stat-card strong { font-size: 1.45rem; }
   .filter-tabs { grid-template-columns: repeat(2, 1fr); }
   .attendance-row { grid-template-columns: 52px 1fr; }
   .attendance-status-cell, .attendance-actions { grid-column: 1 / -1; }
@@ -1463,6 +1491,38 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
   gap: 16px;
   align-items: start;
 }
+/* Today's code sits above the QR and has to be readable from across the front
+   desk, so it is deliberately the largest thing in the panel. */
+.today-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 12px;
+  margin: 4px 0 0;
+  background: var(--green-soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.today-code-label {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+.today-code-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 2.6rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: .18em;
+  /* The letter-spacing trails the last digit; pull it back so it reads centred. */
+  text-indent: .18em;
+  color: var(--green-dark);
+}
+.today-code-date { font-size: .78rem; color: var(--muted); }
+
 .qr-frame {
   display: flex;
   justify-content: center;
@@ -1696,7 +1756,30 @@ html.pwa .date-pill { display: none !important; }
     "list      detail";
   gap: 12px 16px;
 }
-.payment-workspace .payment-customer-grid { grid-area: list; }
+.payment-workspace .fee-mode-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.fee-mode-field > span {
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.fee-mode-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 850;
+}
+
+.payment-customer-grid { grid-area: list; }
 .payment-workspace .payment-customer-detail { grid-area: detail; }
 
 .payment-customer-card {
@@ -1818,7 +1901,30 @@ html.pwa .date-pill { display: none !important; }
       "detail"
       "list";
   }
-  .payment-customer-grid { max-height: none; overflow: visible; padding-right: 0; }
+  .fee-mode-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.fee-mode-field > span {
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.fee-mode-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 850;
+}
+
+.payment-customer-grid { max-height: none; overflow: visible; padding-right: 0; }
 }
 
 /* ---- Attendance history: minimal mobile-reference layout ---- */
@@ -1955,6 +2061,13 @@ html.pwa .date-pill { display: none !important; }
   color: var(--muted);
   font-size: .76rem;
   font-weight: 800;
+}
+.member-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .member-whatsapp-action {
   width: auto;
@@ -2166,4 +2279,198 @@ button.is-busy::before {
     align-items: center;
     width: 100%;
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * Detailed Insights — period picker, in/out breakdowns and the day list.
+ * Reuses the finance palette: green for money in, red for money out.
+ * ------------------------------------------------------------------------- */
+.insight-period-panel { margin-bottom: 16px; }
+
+.insight-mode-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 90%, var(--green-soft));
+  margin-bottom: 12px;
+}
+.insight-mode-button {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 14px;
+  font-size: .82rem;
+  font-weight: 850;
+  min-height: 40px;
+}
+.insight-mode-button.active {
+  border-color: color-mix(in srgb, var(--green) 30%, var(--line));
+  background: var(--panel);
+  color: var(--green);
+}
+.insight-filters { margin-bottom: 0; }
+
+.insight-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.insight-breakdown-list { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.insight-breakdown-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.insight-breakdown-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.insight-breakdown-label { font-size: .88rem; font-weight: 850; }
+.insight-breakdown-row.is-in .insight-breakdown-head strong { color: var(--green); }
+.insight-breakdown-row.is-out .insight-breakdown-head strong { color: var(--red); }
+.insight-breakdown-row small { color: var(--muted); font-size: .74rem; font-weight: 750; }
+
+.insight-breakdown-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--line) 70%, var(--panel));
+  overflow: hidden;
+}
+.insight-breakdown-bar > span { display: block; height: 100%; border-radius: 99px; }
+.insight-breakdown-row.is-in .insight-breakdown-bar > span { background: var(--green); }
+.insight-breakdown-row.is-out .insight-breakdown-bar > span { background: var(--red); }
+
+.insight-subhead {
+  margin: 18px 0 10px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.insight-member-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.insight-member-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: left;
+  font-weight: 800;
+  min-height: 44px;
+}
+.insight-member-list button:hover { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.insight-member-list strong { color: var(--green); white-space: nowrap; }
+
+.insight-day-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.insight-day-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.insight-day-main { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
+.insight-day-date {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 1rem;
+  flex: none;
+}
+.insight-day-copy { min-width: 0; display: grid; gap: 2px; }
+.insight-day-copy > strong { font-size: .95rem; }
+.insight-day-copy > span { color: var(--muted); font-size: .78rem; font-weight: 750; }
+.insight-day-copy em { font-style: normal; font-weight: 900; }
+
+.is-in { color: var(--green); }
+.is-out { color: var(--red); }
+
+.insight-day-net { white-space: nowrap; font-size: .98rem; }
+.insight-read-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--green) 26%, var(--line));
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--green);
+  padding: 8px 10px;
+  font-size: .76rem;
+  font-weight: 900;
+  white-space: nowrap;
+  min-height: 40px;
+}
+.insight-read-more:hover { background: var(--green-soft); }
+.insight-read-more .material-symbols-outlined { font-size: 1rem; }
+
+/* The "Read more" window itself. */
+.day-ledger-dialog { width: min(96vw, 520px); }
+.day-ledger-panel { display: grid; gap: 14px; }
+.day-ledger-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.day-ledger-summary article {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.day-ledger-summary span { display: block; color: var(--muted); font-size: .76rem; font-weight: 900; }
+.day-ledger-summary strong { display: block; margin-top: 6px; font-size: 1.1rem; }
+.day-ledger-summary article.is-in { border-color: color-mix(in srgb, var(--green) 24%, var(--line)); background: var(--green-soft); }
+.day-ledger-summary article.is-out { border-color: color-mix(in srgb, var(--red) 20%, var(--line)); background: var(--red-soft); }
+.day-ledger-summary article.is-in strong { color: var(--green); }
+.day-ledger-summary article.is-out strong { color: var(--red); }
+
+.day-ledger-list { display: grid; gap: 10px; max-height: min(52vh, 420px); overflow-y: auto; }
+.day-ledger-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  text-align: left;
+}
+.day-ledger-row:hover { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.day-ledger-ico { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; flex: none; }
+.day-ledger-row.is-earning .day-ledger-ico { background: var(--green-soft); color: var(--green); }
+.day-ledger-row.is-expense .day-ledger-ico { background: var(--red-soft); color: var(--red); }
+.day-ledger-copy { min-width: 0; display: grid; gap: 2px; }
+.day-ledger-copy strong { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-ledger-copy > span { color: var(--muted); font-size: .78rem; }
+.day-ledger-amount-col { display: grid; gap: 2px; justify-items: end; }
+.day-ledger-amount { white-space: nowrap; font-size: .95rem; }
+.day-ledger-row.is-earning .day-ledger-amount { color: var(--green); }
+.day-ledger-row.is-expense .day-ledger-amount { color: var(--red); }
+.day-ledger-mode { white-space: nowrap; color: var(--muted); font-size: .72rem; font-weight: 700; }
+
+@media (max-width: 900px) {
+  .insight-breakdown-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  /* Stack the day row so the amount and "Read more" stay tappable. */
+  .insight-day-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .insight-read-more { grid-column: 1 / -1; justify-content: center; }
+  .insight-mode-switch { width: 100%; }
+  .insight-mode-button { flex: 1; }
 }

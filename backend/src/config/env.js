@@ -41,8 +41,17 @@ function authConfig() {
     // The super-admin panel uses its own cookie so its session is fully separate
     // from a regular gym-admin session (different interface, no cross-access).
     superCookieName: process.env.SUPER_ADMIN_COOKIE_NAME || "gym_super_session",
+    // Members sign in with gym_id + phone, not email + password, so their session
+    // is signed with a key *derived* from jwtSecret rather than jwtSecret itself.
+    // That guarantees a member token can never verify against the staff/super
+    // secret (and vice versa) even if one leaked into the other's Bearer header.
+    memberCookieName: process.env.MEMBER_AUTH_COOKIE_NAME || "gym_member_session",
+    memberJwtSecret: require("crypto").createHmac("sha256", jwtSecret).update("member-session-v1").digest("hex"),
     cookieSecure: String(process.env.COOKIE_SECURE || "").toLowerCase() === "true",
     tokenTtlSeconds: Number(process.env.AUTH_TOKEN_TTL || 60 * 60 * 12),
+    // "Trust this device" on the member login screen picks between these two.
+    memberTokenTtlSeconds: Number(process.env.MEMBER_AUTH_TOKEN_TTL || 60 * 60 * 24 * 30),
+    memberTokenTtlShortSeconds: Number(process.env.MEMBER_AUTH_TOKEN_TTL_UNTRUSTED || 60 * 60 * 12),
     superAdmin: {
       email: String(process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase(),
       password: String(process.env.SUPER_ADMIN_PASSWORD || ""),

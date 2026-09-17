@@ -88,9 +88,20 @@ function getBillingPeriodKeys(member, settings) {
   return periods;
 }
 
+// Admission-fee rows are stored in payments with this literal as their billing
+// period; it is never a real period key, so they can't mark a period paid.
+const ADMISSION_PERIOD_KEY = "admission";
+
+function isAdmissionPayment(payment) {
+  return payment?.kind === "admission" || payment?.billingPeriod === ADMISSION_PERIOD_KEY;
+}
+
 function getPaidPeriodSet(member) {
   return new Set(
-    (member.payments || []).map((payment) => payment.billingPeriod || payment.billingMonth || payment.month).filter(Boolean),
+    (member.payments || [])
+      .filter((payment) => !isAdmissionPayment(payment))
+      .map((payment) => payment.billingPeriod || payment.billingMonth || payment.month)
+      .filter(Boolean),
   );
 }
 
@@ -123,6 +134,83 @@ function isMembershipExpired(member, settings) {
   return unpaid.some((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysBetween(from, to) {
+  return Math.round((to.getTime() - from.getTime()) / DAY_MS);
+}
+
+function periodStartDate(periodKey) {
+  const key = String(periodKey || "");
+  return parseDateKey(key.length === 7 ? `${key}-01` : key);
+}
+
+// The date a period's payment is actually due — matches the two branches of
+// isMembershipExpired above: a fixed-day gym owes once the period ends, an
+// at-join gym owes from the moment the period starts.
+function periodDueDate(member, settings, periodKey) {
+  return collectionTiming(member, settings) === "fixed-day"
+    ? periodEndDate(member, settings, periodKey)
+    : periodStartDate(periodKey);
+}
+
+/**
+ * What the member app's home screen puts on its "next due" card: when the
+ * oldest unpaid, already-due period fell due (if the member is behind — that's
+ * the debt to clear first), otherwise when the period running now renews, and
+ * how much of it is left.
+ *
+ * Derived here rather than in the check-in frontend so the period math keeps a
+ * single home — the frontend never sees billingCycleMode at all.
+ */
+function memberBillingSummary(member, settings) {
+  const periods = getBillingPeriodKeys(member, settings);
+  const paid = getPaidPeriodSet(member);
+  const unpaid = periods.filter((period) => !paid.has(period));
+  const today = parseDateKey(todayKey());
+
+  // A member can be expired from an OLD unpaid period while the period in
+  // progress hasn't ended yet — "next due" must point at that old debt (the
+  // oldest overdue due date), not silently at the current period's still-
+  // future renewal, or the card would say "overdue" but show 0 days overdue.
+  const overdueDates = unpaid
+    .map((period) => periodDueDate(member, settings, period))
+    .filter((due) => !Number.isNaN(due.getTime()) && due < today)
+    .sort((a, b) => a - b);
+
+  const current = periods[periods.length - 1] || "";
+  const start = periodStartDate(current);
+  const currentEnd = current ? periodEndDate(member, settings, current) : new Date(NaN);
+  // Computed independently above from the same unpaid set and due-date rules
+  // as isMembershipExpired, so this should always agree with the check-in
+  // gate; fall back to the gate's own answer if the two ever disagree.
+  const expired = overdueDates.length > 0 || isMembershipExpired(member, settings);
+  const target = overdueDates.length ? overdueDates[0] : currentEnd;
+  const dated = current && !Number.isNaN(start.getTime()) && !Number.isNaN(target.getTime());
+
+  // Signed once, then split into "days left" (future) and "days overdue" (past)
+  // so the app can show one or the other instead of clamping overdue to 0.
+  const diff = dated ? daysBetween(today, target) : 0;
+
+  return {
+    amount: Number(member?.fee || 0),
+    planLabel:
+      membershipType(member) === "package" ? `${packageMonths(member)}-month package` : "Monthly",
+    // Not overdue: the renewal date of the period in progress. Overdue: the
+    // due date of the oldest unpaid period — the debt to clear first.
+    nextDueDate: dated ? localDateKey(target) : "",
+    daysLeft: dated ? Math.max(0, diff) : 0,
+    daysOverdue: dated ? Math.max(0, -diff) : 0,
+    // Length of the current period, so the card can draw it as a progress ring.
+    cycleDays: dated ? Math.max(1, daysBetween(start, currentEnd)) : 0,
+    unpaidPeriods: unpaid.length,
+    expired,
+  };
+}
+
 module.exports = {
+  ADMISSION_PERIOD_KEY,
+  isAdmissionPayment,
   isMembershipExpired,
+  memberBillingSummary,
 };

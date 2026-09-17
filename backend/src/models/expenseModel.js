@@ -1,5 +1,6 @@
 const { exec, query } = require("../config/database");
 const { toDateKey } = require("../utils/date");
+const { normalizePaymentMode } = require("../utils/member");
 
 function mapExpenseRow(row) {
   return {
@@ -8,6 +9,7 @@ function mapExpenseRow(row) {
     title: row.title,
     amount: Number(row.amount || 0),
     date: toDateKey(row.expense_date),
+    mode: normalizePaymentMode(row.payment_mode),
   };
 }
 
@@ -26,11 +28,12 @@ async function getExpenseById(gymId, id) {
 
 async function saveExpense(gymId, expense) {
   await exec(
-    `INSERT INTO expenses (id, tenant_id, category, title, amount, expense_date)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO expenses (id, tenant_id, category, title, amount, expense_date, payment_mode)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       category = VALUES(category), title = VALUES(title), amount = VALUES(amount), expense_date = VALUES(expense_date)`,
-    [expense.id, gymId, expense.category, expense.title, expense.amount, expense.date],
+       category = VALUES(category), title = VALUES(title), amount = VALUES(amount), expense_date = VALUES(expense_date),
+       payment_mode = VALUES(payment_mode)`,
+    [expense.id, gymId, expense.category, expense.title, expense.amount, expense.date, expense.mode || null],
   );
   return getExpenseById(gymId, expense.id);
 }

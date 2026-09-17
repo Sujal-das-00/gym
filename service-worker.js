@@ -1,14 +1,10 @@
-const CACHE_NAME = "gym-pwa-v6";
+const CACHE_NAME = "gym-pwa-v9";
 const APP_SHELL = [
   "/",
   "/admin",
   "/checkin",
   "/manifest.json",
   "/service-worker.js",
-  "/admin/style.css",
-  "/admin/script.js",
-  "/checkin/styles.css",
-  "/checkin/checkin.js",
   "/icons/icon-192.svg",
   "/icons/icon-512.svg",
 ];
@@ -34,7 +30,13 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   const isNavigation = request.mode === "navigate" || request.destination === "document";
-  const isAppShell = APP_SHELL.includes(url.pathname) || url.pathname.startsWith("/icons/");
+  // Both frontends are hashed Vite bundles, so their assets can't be listed in
+  // APP_SHELL up front — match them by prefix and cache them as they load.
+  const isAppShell =
+    APP_SHELL.includes(url.pathname) ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/admin/assets/") ||
+    url.pathname.startsWith("/checkin/assets/");
   if (!isNavigation && !isAppShell) return;
 
   // Network-first: always serve the freshest HTML/JS/CSS when online so code
@@ -48,6 +50,12 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/admin"))),
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
+          // Offline navigation: fall back to the shell for whichever app was asked for.
+          return caches.match(url.pathname.startsWith("/checkin") ? "/checkin" : "/admin");
+        }),
+      ),
   );
 });

@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { todayKey } = require("../utils/date");
-const { normalizeMember, normalizePhone, publicMember } = require("../utils/member");
+const { normalizeMember, normalizePaymentMode, normalizePhone, publicMember } = require("../utils/member");
 const { saveImageData } = require("./imageService");
 const { repo } = require("../models");
 
@@ -12,6 +12,13 @@ async function mergeMemberPayload(existing, payload) {
     phone: normalizePhone(payload.phone ?? existing?.phone),
     address: String(payload.address ?? existing?.address ?? "").trim(),
     fee: Number(payload.fee ?? existing?.fee ?? 0),
+    // One-off joining charge. Left at 0 for gyms that don't collect one.
+    admissionFee: Number(payload.admissionFee ?? existing?.admissionFee ?? 0),
+    // How the admission fee was collected. Falls back to the mode already on
+    // record (from the existing admission payment row) when the caller omits it.
+    admissionMode: normalizePaymentMode(
+      payload.admissionMode ?? existing?.payments?.find((payment) => payment.kind === "admission")?.mode ?? "",
+    ),
     membershipType: payload.membershipType === "package" ? "package" : existing?.membershipType === "package" ? "package" : "monthly",
     packageMonths: Math.max(1, Math.round(Number(payload.packageMonths ?? existing?.packageMonths ?? 1))),
     collectionTiming: ["at-join", "fixed-day"].includes(payload.collectionTiming)
@@ -74,6 +81,13 @@ async function createMember(gymId, payload) {
 
   const saved = await repo().saveMember(gymId, member);
 
+  // The admission fee is collected at joining, so it is recorded straight away
+  // as its own payment row (kind "admission") — separate from the membership
+  // terms, and skipped entirely when the fee is 0. admissionMode isn't a
+  // members-table column, so saveMember's DB round-trip drops it — carry it
+  // over from the pre-save `member` explicitly.
+  await repo().syncAdmissionPayment({ ...saved, admissionMode: member.admissionMode });
+
   // "Collect at join" means the joining term is paid upfront — record that payment so the
   // next due date lands one cycle later instead of showing the join period as already due.
   if (member.collectionTiming === "at-join") {
@@ -87,10 +101,9 @@ async function createMember(gymId, payload) {
         billingPeriod: periodKey,
       },
     ]);
-    return publicMember(await repo().getMemberById(gymId, saved.id));
   }
 
-  return publicMember(saved);
+  return publicMember(await repo().getMemberById(gymId, saved.id));
 }
 
 async function updateMember(gymId, id, payload) {
@@ -99,7 +112,12 @@ async function updateMember(gymId, id, payload) {
   const member = await mergeMemberPayload(existing, payload);
   member.id = id;
   await assertUniqueMember(gymId, member);
-  return publicMember(await repo().saveMember(gymId, member));
+  const saved = await repo().saveMember(gymId, member);
+  // Re-sync so changing (or clearing) the admission fee, or moving the start
+  // date, updates the recorded admission payment instead of leaving a stale one.
+  // admissionMode isn't a members-table column, so carry it over explicitly.
+  await repo().syncAdmissionPayment({ ...saved, admissionMode: member.admissionMode });
+  return publicMember(await repo().getMemberById(gymId, id));
 }
 
 module.exports = {

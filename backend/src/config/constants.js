@@ -5,13 +5,24 @@ const PROJECT_ROOT = path.resolve(BACKEND_ROOT, "..");
 
 const PORT = Number(process.env.PORT || 5051);
 const ADMIN_DIR = path.join(PROJECT_ROOT, "admin-frontend");
+// The admin dashboard is a React app built by Vite; Express serves the build,
+// not the source tree. Run `npm install && npm run build` in admin-frontend/.
+const ADMIN_DIST = path.join(ADMIN_DIR, "dist");
 const SUPERADMIN_DIR = path.join(PROJECT_ROOT, "superadmin-frontend");
 const CHECKIN_DIR = path.join(PROJECT_ROOT, "checkin-frontend");
+// The member check-in app is a React app built by Vite, like the admin dashboard.
+// Run `npm install && npm run build` in checkin-frontend/.
+const CHECKIN_DIST = path.join(CHECKIN_DIR, "dist");
 const ICONS_DIR = path.join(PROJECT_ROOT, "icons");
 const DATA_DIR = path.join(BACKEND_ROOT, "data");
 const UPLOAD_DIR = path.join(BACKEND_ROOT, "uploads");
 const LEGACY_DB_PATH = path.join(DATA_DIR, "db.json");
 const SCHEMA_PATH = path.join(BACKEND_ROOT, "schema.sql");
+
+// How a payment was collected at the front desk. Payments recorded before this
+// existed carry no mode at all — that reads as "not recorded", and is never
+// silently assumed to be cash.
+const PAYMENT_MODES = ["cash", "upi", "card", "bank", "cheque", "other"];
 
 const DEFAULT_SETTINGS = {
   gymName: "Gym Admin",
@@ -37,12 +48,15 @@ module.exports = {
   PORT,
   PROJECT_ROOT,
   ADMIN_DIR,
+  ADMIN_DIST,
   SUPERADMIN_DIR,
   CHECKIN_DIR,
+  CHECKIN_DIST,
   ICONS_DIR,
   DATA_DIR,
   UPLOAD_DIR,
   LEGACY_DB_PATH,
   SCHEMA_PATH,
   DEFAULT_SETTINGS,
+  PAYMENT_MODES,
 };

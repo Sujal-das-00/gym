@@ -12,7 +12,6 @@ function setSessionCookie(res, token) {
 async function postLogin(req, res) {
   const email = String(req.body?.email || "").trim();
   const password = String(req.body?.password || "");
-  console.log(email, " ", password)
   const { token, user } = await authService.login(email, password);
   setSessionCookie(res, token);
   // Also return the token so the SPA can send it as `Authorization: Bearer` —

@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS members (
   phone VARCHAR(30) NOT NULL,
   address TEXT NOT NULL,
   fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- One-off joining/admission charge collected before the first membership term.
+  -- 0 for gyms that don't charge one. Mirrored into payments as a kind='admission' row.
+  admission_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
   membership_type ENUM('monthly', 'package') NOT NULL DEFAULT 'monthly',
   package_months INT UNSIGNED NOT NULL DEFAULT 1,
   collection_timing VARCHAR(16) NOT NULL DEFAULT '',
@@ -119,6 +122,9 @@ CREATE TABLE IF NOT EXISTS expenses (
   title VARCHAR(160) NOT NULL DEFAULT '',
   amount DECIMAL(10,2) NOT NULL DEFAULT 0,
   expense_date DATE NOT NULL,
+  -- How the money left the till. NULL means it was never recorded (every row
+  -- saved before this column existed), which is not the same as cash.
+  payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_expenses_tenant_date (tenant_id, expense_date),
   CONSTRAINT fk_expenses_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
@@ -132,8 +138,17 @@ CREATE TABLE IF NOT EXISTS payments (
   billing_month VARCHAR(7) NOT NULL DEFAULT '',
   billing_period VARCHAR(20) NOT NULL,
   amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- 'membership' rows pay for a billing period (billing_period names it).
+  -- 'admission' rows are the one-off joining fee and never mark a period paid
+  -- (billing_period is the literal 'admission'); one per member, kept in sync
+  -- with members.admission_fee.
+  kind ENUM('membership', 'admission') NOT NULL DEFAULT 'membership',
+  -- How the money was collected. NULL means it was never recorded (every row
+  -- saved before this column existed), which is not the same as cash.
+  payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_payments_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
   INDEX idx_payments_member_date (member_id, payment_date),
+  INDEX idx_payments_member_kind (member_id, kind),
   INDEX idx_payments_billing_period (billing_period)
 );

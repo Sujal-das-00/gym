@@ -4,7 +4,7 @@ const path = require("path");
 const sharp = require("sharp");
 const { UPLOAD_DIR } = require("../config/constants");
 
-const MAX_DIMENSION = 1024; // longest side in px after resize
+const MAX_DIMENSION = 256; // longest side in px after resize; largest on-screen use is a 96px avatar
 const WEBP_QUALITY = 70;
 
 async function saveImageData(dataUrl, prefix) {

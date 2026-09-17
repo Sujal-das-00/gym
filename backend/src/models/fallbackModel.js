@@ -1,7 +1,8 @@
 const crypto = require("crypto");
 const { nowIso, todayKey, toDateKey } = require("../utils/date");
-const { normalizeMember, normalizePhone, publicMember } = require("../utils/member");
+const { normalizeMember, normalizePaymentMode, normalizePhone, publicMember } = require("../utils/member");
 const { normalizeSettings } = require("../utils/settings");
+const { ADMISSION_PERIOD_KEY } = require("../utils/billing");
 const store = require("../services/memoryStore");
 
 function getAllMembers() {
@@ -19,6 +20,18 @@ function findMember(gymId, identifier) {
   const phone = normalizePhone(value);
   const member = store.getState().members.find((item) => {
     return String(item.id || "").toLowerCase() === value || String(item.gymId || "").toLowerCase() === value || (phone && normalizePhone(item.phone) === phone);
+  });
+  return publicMember(member || null);
+}
+
+// Unlike findMember (OR-match, used by kiosk check-in), login requires BOTH the
+// membership code and the phone to match the same member — two factors, not one.
+function findMemberByCredentials(gymId, gymCode, phone) {
+  const code = String(gymCode || "").trim().toLowerCase();
+  const normalizedPhone = normalizePhone(phone);
+  if (!code || !normalizedPhone) return publicMember(null);
+  const member = store.getState().members.find((item) => {
+    return String(item.gymId || "").toLowerCase() === code && normalizePhone(item.phone) === normalizedPhone;
   });
   return publicMember(member || null);
 }
@@ -99,6 +112,32 @@ function addPayments(member, payments = []) {
       billingMonth: String(payment.billingMonth || (billingPeriod.length === 7 ? billingPeriod : "")),
       billingPeriod,
       amount: Number(payment.amount || member.fee || 0),
+      kind: payment.kind === "admission" ? "admission" : "membership",
+      mode: normalizePaymentMode(payment.mode),
+    });
+  }
+  store.persist();
+}
+
+// Mirrors paymentModel.syncAdmissionPayment: one admission-fee payment per
+// member, always matching members.admissionFee, so an edited or cleared fee
+// leaves no stale earning behind.
+function syncAdmissionPayment(member) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  if (!target) return;
+  target.payments = (target.payments || []).filter((payment) => payment.kind !== "admission");
+  const amount = Number(member.admissionFee || 0);
+  if (amount > 0) {
+    const date = toDateKey(member.startDate || todayKey());
+    target.payments.push({
+      id: crypto.randomUUID(),
+      date,
+      month: date.slice(0, 7),
+      billingMonth: "",
+      billingPeriod: ADMISSION_PERIOD_KEY,
+      amount,
+      kind: "admission",
+      mode: normalizePaymentMode(member.admissionMode),
     });
   }
   store.persist();
@@ -200,6 +239,7 @@ module.exports = {
   deleteMember,
   findCheckinForDate,
   findMember,
+  findMemberByCredentials,
   getAllExpenses,
   getAllMembers,
   getAttendanceRevision,
@@ -212,4 +252,5 @@ module.exports = {
   saveMember,
   saveSettings,
   setMemberAttendance,
+  syncAdmissionPayment,
 };
