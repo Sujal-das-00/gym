@@ -53,6 +53,7 @@ export const VIEW_COPY = {
   expenses: ["Expense Tracker", "Track every expense and earning of the gym in one ledger."],
   insights: ["Detailed Insights", "Pick any month, year or date range and see exactly where the money came from and went."],
   trainers: ["Trainers", "Manage trainer profiles, specialties, shifts, and contact details."],
+  notifications: ["Send Notification", "Push fee reminders and announcements to your members' phones."],
   settings: ["Settings", "Update your gym profile and logo."],
   help: ["Need Help", "Video tutorials in Hindi & English, plus a step-by-step text guide."],
 };
@@ -68,6 +69,7 @@ export const VIEW_SHORT_TITLE = {
   payments: "Payments",
   expenses: "Expense Tracker",
   insights: "Detailed Insights",
+  notifications: "Send Notification",
   settings: "Settings",
   help: "Need Help",
 };

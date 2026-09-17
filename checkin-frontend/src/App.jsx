@@ -11,7 +11,8 @@ import useCheckin from "./hooks/useCheckin.js";
 import useGymBranding from "./hooks/useGymBranding.js";
 import useInstallPrompt from "./hooks/useInstallPrompt.js";
 import useMemberAccount from "./hooks/useMemberAccount.js";
-import { readCodeFromLocation, readScan, readSlugFromLocation } from "./lib/gym.js";
+import usePushNotifications from "./hooks/usePushNotifications.js";
+import { readCodeFromLocation, readScan, readScreenFromLocation, readSlugFromLocation } from "./lib/gym.js";
 import AccountPanel from "./views/AccountPanel.jsx";
 import CheckinPanel from "./views/CheckinPanel.jsx";
 import MemberHome from "./views/MemberHome.jsx";
@@ -28,7 +29,9 @@ const PAGE_TITLES = {
 export default function App() {
   const [slug, setSlug] = useState(readSlugFromLocation);
   const [tab, setTab] = useState("checkin");
-  const [destination, setDestination] = useState("home");
+  // Seeded from ?screen= so a tapped push notification lands on the screen it
+  // promised — a fee reminder opens the dashboard with the dues card on it.
+  const [destination, setDestination] = useState(readScreenFromLocation);
   const [scanNote, setScanNote] = useState(null);
   // Today's front-desk code, either scanned off the QR or carried in the ?c= of
   // the link it points at. It only pre-fills the field; the member still submits.
@@ -37,6 +40,7 @@ export default function App() {
   const { canInstall, promptInstall } = useInstallPrompt();
   const checkin = useCheckin(slug);
   const account = useMemberAccount(slug);
+  const push = usePushNotifications(slug, account.member?.id || "");
 
   // Scanning a QR swaps gyms with pushState, so the back button has to put the
   // previous gym back.
@@ -108,6 +112,7 @@ export default function App() {
               gymName={branding.gymName}
               history={account.history}
               member={account.member}
+              push={push}
             />
           )}
           {destination === "receipts" && (

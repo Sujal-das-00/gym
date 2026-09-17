@@ -152,3 +152,32 @@ CREATE TABLE IF NOT EXISTS payments (
   INDEX idx_payments_member_kind (member_id, kind),
   INDEX idx_payments_billing_period (billing_period)
 );
+
+-- Web Push endpoints, one row per BROWSER/DEVICE — a member who opens the PWA
+-- on a phone and a laptop has two. Only the subscription (endpoint + the two
+-- keys the push service needs to encrypt to it) is stored; notification bodies
+-- are never persisted here.
+--
+-- endpoint is a URL that can run past what MySQL will index in one column, so
+-- uniqueness is enforced on its SHA-256 instead. It is global, not per tenant:
+-- one browser is one endpoint, and re-subscribing on a device that was signed
+-- in as a different member must MOVE that row, never duplicate it.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  member_id CHAR(36) NOT NULL,
+  -- Denormalized from members so a gym's sends can be scoped without a join.
+  tenant_id CHAR(36) NOT NULL,
+  endpoint TEXT NOT NULL,
+  endpoint_hash CHAR(64) NOT NULL,
+  p256dh VARCHAR(255) NOT NULL,
+  auth VARCHAR(255) NOT NULL,
+  -- Only so a member can tell their devices apart when revoking one.
+  user_agent VARCHAR(255) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_push_endpoint (endpoint_hash),
+  INDEX idx_push_member (member_id),
+  INDEX idx_push_tenant (tenant_id),
+  CONSTRAINT fk_push_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+  CONSTRAINT fk_push_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);

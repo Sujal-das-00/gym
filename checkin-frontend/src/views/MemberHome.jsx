@@ -1,5 +1,6 @@
 import AttendanceCard from "../components/AttendanceCard.jsx";
 import InvoicesCard from "../components/InvoicesCard.jsx";
+import NotificationCard from "../components/NotificationCard.jsx";
 import MemberStatPills from "../components/MemberStatPills.jsx";
 import NextDueCard from "../components/NextDueCard.jsx";
 import { initials } from "../lib/format.js";
@@ -11,7 +12,7 @@ import { currentStreak, visitsThisMonth, weekStrip } from "../lib/memberStats.js
  * and the week strip; payments drive the receipts; the server's billing summary
  * drives the renewal card.
  */
-export default function MemberHome({ billing, gymName, history, member }) {
+export default function MemberHome({ billing, gymName, history, member, push }) {
   const attendance = member.attendance || [];
 
   return (
@@ -56,6 +57,11 @@ export default function MemberHome({ billing, gymName, history, member }) {
       </section>
 
       <NextDueCard billing={billing} />
+
+      {/* Directly under the dues card: the switch is most worth tapping for the
+          member who just saw what they owe. Renders nothing when the server has
+          no VAPID keys or the browser can't do push. */}
+      {push ? <NotificationCard push={push} /> : null}
 
       <AttendanceCard gymName={gymName} history={history} week={weekStrip(attendance)} />
 

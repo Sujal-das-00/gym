@@ -67,3 +67,40 @@ export async function postCheckin(slug, identifier, code) {
   if (!res.ok) throw new Error(data.error || "Check-in failed");
   return data;
 }
+
+/* ---- Web Push -----------------------------------------------------------
+ * The public VAPID key is not a secret — it is what the browser encrypts its
+ * payloads to. The matching private key never leaves the backend.
+ * ----------------------------------------------------------------------- */
+
+export async function fetchPushPublicKey() {
+  const res = await fetch("/api/push/public-key");
+  if (!res.ok) throw new Error("Push notifications are unavailable");
+  return res.json();
+}
+
+// Registering the device needs the member session, so these all go through the
+// account namespace with the member cookie attached.
+export async function postPushSubscribe(slug, subscription) {
+  const res = await fetch(`${publicBase(slug)}/account/push/subscribe`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription }),
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data.error || "Could not turn on notifications");
+  return data;
+}
+
+export async function postPushUnsubscribe(slug, endpoint) {
+  const res = await fetch(`${publicBase(slug)}/account/push/unsubscribe`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint }),
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data.error || "Could not turn off notifications");
+  return data;
+}

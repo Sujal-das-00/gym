@@ -122,16 +122,31 @@ function periodEndDate(member, settings, periodKey) {
   return end;
 }
 
-// Mirrors the admin frontend's isOverdue(): the membership counts as expired once a
-// billing period is due without payment — that is when renewal has lapsed.
-function isMembershipExpired(member, settings) {
+// Unpaid periods that are already PAST their collection point — the ones a member
+// actually owes money for right now. Mirrors getDueUnpaidPeriods() in
+// admin-frontend/src/lib/billing.js; keep the two in sync, because this is what
+// the fee-reminder notification quotes back to the member.
+function dueUnpaidPeriods(member, settings) {
   const unpaid = getUnpaidPeriods(member, settings);
   if (collectionTiming(member, settings) === "fixed-day") {
     // Only overdue once a period has fully ended without payment; the in-progress period is not yet due.
     const today = todayKey();
-    return unpaid.some((period) => localDateKey(periodEndDate(member, settings, period)) < today);
+    return unpaid.filter((period) => localDateKey(periodEndDate(member, settings, period)) < today);
   }
-  return unpaid.some((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
+  return unpaid.filter((period) => period < todayKey() || (period.length === 7 && period < monthKey()));
+}
+
+// Mirrors the admin frontend's isOverdue(): the membership counts as expired once a
+// billing period is due without payment — that is when renewal has lapsed.
+function isMembershipExpired(member, settings) {
+  return dueUnpaidPeriods(member, settings).length > 0;
+}
+
+// Rupees the member owes today: one fee per already-due unpaid period. The
+// one-off admission charge is deliberately excluded, matching the "Overdue"
+// amount the admin dashboard shows (getOverdueAmount).
+function memberOutstanding(member, settings) {
+  return dueUnpaidPeriods(member, settings).length * Number(member?.fee || 0);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -210,7 +225,9 @@ function memberBillingSummary(member, settings) {
 
 module.exports = {
   ADMISSION_PERIOD_KEY,
+  dueUnpaidPeriods,
   isAdmissionPayment,
   isMembershipExpired,
   memberBillingSummary,
+  memberOutstanding,
 };

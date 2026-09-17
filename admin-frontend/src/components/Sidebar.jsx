@@ -33,6 +33,13 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    label: "Notifications",
+    // Owner-only: a mass push reaches every member's phone, so `staff` never
+    // sees the link. NotificationsView and the backend both re-check the role.
+    roles: ["gym_admin", "super_admin"],
+    links: [{ view: "notifications", icon: "notifications_active", text: "Send Notification" }],
+  },
+  {
     label: "Settings",
     links: [{ view: "settings", icon: "settings", text: "Settings" }],
   },
@@ -43,7 +50,7 @@ const NAV_SECTIONS = [
 ];
 
 export default function Sidebar() {
-  const { settings, activeView, setView, openMemberDialog } = useApp();
+  const { settings, activeView, setView, openMemberDialog, user } = useApp();
   const name = settings.gymName || "Gym Admin";
   const initials = getInitials(name) || "GA";
 
@@ -60,7 +67,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="side-nav">
-        {NAV_SECTIONS.map((section) => (
+        {NAV_SECTIONS.filter((section) => !section.roles || section.roles.includes(user?.role)).map((section) => (
           <Fragment key={section.label}>
             <p>{section.label}</p>
             {section.links.map((link) => (

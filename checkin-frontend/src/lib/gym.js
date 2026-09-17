@@ -37,6 +37,23 @@ export function readCodeFromLocation() {
   }
 }
 
+/**
+ * Which member screen to land on, from the ?screen= a push notification's click
+ * URL carries (backend/src/services/notificationService.js builds it). Anything
+ * unrecognised falls back to the dashboard, so a stale or hand-edited link can
+ * never leave the app on a blank destination.
+ */
+const MEMBER_SCREENS = ["home", "receipts", "id-card", "checkin"];
+
+export function readScreenFromLocation() {
+  try {
+    const screen = String(new URLSearchParams(window.location.search).get("screen") || "").trim();
+    return MEMBER_SCREENS.includes(screen) ? screen : "home";
+  } catch {
+    return "home";
+  }
+}
+
 // Namespace the saved member id per gym so different gyms don't overwrite each other.
 export const savedIdKey = (slug) => (slug ? `gym-checkin-id:${slug}` : "gym-checkin-id");
 

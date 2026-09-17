@@ -13,6 +13,7 @@ import TrainersView from "./views/TrainersView.jsx";
 import PaymentsView from "./views/PaymentsView.jsx";
 import ExpensesView from "./views/ExpensesView.jsx";
 import InsightsView from "./views/InsightsView.jsx";
+import NotificationsView from "./views/NotificationsView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
 import HelpView from "./views/HelpView.jsx";
 import MemberDialog from "./dialogs/MemberDialog.jsx";
@@ -38,6 +39,7 @@ const VIEWS = [
   ["payments", PaymentsView],
   ["expenses", ExpensesView],
   ["insights", InsightsView],
+  ["notifications", NotificationsView],
   ["settings", SettingsView],
   ["help", HelpView],
 ];

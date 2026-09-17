@@ -60,6 +60,18 @@ function authConfig() {
   };
 }
 
+// Web Push (VAPID). The PRIVATE key never leaves the server — only publicKey is
+// ever handed to a browser. Missing keys are not fatal: the app boots without
+// push and every notification endpoint answers 503 instead of crashing.
+function pushConfig() {
+  return {
+    publicKey: String(process.env.VAPID_PUBLIC_KEY || "").trim(),
+    privateKey: String(process.env.VAPID_PRIVATE_KEY || "").trim(),
+    // Push services require a contact for the key owner: "mailto:" or an https URL.
+    subject: String(process.env.VAPID_SUBJECT || "").trim() || "mailto:support@gymboo.app",
+  };
+}
+
 function normalizeBaseUrl(value) {
   const trimmed = String(value || "").trim();
   return trimmed.replace(/\/+$/, "");
@@ -80,4 +92,5 @@ module.exports = {
   authConfig,
   dbConfig,
   getPublicBaseUrl,
+  pushConfig,
 };
