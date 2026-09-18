@@ -6,7 +6,14 @@ async function readJson(res) {
 
 export async function fetchGymSettings(slug) {
   const res = await fetch(`${publicBase(slug)}/settings`);
-  if (!res.ok) throw new Error("Branding unavailable");
+  if (!res.ok) {
+    // The status rides along because 404 ("no such gym, or it closed") has to be
+    // told apart from an offline blip: the app forgets a remembered gym on the
+    // first, and keeps it on the second.
+    const error = new Error("Branding unavailable");
+    error.status = res.status;
+    throw error;
+  }
   return res.json();
 }
 

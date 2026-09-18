@@ -48,6 +48,18 @@ async function checkinAppName(slug) {
   }
 }
 
+/**
+ * The label under the installed icon. The launcher ellipsizes what doesn't fit, so
+ * the gym's own name goes in whole rather than pre-truncated to "Iron Paradis" —
+ * only a name long enough to be absurd is cut, and then on a word boundary.
+ */
+function shortName(name) {
+  if (name.length <= 30) return name;
+  const cut = name.slice(0, 31);
+  const boundary = cut.lastIndexOf(" ");
+  return (boundary > 12 ? cut.slice(0, boundary) : name.slice(0, 30)).trim();
+}
+
 function mountFrontendRoutes(app) {
   app.use(express.static(PROJECT_ROOT));
   app.use("/icons", express.static(ICONS_DIR));
@@ -77,12 +89,15 @@ function mountFrontendRoutes(app) {
     res.type("application/manifest+json").json({
       id: startUrl,
       name,
-      short_name: name.length > 12 ? name.slice(0, 12).trim() : name,
+      short_name: shortName(name),
       description: "Quick member check-in for your gym.",
       // The daily ?c= code is deliberately left out of start_url: it expires, the
       // slug doesn't.
       start_url: startUrl,
-      scope: "/checkin/",
+      // Not "/checkin/": the slug-less start_url is "/checkin", which is outside a
+      // trailing-slash scope, and a start_url out of scope makes the whole manifest
+      // invalid — the browser then offers no install at all on the bare page.
+      scope: "/checkin",
       display: "standalone",
       background_color: "#ffffff",
       theme_color: "#f86a10",

@@ -54,6 +54,50 @@ export function readScreenFromLocation() {
   }
 }
 
+/**
+ * The gym the member last scanned into.
+ *
+ * The installed app (and the APK) opens the bare /checkin — the same build for
+ * every gym, so its URL can't name one. The first scanned QR is remembered here
+ * and every launch after that goes straight to that gym's page.
+ */
+const LAST_GYM_KEY = "gym-checkin:last-gym";
+
+export function readLastGym() {
+  try {
+    return localStorage.getItem(LAST_GYM_KEY) || "";
+  } catch {
+    // localStorage unavailable (private mode) — the member just scans each time.
+    return "";
+  }
+}
+
+export function writeLastGym(slug) {
+  try {
+    if (slug) localStorage.setItem(LAST_GYM_KEY, slug);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearLastGym() {
+  try {
+    localStorage.removeItem(LAST_GYM_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// /checkin?pick=1 — the "not your gym?" link. It opens the scanner on a phone that
+// already has a gym saved, which is the only way back out of the auto-open.
+export function wantsGymPicker() {
+  try {
+    return new URLSearchParams(window.location.search).has("pick");
+  } catch {
+    return false;
+  }
+}
+
 // Namespace the saved member id per gym so different gyms don't overwrite each other.
 export const savedIdKey = (slug) => (slug ? `gym-checkin-id:${slug}` : "gym-checkin-id");
 

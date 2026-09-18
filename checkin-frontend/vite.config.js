@@ -17,6 +17,14 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:5051",
       "/uploads": "http://localhost:5051",
+      // The PWA pieces live on the Express side (backend/src/routes/frontendRoutes.js
+      // builds the manifest per gym), so `npm run dev` has to borrow them too —
+      // without the manifest, the icons it points at and the service worker, the
+      // browser can only make a bookmark shortcut instead of installing the app.
+      "/checkin/manifest.json": "http://localhost:5051",
+      "/icons": "http://localhost:5051",
+      "/service-worker.js": "http://localhost:5051",
     },
+    allowedHosts:["dubai-visibility-cheap-vote.trycloudflare.com"]
   },
 });

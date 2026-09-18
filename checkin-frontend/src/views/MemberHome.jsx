@@ -67,7 +67,7 @@ export default function MemberHome({ billing, gymName, history, install, member,
       {/* Next to the notification switch: both are one-off phone setup, and a
           member who signed in here is the one worth offering the icon to. Gone
           once the app is running installed. */}
-      {install ? <InstallBanner canInstall={install.canInstall} onInstall={install.onInstall} /> : null}
+      {install ? <InstallBanner {...install} /> : null}
 
       <AttendanceCard gymName={gymName} history={history} week={weekStrip(attendance)} />
 

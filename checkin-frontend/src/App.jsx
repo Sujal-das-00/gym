@@ -12,7 +12,16 @@ import useGymBranding from "./hooks/useGymBranding.js";
 import useInstallPrompt from "./hooks/useInstallPrompt.js";
 import useMemberAccount from "./hooks/useMemberAccount.js";
 import usePushNotifications from "./hooks/usePushNotifications.js";
-import { readCodeFromLocation, readScan, readScreenFromLocation, readSlugFromLocation } from "./lib/gym.js";
+import {
+  clearLastGym,
+  readCodeFromLocation,
+  readLastGym,
+  readScan,
+  readScreenFromLocation,
+  readSlugFromLocation,
+  wantsGymPicker,
+  writeLastGym,
+} from "./lib/gym.js";
 import AccountPanel from "./views/AccountPanel.jsx";
 import CheckinPanel from "./views/CheckinPanel.jsx";
 import MemberHome from "./views/MemberHome.jsx";
@@ -28,6 +37,17 @@ const PAGE_TITLES = {
 
 export default function App() {
   const [slug, setSlug] = useState(readSlugFromLocation);
+  /**
+   * The gym to open on launch, read once before first paint.
+   *
+   * The installed app and the APK are the same build for every gym, so they open
+   * the bare /checkin with no gym in the URL. Whichever gym the member scanned
+   * into last was remembered, and this sends them straight back there. The "not
+   * your gym?" link (/checkin?pick=1) is what skips it.
+   */
+  const [savedGym] = useState(() =>
+    readSlugFromLocation() || wantsGymPicker() ? "" : readLastGym(),
+  );
   const [tab, setTab] = useState("checkin");
   // Seeded from ?screen= so a tapped push notification lands on the screen it
   // promised — a fee reminder opens the dashboard with the dues card on it.
@@ -36,15 +56,22 @@ export default function App() {
   // Today's front-desk code, either scanned off the QR or carried in the ?c= of
   // the link it points at. It only pre-fills the field; the member still submits.
   const [scannedCode, setScannedCode] = useState(readCodeFromLocation);
-  const { branding } = useGymBranding(slug);
-  const { canInstall, installed, promptInstall } = useInstallPrompt(slug);
-  const install = slug && !installed ? { canInstall, onInstall: promptInstall } : null;
+  const { branding, found } = useGymBranding(slug);
+  const { installed, platform, promptInstall, secure } = useInstallPrompt(slug);
+  // The server says this gym doesn't exist (it closed, or the QR is stale), so the
+  // app offers the scanner instead of a check-in page that can only fail.
+  const gymMissing = Boolean(slug) && found === false;
+  // Nothing to install for a gym that doesn't exist — that screen is the scanner.
+  const install = slug && !installed && !gymMissing
+    ? { gymName: branding.gymName, onInstall: promptInstall, platform, secure }
+    : null;
   const checkin = useCheckin(slug);
   const account = useMemberAccount(slug);
   const push = usePushNotifications(slug, account.member?.id || "");
 
-  // Scanning a QR swaps gyms with pushState, so the back button has to put the
-  // previous gym back.
+  // A push notification (or anything else that steers the open tab) can change the
+  // gym in the address bar without a reload, so keep the app on whatever /checkin
+  // slug the URL says — including when the back button restores an earlier one.
   useEffect(() => {
     const onPopState = () => setSlug(readSlugFromLocation());
     window.addEventListener("popstate", onPopState);
@@ -54,6 +81,22 @@ export default function App() {
   useEffect(() => {
     document.title = branding.gymName ? `${branding.gymName} check-in` : "Gym Check-in";
   }, [branding.gymName]);
+
+  // Remember the gym only once the server has confirmed it, and forget it the
+  // moment it stops existing — otherwise a closed gym would send every later
+  // launch to a dead page with no way back to the scanner. An offline load leaves
+  // the remembered gym alone (found is null, not false).
+  useEffect(() => {
+    if (!slug) return;
+    if (found === true) writeLastGym(slug);
+    if (found === false) clearLastGym();
+  }, [found, slug]);
+
+  // replace(), not assign(): the bare /checkin the app launched on shouldn't sit
+  // in history for the back button to bounce off.
+  useEffect(() => {
+    if (savedGym) window.location.replace(`/checkin/${encodeURIComponent(savedGym)}`);
+  }, [savedGym]);
 
   /**
    * A front-desk QR carries the gym's check-in URL plus today's code, so scanning
@@ -71,9 +114,13 @@ export default function App() {
         });
         return;
       }
+      // A different gym is a real navigation, not a pushState: the browser reads
+      // <link rel="manifest"> as the page loads, so a gym swapped in after boot
+      // would still install the manifest — and the start_url — of the old one.
       if (scanned !== slug) {
-        window.history.pushState({}, "", `/checkin/${encodeURIComponent(scanned)}`);
-        setSlug(scanned);
+        const query = code ? `?c=${encodeURIComponent(code)}` : "";
+        window.location.assign(`/checkin/${encodeURIComponent(scanned)}${query}`);
+        return;
       }
       if (code) setScannedCode(code);
       setScanNote({
@@ -94,6 +141,17 @@ export default function App() {
     setDestination("home");
     setTab("account");
   }, [endSession]);
+
+  // The launch redirect above is already running — a spinner-free holding screen
+  // beats a flash of the "choose your gym" scanner the member is about to skip.
+  if (savedGym) {
+    return (
+      <main className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+        <BrandHeader gymName="" logo="" />
+        <p className="text-xs text-on-surface-variant">Opening your gym…</p>
+      </main>
+    );
+  }
 
   // Signed in: the member app proper, with its own header and bottom nav.
   if (slug && account.member) {
@@ -145,7 +203,9 @@ export default function App() {
           changing tabs reads as the same screen swapping its inputs. */}
       <BrandHeader gymName={branding.gymName} logo={branding.logo} />
 
-      {slug ? (
+      {install && <InstallBanner {...install} />}
+
+      {slug && !gymMissing ? (
         <>
           <TabSwitcher active={tab} onChange={setTab} />
           {tab === "checkin" ? (
@@ -156,18 +216,18 @@ export default function App() {
           ) : (
             <AccountPanel busy={account.busy} error={account.error} onUnlock={account.signIn} />
           )}
+          <a
+            className="text-[11px] text-on-surface-variant underline text-center py-1"
+            href="/checkin?pick=1"
+          >
+            Not your gym? Scan another front-desk QR
+          </a>
         </>
       ) : (
         <div className="flex flex-col space-y-3.5">
-          <MissingGymNotice />
+          <MissingGymNotice reason={gymMissing ? "unknown" : "missing"} />
           {scanNote && <StatusNote tone={scanNote.tone}>{scanNote.message}</StatusNote>}
           <QrScannerCard onScan={handleScan} />
-        </div>
-      )}
-
-      {install && (
-        <div className="pt-1">
-          <InstallBanner canInstall={install.canInstall} onInstall={install.onInstall} />
         </div>
       )}
     </main>

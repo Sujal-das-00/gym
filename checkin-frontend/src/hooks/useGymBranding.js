@@ -13,15 +13,20 @@ const FALLBACK = { gymName: "Gym Check-in", logo: "" };
 export default function useGymBranding(slug) {
   const [branding, setBranding] = useState(FALLBACK);
   const [loaded, setLoaded] = useState(false);
+  // true: this gym exists. false: the server says it doesn't (404 — deleted, or
+  // closed). null: not asked yet, or the phone is offline and we can't tell.
+  const [found, setFound] = useState(null);
 
   useEffect(() => {
     if (!slug) {
       setBranding(FALLBACK);
+      setFound(null);
       setLoaded(true);
       return undefined;
     }
     let active = true;
     setLoaded(false);
+    setFound(null);
     fetchGymSettings(slug)
       .then((settings) => {
         if (!active) return;
@@ -29,10 +34,14 @@ export default function useGymBranding(slug) {
           gymName: settings.gymName || FALLBACK.gymName,
           logo: settings.logo || "",
         });
+        setFound(true);
       })
-      .catch(() => {
-        // Unknown or offline gym — fall back to the neutral wordmark.
-        if (active) setBranding(FALLBACK);
+      .catch((error) => {
+        // Unknown or offline gym — fall back to the neutral wordmark. Only a 404
+        // is proof the gym is gone; anything else leaves the question open.
+        if (!active) return;
+        setBranding(FALLBACK);
+        setFound(error?.status === 404 ? false : null);
       })
       .finally(() => {
         if (active) setLoaded(true);
@@ -42,5 +51,5 @@ export default function useGymBranding(slug) {
     };
   }, [slug]);
 
-  return { branding, loaded };
+  return { branding, found, loaded };
 }
