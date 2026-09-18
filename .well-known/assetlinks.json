@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.toolszila.gymbot.twa",
+        "sha256_cert_fingerprints": ["10:5A:C7:AD:35:6E:C8:50:9C:FA:B3:BA:CD:62:DA:74:02:C1:79:02:22:97:D4:BD:79:23:51:53:57:C2:95:10"]
+      }
+    }]

@@ -14,6 +14,9 @@ const CHECKIN_DIR = path.join(PROJECT_ROOT, "checkin-frontend");
 // Run `npm install && npm run build` in checkin-frontend/.
 const CHECKIN_DIST = path.join(CHECKIN_DIR, "dist");
 const ICONS_DIR = path.join(PROJECT_ROOT, "icons");
+// Digital Asset Links: proves the members' Android app and this site share an
+// owner, which is what lets the app run without Chrome's URL bar.
+const ASSET_LINKS_PATH = path.join(PROJECT_ROOT, ".well-known", "assetlinks.json");
 const DATA_DIR = path.join(BACKEND_ROOT, "data");
 const UPLOAD_DIR = path.join(BACKEND_ROOT, "uploads");
 const LEGACY_DB_PATH = path.join(DATA_DIR, "db.json");
@@ -53,6 +56,7 @@ module.exports = {
   CHECKIN_DIR,
   CHECKIN_DIST,
   ICONS_DIR,
+  ASSET_LINKS_PATH,
   DATA_DIR,
   UPLOAD_DIR,
   LEGACY_DB_PATH,

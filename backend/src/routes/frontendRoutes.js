@@ -1,7 +1,15 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { ADMIN_DIST, SUPERADMIN_DIR, CHECKIN_DIST, ICONS_DIR, PROJECT_ROOT, UPLOAD_DIR } = require("../config/constants");
+const {
+  ADMIN_DIST,
+  ASSET_LINKS_PATH,
+  SUPERADMIN_DIR,
+  CHECKIN_DIST,
+  ICONS_DIR,
+  PROJECT_ROOT,
+  UPLOAD_DIR,
+} = require("../config/constants");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
 
@@ -60,7 +68,79 @@ function shortName(name) {
   return (boundary > 12 ? cut.slice(0, boundary) : name.slice(0, 30)).trim();
 }
 
+/**
+ * Digital Asset Links — what makes the Android app drop the URL bar.
+ *
+ * An APK wrapping this site (a Trusted Web Activity, which is what PWABuilder and
+ * Bubblewrap produce) shows the address bar on every screen until Chrome can prove
+ * the app and the site belong to the same owner. It proves it by fetching
+ * /.well-known/assetlinks.json and finding the app's package name and signing
+ * fingerprint in it. Unverified, the app still works — it just never looks like an
+ * app.
+ *
+ * Edit .well-known/assetlinks.json (its README explains where the two values come
+ * from). Placeholders still in place count as "not filled in yet", so a half-done
+ * file is never served as if it were real — the .env pair below is used instead.
+ */
+function readAssetLinksFile() {
+  let raw;
+  try {
+    raw = fs.readFileSync(ASSET_LINKS_PATH, "utf8");
+  } catch {
+    return null; // No file — fall back to the environment.
+  }
+  if (raw.includes("REPLACE_WITH")) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return { error: `.well-known/assetlinks.json is not valid JSON: ${error.message}` };
+  }
+}
+
+/**
+ * The same two values out of .env, for a deployment that would rather configure
+ * them than edit a file:
+ *   TWA_PACKAGE_NAME=com.toolszila.gymbot
+ *   TWA_SHA256_FINGERPRINT=AB:CD:...
+ * List several fingerprints comma-separated — with Play App Signing the upload key
+ * and the Play signing key are different, and both have to be in here.
+ */
+function readAssetLinksEnv() {
+  const packageName = String(process.env.TWA_PACKAGE_NAME || "").trim();
+  const fingerprints = String(process.env.TWA_SHA256_FINGERPRINT || "")
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  if (!packageName || !fingerprints.length) return null;
+  return [
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: packageName,
+        sha256_cert_fingerprints: fingerprints,
+      },
+    },
+  ];
+}
+
 function mountFrontendRoutes(app) {
+  // Ahead of express.static, which ignores dot-directories and would answer 404
+  // for anything under /.well-known.
+  app.get("/.well-known/assetlinks.json", (req, res) => {
+    const fromFile = readAssetLinksFile();
+    if (fromFile?.error) return res.status(500).json({ error: fromFile.error });
+    const links = fromFile || readAssetLinksEnv();
+    if (!links) {
+      return res.status(404).json({
+        error:
+          "No Android app configured — fill in .well-known/assetlinks.json, or set TWA_PACKAGE_NAME and TWA_SHA256_FINGERPRINT.",
+      });
+    }
+    // Chrome insists on application/json here; anything else fails verification.
+    return res.type("application/json").json(links);
+  });
+
   app.use(express.static(PROJECT_ROOT));
   app.use("/icons", express.static(ICONS_DIR));
   app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "30d" }));
