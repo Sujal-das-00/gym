@@ -2482,7 +2482,10 @@ button.is-busy::before {
 
 .notify-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Four tiles: overdue, reachable, outstanding, and the gym-wide notification
+     roster count. auto-fit keeps them on one row where there is room and wraps
+     them two-up on a phone without a second breakpoint. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -2567,3 +2570,7 @@ button.is-busy::before {
 .notify-unreachable-list > div:last-child { border-bottom: 0; }
 .notify-unreachable-list em { color: var(--muted); font-style: normal; font-size: .78rem; font-weight: 700; }
 .notify-unreachable-list strong { color: var(--red); font-weight: 850; }
+
+/* Same list, different meaning: these members CAN be reached, so the trailing
+   column is a neutral status rather than a red amount owed. */
+.notify-subscribed-list strong { color: var(--muted); font-size: .78rem; font-weight: 750; white-space: nowrap; }

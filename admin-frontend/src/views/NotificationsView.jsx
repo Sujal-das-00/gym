@@ -79,8 +79,11 @@ export default function NotificationsView() {
 
   useEffect(refreshPreview, [refreshPreview]);
 
+  // isOverdue, not getOverdueAmount > 0 — the same test the Dashboard, Members
+  // and Payments screens use, and the one membersWithPendingFees() applies on the
+  // backend. An amount test silently drops members whose fee is 0.
   const pendingCount = useMemo(
-    () => members.filter((member) => domain.getOverdueAmount(member) > 0).length,
+    () => members.filter((member) => domain.isOverdue(member)).length,
     [members, domain],
   );
 
@@ -97,6 +100,11 @@ export default function NotificationsView() {
   // Members who owe money AND have no device registered — the ones to chase in
   // person, and the reason a send can come back as zero.
   const unreachable = (preview?.pending || []).filter((entry) => entry.devices === 0);
+  // Everyone in the gym who has the member app's switch on, overdue or not.
+  // This is what an announcement to "All members" actually reaches, and the
+  // only way to see why that can land on a phone while a fee reminder finds
+  // nobody: the registered devices belong to members who are paid up.
+  const subscribed = preview?.subscribed || [];
 
   const query = search.trim().toLowerCase();
   const matches = members
@@ -224,6 +232,12 @@ export default function NotificationsView() {
             <span>Total outstanding</span>
             <strong>{preview ? currency(preview.totalOutstanding) : "—"}</strong>
           </article>
+          <article>
+            <span>Notifications on (whole gym)</span>
+            <strong>
+              {preview ? `${preview.subscribedMembers} of ${preview.totalMembers}` : "—"}
+            </strong>
+          </article>
         </div>
 
         {/* The confusing case: people owe money, but the reminder reaches nobody
@@ -234,8 +248,19 @@ export default function NotificationsView() {
           <p className="notify-warning">
             <strong>No reminders can be sent yet.</strong> {preview.eligibleMembers} member
             {preview.eligibleMembers === 1 ? "" : "s"} owe money, but none of them have turned on
-            notifications in the member app. Ask them to sign in at the check-in page and tap
-            "Turn on notifications" on their dashboard.
+            notifications in the member app.{" "}
+            {preview.subscribedMembers > 0 ? (
+              <>
+                The {preview.subscribedMembers} device owner
+                {preview.subscribedMembers === 1 ? "" : "s"} listed below have notifications on and
+                are paid up — that is why an announcement to "All members" still reaches a phone
+                while this reminder reaches nobody.
+              </>
+            ) : (
+              <>No member in this gym has turned notifications on yet.</>
+            )}{" "}
+            Ask the members who owe to sign in at the check-in page and tap "Turn on notifications"
+            on their dashboard.
           </p>
         ) : null}
 
@@ -251,6 +276,27 @@ export default function NotificationsView() {
                   <span>{entry.name}</span>
                   <em>{entry.phone}</em>
                   <strong>{currency(entry.outstanding)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {subscribed.length ? (
+          <div className="notify-unreachable">
+            <h3 className="subhead">
+              Notifications turned on ({subscribed.length}
+              {preview.subscribedMembers > subscribed.length ? "+" : ""})
+            </h3>
+            <div className="notify-unreachable-list notify-subscribed-list">
+              {subscribed.map((entry) => (
+                <div key={entry.id}>
+                  <span>{entry.name}</span>
+                  <em>{entry.phone}</em>
+                  <strong>
+                    {entry.overdue ? "Owes" : "Paid up"} · {entry.devices} device
+                    {entry.devices === 1 ? "" : "s"}
+                  </strong>
                 </div>
               ))}
             </div>

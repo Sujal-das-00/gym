@@ -1,5 +1,5 @@
 const { createHttpError } = require("../utils/http");
-const { memberOutstanding } = require("../utils/billing");
+const { dueUnpaidPeriods, memberOutstanding } = require("../utils/billing");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
 const { pushAvailable, pushDisabledReason, sendToSubscriptions } = require("./pushService");
@@ -10,6 +10,24 @@ const MAX_BODY = 300;
 
 function rupees(amount) {
   return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(Math.round(Number(amount) || 0))}`;
+}
+
+function firstName(member) {
+  const name = String(member?.name || "").trim();
+  return name.split(" ")[0] || name || "there";
+}
+
+/**
+ * What the member is behind on, in words.
+ *
+ * A gym that has not set a monthly fee still has overdue members — their
+ * outstanding is 0 rupees, and quoting "₹0 in pending fees" at them reads as a
+ * bug. Count the periods instead whenever there is no amount to name.
+ */
+function dueText(outstanding, unpaidPeriods) {
+  if (outstanding > 0) return `you have ${rupees(outstanding)} in pending fees`;
+  const count = Math.max(1, Number(unpaidPeriods) || 1);
+  return `your membership has ${count} unpaid ${count === 1 ? "period" : "periods"}`;
 }
 
 // The member app is served per gym slug, so every deep link has to carry it.
@@ -54,13 +72,29 @@ async function gymContext(gymId) {
   return { gym, settings, members };
 }
 
-// Members of THIS gym who owe money today, each with the amount they owe.
-// getAllMembers is already tenant-filtered, so no other gym's member can appear.
+/**
+ * Members of THIS gym who are behind on payment today, each with the number of
+ * billing periods they have not paid and the rupees that adds up to.
+ * getAllMembers is already tenant-filtered, so no other gym's member can appear.
+ *
+ * The test is the COUNT of due unpaid periods, not the rupee total — the same
+ * test as isOverdue() in admin-frontend/src/lib/billing.js, which is what puts
+ * the "Overdue" badge on a member everywhere else in the panel. Filtering on
+ * `outstanding > 0` instead used to drop every member whose monthly fee is 0
+ * (the column's default, and what a gym that hasn't set a fee yet has on every
+ * row): they showed as overdue on the dashboard, in Members and in Payments,
+ * and in their own member app — but were invisible to the one screen that
+ * exists to chase them.
+ */
 function membersWithPendingFees(members, settings) {
   return members
-    .map((member) => ({ member, outstanding: memberOutstanding(member, settings) }))
-    .filter((entry) => entry.outstanding > 0)
-    .sort((a, b) => b.outstanding - a.outstanding);
+    .map((member) => ({
+      member,
+      outstanding: memberOutstanding(member, settings),
+      unpaidPeriods: dueUnpaidPeriods(member, settings).length,
+    }))
+    .filter((entry) => entry.unpaidPeriods > 0)
+    .sort((a, b) => b.outstanding - a.outstanding || b.unpaidPeriods - a.unpaidPeriods);
 }
 
 // Long enough to act on, short enough that a 500-member gym doesn't ship its
@@ -68,32 +102,55 @@ function membersWithPendingFees(members, settings) {
 const PREVIEW_LIST_LIMIT = 50;
 
 /**
- * Counts for the admin button — how many members owe money and how many of them
- * could actually be reached — without sending anything.
+ * Counts for the admin button — how many members are behind on payment and how
+ * many of them could actually be reached — without sending anything.
  *
- * Also names them. "0 reminders sent" with 12 members overdue is baffling on its
- * own; the fix is always "these specific people have not turned notifications
- * on", so the owner needs the list, not just the number.
+ * Also names them, twice over. "0 reminders sent" with 12 members overdue is
+ * baffling on its own, and so is the opposite pair of facts the owner hits
+ * first: an announcement to "All members" lands on a phone, but the fee
+ * reminder reports nobody to remind. Both have the same one cause — the
+ * devices that are registered belong to members who do NOT owe anything — and
+ * neither the overdue list nor a count can show that. So the gym's whole
+ * notification roster is returned alongside it: who has the app switched on,
+ * and how many devices each of them has.
  */
 async function feeReminderPreview(gymId) {
   const { settings, members } = await gymContext(gymId);
   const pending = membersWithPendingFees(members, settings);
+  // Every member, not just the overdue ones: the roster below is the whole
+  // point, and one query answers both halves.
   const subscriptions = pushAvailable()
-    ? await repo().listPushSubscriptionsForMembers(gymId, pending.map((entry) => entry.member.id))
+    ? await repo().listPushSubscriptionsForMembers(gymId, members.map((member) => member.id))
     : [];
 
   const deviceCount = new Map();
   for (const subscription of subscriptions) {
     deviceCount.set(subscription.memberId, (deviceCount.get(subscription.memberId) || 0) + 1);
   }
+  const overdueIds = new Set(pending.map((entry) => entry.member.id));
 
   const list = pending.slice(0, PREVIEW_LIST_LIMIT).map((entry) => ({
     id: entry.member.id,
     name: entry.member.name,
     phone: entry.member.phone,
     outstanding: entry.outstanding,
+    unpaidPeriods: entry.unpaidPeriods,
     devices: deviceCount.get(entry.member.id) || 0,
   }));
+
+  // Who has notifications on, most devices first — the answer to "then who DID
+  // my announcement reach?". Overdue is flagged so the two lists line up.
+  const subscribed = members
+    .filter((member) => deviceCount.has(member.id))
+    .map((member) => ({
+      id: member.id,
+      name: member.name,
+      phone: member.phone,
+      devices: deviceCount.get(member.id) || 0,
+      overdue: overdueIds.has(member.id),
+    }))
+    .sort((a, b) => b.devices - a.devices || a.name.localeCompare(b.name))
+    .slice(0, PREVIEW_LIST_LIMIT);
 
   return {
     available: pushAvailable(),
@@ -102,8 +159,13 @@ async function feeReminderPreview(gymId) {
     eligibleMembers: pending.length,
     reachableMembers: pending.filter((entry) => deviceCount.has(entry.member.id)).length,
     totalOutstanding: pending.reduce((sum, entry) => sum + entry.outstanding, 0),
-    // Capped; `eligibleMembers` remains the true total.
+    totalMembers: members.length,
+    // Gym-wide, across everyone — what an announcement to "All members" reaches.
+    subscribedMembers: deviceCount.size,
+    registeredDevices: subscriptions.length,
+    // Both capped; the counts above remain the true totals.
     pending: list,
+    subscribed,
   };
 }
 
@@ -139,7 +201,7 @@ async function sendFeeReminders(gymId) {
     expired: 0,
   };
 
-  for (const { member, outstanding } of pending) {
+  for (const { member, outstanding, unpaidPeriods } of pending) {
     const devices = byMember.get(member.id) || [];
     if (!devices.length) {
       summary.membersWithoutSubscription += 1;
@@ -148,7 +210,7 @@ async function sendFeeReminders(gymId) {
     // One member's push service being down must not stop the rest of the batch.
     const result = await sendToSubscriptions(devices, {
       title: "Fee Payment Reminder",
-      body: `Hi ${member.name.split(" ")[0] || member.name}, you have ${rupees(outstanding)} in pending fees. Please clear your dues.`,
+      body: `Hi ${firstName(member)}, ${dueText(outstanding, unpaidPeriods)}. Please clear your dues.`,
       url: memberAppUrl(gym.slug, "home"),
       tag: `fee-reminder-${member.id}`,
       kind: "fee-reminder",

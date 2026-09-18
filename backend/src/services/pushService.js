@@ -91,6 +91,21 @@ function buildPayload({ title, body, url, tag, kind }) {
   });
 }
 
+/**
+ * Sent with every push.
+ *
+ * `urgency: "high"` is not decoration. The default, "normal", tells the push
+ * service the message can wait for the device to wake up on its own — so on an
+ * Android phone in Doze the notification only lands minutes or hours later,
+ * typically the moment the member next opens something, which reads as "it
+ * only works while the app is open". A fee reminder is a user-visible message
+ * that must draw the screen now, which is exactly what "high" asks for.
+ *
+ * TTL is a day: a phone that is off overnight still gets the reminder, and one
+ * that stays off longer gets nothing rather than yesterday's news.
+ */
+const SEND_OPTIONS = { TTL: 24 * 60 * 60, urgency: "high" };
+
 // 404 (endpoint never existed) and 410 Gone (permission revoked, app
 // uninstalled, browser data cleared) are permanent: the row is dead weight and
 // every future send to it would fail the same way, so drop it. Anything else
@@ -116,7 +131,7 @@ async function sendToSubscriptions(subscriptions, payloadInput) {
         webpush.sendNotification(
           { endpoint: subscription.endpoint, keys: subscription.keys },
           payload,
-          { TTL: 24 * 60 * 60 },
+          SEND_OPTIONS,
         ),
       ),
     );

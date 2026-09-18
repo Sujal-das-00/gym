@@ -1,4 +1,4 @@
-const CACHE_NAME = "gym-pwa-v11";
+const CACHE_NAME = "gym-pwa-v12";
 const APP_SHELL = [
   "/",
   "/admin",
@@ -98,10 +98,21 @@ function readPayload(event) {
   }
 }
 
-self.addEventListener("push", (event) => {
-  const payload = readPayload(event);
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
+/**
+ * Chrome holds a push to ONE promise: whatever `event.waitUntil()` is given must
+ * end in a notification actually being drawn. If it rejects — an icon that will
+ * not load, an option this browser version won't take, anything — Chrome draws
+ * its own "This site has been updated in the background" in place of ours. That
+ * generic line is what a member reads as the app spamming them, and it is the
+ * only thing they see, because the real notification never appeared.
+ *
+ * So the rich notification is attempted first and a plain one is the backstop:
+ * title and body with no icon, no actions and no options that can be refused.
+ * A fee reminder that arrives looking plain still beats one that never arrives.
+ */
+function drawNotification(payload) {
+  return self.registration
+    .showNotification(payload.title, {
       body: payload.body,
       icon: payload.icon,
       badge: payload.badge,
@@ -115,8 +126,18 @@ self.addEventListener("push", (event) => {
       // path, enforced server-side in notificationService.safeClickUrl().
       data: { url: payload.url, kind: payload.kind },
       actions: [{ action: "open", title: payload.kind === "fee-reminder" ? "View dues" : "Open GymBoo" }],
-    }),
-  );
+    })
+    .catch(() =>
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        tag: payload.tag,
+        data: { url: payload.url, kind: payload.kind },
+      }),
+    );
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(drawNotification(readPayload(event)));
 });
 
 self.addEventListener("notificationclick", (event) => {
