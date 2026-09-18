@@ -1,4 +1,5 @@
 import AttendanceCard from "../components/AttendanceCard.jsx";
+import InstallBanner from "../components/InstallBanner.jsx";
 import InvoicesCard from "../components/InvoicesCard.jsx";
 import NotificationCard from "../components/NotificationCard.jsx";
 import MemberStatPills from "../components/MemberStatPills.jsx";
@@ -12,7 +13,7 @@ import { currentStreak, visitsThisMonth, weekStrip } from "../lib/memberStats.js
  * and the week strip; payments drive the receipts; the server's billing summary
  * drives the renewal card.
  */
-export default function MemberHome({ billing, gymName, history, member, push }) {
+export default function MemberHome({ billing, gymName, history, install, member, push }) {
   const attendance = member.attendance || [];
 
   return (
@@ -62,6 +63,11 @@ export default function MemberHome({ billing, gymName, history, member, push }) 
           member who just saw what they owe. Renders nothing when the server has
           no VAPID keys or the browser can't do push. */}
       {push ? <NotificationCard push={push} /> : null}
+
+      {/* Next to the notification switch: both are one-off phone setup, and a
+          member who signed in here is the one worth offering the icon to. Gone
+          once the app is running installed. */}
+      {install ? <InstallBanner canInstall={install.canInstall} onInstall={install.onInstall} /> : null}
 
       <AttendanceCard gymName={gymName} history={history} week={weekStrip(attendance)} />
 

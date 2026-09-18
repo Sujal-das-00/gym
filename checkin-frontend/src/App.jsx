@@ -37,9 +37,8 @@ export default function App() {
   // the link it points at. It only pre-fills the field; the member still submits.
   const [scannedCode, setScannedCode] = useState(readCodeFromLocation);
   const { branding } = useGymBranding(slug);
-  // The gym name goes into the install prompt, so the installed icon is the
-  // member's own gym rather than a generic "Gym Check-in".
-  const { canInstall, promptInstall } = useInstallPrompt(branding.gymName, slug);
+  const { canInstall, installed, promptInstall } = useInstallPrompt(slug);
+  const install = slug && !installed ? { canInstall, onInstall: promptInstall } : null;
   const checkin = useCheckin(slug);
   const account = useMemberAccount(slug);
   const push = usePushNotifications(slug, account.member?.id || "");
@@ -113,6 +112,7 @@ export default function App() {
               billing={account.billing}
               gymName={branding.gymName}
               history={account.history}
+              install={install}
               member={account.member}
               push={push}
             />
@@ -165,9 +165,9 @@ export default function App() {
         </div>
       )}
 
-      {canInstall && (
+      {install && (
         <div className="pt-1">
-          <InstallBanner onInstall={promptInstall} />
+          <InstallBanner canInstall={install.canInstall} onInstall={install.onInstall} />
         </div>
       )}
     </main>
