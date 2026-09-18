@@ -63,9 +63,17 @@ function membersWithPendingFees(members, settings) {
     .sort((a, b) => b.outstanding - a.outstanding);
 }
 
+// Long enough to act on, short enough that a 500-member gym doesn't ship its
+// whole defaulter list on every page load.
+const PREVIEW_LIST_LIMIT = 50;
+
 /**
  * Counts for the admin button — how many members owe money and how many of them
  * could actually be reached — without sending anything.
+ *
+ * Also names them. "0 reminders sent" with 12 members overdue is baffling on its
+ * own; the fix is always "these specific people have not turned notifications
+ * on", so the owner needs the list, not just the number.
  */
 async function feeReminderPreview(gymId) {
   const { settings, members } = await gymContext(gymId);
@@ -73,14 +81,29 @@ async function feeReminderPreview(gymId) {
   const subscriptions = pushAvailable()
     ? await repo().listPushSubscriptionsForMembers(gymId, pending.map((entry) => entry.member.id))
     : [];
-  const reachable = new Set(subscriptions.map((subscription) => subscription.memberId));
+
+  const deviceCount = new Map();
+  for (const subscription of subscriptions) {
+    deviceCount.set(subscription.memberId, (deviceCount.get(subscription.memberId) || 0) + 1);
+  }
+
+  const list = pending.slice(0, PREVIEW_LIST_LIMIT).map((entry) => ({
+    id: entry.member.id,
+    name: entry.member.name,
+    phone: entry.member.phone,
+    outstanding: entry.outstanding,
+    devices: deviceCount.get(entry.member.id) || 0,
+  }));
+
   return {
     available: pushAvailable(),
     // "missing" | "invalid" | "" — lets the panel name the actual problem.
     disabledReason: pushAvailable() ? "" : pushDisabledReason(),
     eligibleMembers: pending.length,
-    reachableMembers: pending.filter((entry) => reachable.has(entry.member.id)).length,
+    reachableMembers: pending.filter((entry) => deviceCount.has(entry.member.id)).length,
     totalOutstanding: pending.reduce((sum, entry) => sum + entry.outstanding, 0),
+    // Capped; `eligibleMembers` remains the true total.
+    pending: list,
   };
 }
 

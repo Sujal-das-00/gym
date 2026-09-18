@@ -2535,3 +2535,35 @@ button.is-busy::before {
 @media (max-width: 720px) {
   .notify-stats, .notify-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.notify-warning {
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fdf3e7;
+  border: 1px solid #f0d2a8;
+  color: #6b4405;
+  font-size: .84rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.notify-unreachable { margin-bottom: 12px; }
+.notify-unreachable-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.notify-unreachable-list > div {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.notify-unreachable-list > div:last-child { border-bottom: 0; }
+.notify-unreachable-list em { color: var(--muted); font-style: normal; font-size: .78rem; font-weight: 700; }
+.notify-unreachable-list strong { color: var(--red); font-weight: 850; }

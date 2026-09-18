@@ -94,6 +94,9 @@ export default function NotificationsView() {
 
   const unavailable = preview?.available === false;
   const reachable = preview?.reachableMembers ?? 0;
+  // Members who owe money AND have no device registered — the ones to chase in
+  // person, and the reason a send can come back as zero.
+  const unreachable = (preview?.pending || []).filter((entry) => entry.devices === 0);
 
   const query = search.trim().toLowerCase();
   const matches = members
@@ -223,13 +226,48 @@ export default function NotificationsView() {
           </article>
         </div>
 
+        {/* The confusing case: people owe money, but the reminder reaches nobody
+            because none of THEM have notifications on. A toast that vanishes in
+            two seconds is not enough to explain that, so it is stated inline and
+            the members are named. */}
+        {preview && preview.eligibleMembers > 0 && preview.reachableMembers === 0 ? (
+          <p className="notify-warning">
+            <strong>No reminders can be sent yet.</strong> {preview.eligibleMembers} member
+            {preview.eligibleMembers === 1 ? "" : "s"} owe money, but none of them have turned on
+            notifications in the member app. Ask them to sign in at the check-in page and tap
+            "Turn on notifications" on their dashboard.
+          </p>
+        ) : null}
+
+        {unreachable.length ? (
+          <div className="notify-unreachable">
+            <h3 className="subhead">
+              Owe money, cannot be reached ({unreachable.length}
+              {preview.eligibleMembers > preview.pending.length ? "+" : ""})
+            </h3>
+            <div className="notify-unreachable-list">
+              {unreachable.map((entry) => (
+                <div key={entry.id}>
+                  <span>{entry.name}</span>
+                  <em>{entry.phone}</em>
+                  <strong>{currency(entry.outstanding)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <button
           className="notify-button"
-          disabled={remindBusy || !preview}
+          disabled={remindBusy || !preview || !reachable}
           onClick={onRemind}
           type="button"
         >
-          {remindBusy ? "Sending…" : "🔔 Remind Members with Pending Fees"}
+          {remindBusy
+            ? "Sending…"
+            : reachable
+              ? `🔔 Remind ${reachable} member${reachable === 1 ? "" : "s"} with pending fees`
+              : "🔔 No one to remind yet"}
         </button>
       </section>
 
