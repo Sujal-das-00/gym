@@ -1290,6 +1290,40 @@ dialog::backdrop { background: rgba(23,32,27,.42); }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .form-grid .wide { grid-column: 1 / -1; }
 .field-hint { color: var(--muted); font-size: .72rem; font-weight: 700; line-height: 1.35; }
+.field-error { color: var(--red); font-size: .72rem; font-weight: 800; line-height: 1.35; }
+input.has-error, textarea.has-error, select.has-error { border-color: var(--red); background: #fffafa; }
+input.has-error:focus, textarea.has-error:focus, select.has-error:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(196,61,50,.14); }
+.form-error {
+  margin: 14px 0 0;
+  border: 1px solid #f0cac5;
+  border-radius: 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  padding: 10px 12px;
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* Phone inputs hold the bare 10-digit number; the +91 is a fixed, non-editable
+   prefix drawn as part of the same box. */
+.phone-input { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+.phone-input .phone-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-right: 1px solid var(--line);
+  background: #f4f7f4;
+  color: var(--muted);
+  font-weight: 850;
+  font-size: .85rem;
+}
+.phone-input input { border: 0; border-radius: 0; background: transparent; }
+.phone-input input:focus { box-shadow: none; }
+.phone-input:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(17,120,74,.12); }
+.phone-input.has-error { border-color: var(--red); background: #fffafa; }
+.phone-input.has-error .phone-prefix { border-right-color: #f0cac5; background: var(--red-soft); color: var(--red); }
+.phone-input.has-error:focus-within { border-color: var(--red); box-shadow: 0 0 0 3px rgba(196,61,50,.14); }
 .form-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
 .member-title { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
 .member-title p { margin-bottom: 0; color: var(--muted); }

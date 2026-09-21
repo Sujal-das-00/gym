@@ -1,14 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
+import FieldError from "../components/FieldError.jsx";
+import PhoneField from "../components/PhoneField.jsx";
 import { todayKey } from "../lib/dates.js";
 import { readPhoto } from "../lib/photo.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
+import { firstErrorField, toPhoneDigits, validateMember } from "../lib/validation.js";
+
+// Order the fields appear in the form, so the first invalid one is the one we
+// focus after a failed submit.
+const FIELD_ORDER = ["gymId", "name", "phone", "address", "fee", "admissionFee", "packageMonths", "startDate"];
+
+const FIELD_IDS = {
+  gymId: "gymIdInput",
+  name: "nameInput",
+  phone: "phoneInput",
+  address: "addressInput",
+  fee: "feeInput",
+  admissionFee: "admissionFeeInput",
+  packageMonths: "packageMonthsInput",
+  startDate: "startDateInput",
+};
 
 export default function MemberDialog() {
   const {
     memberDialog,
     closeMemberDialog,
+    members,
     trainers,
     domain,
     generateGymId,
@@ -32,12 +51,17 @@ export default function MemberDialog() {
   const [trainerId, setTrainerId] = useState("");
   const [photo, setPhoto] = useState("");
   const [busy, setBusy] = useState(false);
+  // A field only shows its error once it has been left or the form submitted —
+  // errors while still typing the first character read as nagging.
+  const [touched, setTouched] = useState({});
+  const [formError, setFormError] = useState("");
+  const formRef = useRef(null);
 
   useEffect(() => {
     if (!memberDialog.open) return;
     setGymId(member?.gymId || member?.id || generateGymId());
     setName(member?.name || "");
-    setPhone(member?.phone || "");
+    setPhone(toPhoneDigits(member?.phone));
     setAddress(member?.address || "");
     setFee(member?.fee || "");
     setAdmissionFee(Number(member?.admissionFee || 0) > 0 ? member.admissionFee : "");
@@ -49,10 +73,28 @@ export default function MemberDialog() {
     setTrainerId(member?.trainerId || "");
     setPhoto(member?.photo || "");
     setBusy(false);
+    setTouched({});
+    setFormError("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberDialog.open, member]);
 
   const isPackage = membershipType === "package";
+
+  const otherMembers = useMemo(() => (members || []).filter((item) => item.id !== member?.id), [members, member?.id]);
+  const errors = validateMember(
+    { gymId, name, phone, address, fee, admissionFee, membershipType, packageMonths, startDate },
+    otherMembers,
+  );
+  const errorCount = Object.keys(errors).length;
+
+  const markTouched = (field) => setTouched((current) => ({ ...current, [field]: true }));
+  const errorFor = (field) => (touched[field] ? errors[field] || "" : "");
+  const fieldProps = (field) => ({
+    onBlur: () => markTouched(field),
+    "aria-invalid": errorFor(field) ? "true" : undefined,
+    "aria-describedby": errorFor(field) ? FIELD_IDS[field] + "-error" : undefined,
+    className: errorFor(field) ? "has-error" : undefined,
+  });
 
   const trainerOptions = trainers
     .slice()
@@ -61,18 +103,35 @@ export default function MemberDialog() {
   const onPhotoChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setPhoto(await readPhoto(file));
+    try {
+      setPhoto(await readPhoto(file));
+    } catch (error) {
+      showToast(error?.message || "Could not read that image. Try another photo.");
+      event.target.value = "";
+    }
   };
 
   const onSubmit = async (event) => {
     event.preventDefault();
     if (busy) return;
+
+    if (errorCount) {
+      setTouched(Object.fromEntries(FIELD_ORDER.map((field) => [field, true])));
+      setFormError(
+        errorCount === 1 ? "Fix the highlighted field to save." : "Fix the " + errorCount + " highlighted fields to save.",
+      );
+      const field = firstErrorField(errors, FIELD_ORDER);
+      formRef.current?.querySelector("#" + FIELD_IDS[field])?.focus();
+      return;
+    }
+
+    setFormError("");
     setBusy(true);
     const payload = {
       id: member?.id || "",
       gymId: String(gymId || "").trim().toUpperCase() || generateGymId(),
       name: String(name).trim(),
-      phone: String(phone).trim(),
+      phone: toPhoneDigits(phone),
       address: String(address).trim(),
       fee: Number(fee),
       admissionFee: Math.max(0, Number(admissionFee) || 0),
@@ -88,7 +147,11 @@ export default function MemberDialog() {
       await saveMember(payload);
       closeMemberDialog();
     } catch (error) {
-      showToast(error.message);
+      // The save failed server-side (duplicate, offline, expired session) — keep
+      // the dialog open with the typed values and say why above the buttons.
+      const message = error?.message || "Could not save this member. Check your connection and try again.";
+      setFormError(message);
+      showToast(message);
     } finally {
       setBusy(false);
     }
@@ -102,7 +165,9 @@ export default function MemberDialog() {
       await deleteMember(member.id);
       closeMemberDialog();
     } catch (error) {
-      showToast(error.message);
+      const message = error?.message || "Could not delete this member. Try again.";
+      setFormError(message);
+      showToast(message);
     } finally {
       setBusy(false);
     }
@@ -110,7 +175,7 @@ export default function MemberDialog() {
 
   return (
     <Dialog className="member-dialog" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
-      <form className="member-form" id="memberForm" method="dialog" onSubmit={onSubmit}>
+      <form className="member-form" id="memberForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
         <div className="dialog-head">
           <div>
             <p className="eyebrow">Easy onboarding</p>
@@ -146,43 +211,45 @@ export default function MemberDialog() {
               id="gymIdInput"
               name="gymId"
               placeholder="Auto generated"
+              maxLength={40}
               value={gymId}
               onChange={(event) => setGymId(event.target.value)}
+              {...fieldProps("gymId")}
             />
+            <FieldError id="gymIdInput-error" message={errorFor("gymId")} />
           </label>
           <label>
             Name
             <input
               id="nameInput"
               name="name"
-              required
               autoComplete="name"
+              maxLength={80}
               value={name}
               onChange={(event) => setName(event.target.value)}
+              {...fieldProps("name")}
             />
+            <FieldError id="nameInput-error" message={errorFor("name")} />
           </label>
-          <label>
-            Mobile number
-            <input
-              id="phoneInput"
-              name="phone"
-              required
-              inputMode="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          </label>
+          <PhoneField
+            id="phoneInput"
+            value={phone}
+            onChange={setPhone}
+            onBlur={() => markTouched("phone")}
+            error={errorFor("phone")}
+          />
           <label className="wide">
             Address
             <textarea
               id="addressInput"
               name="address"
               rows="3"
-              required
+              maxLength={200}
               value={address}
               onChange={(event) => setAddress(event.target.value)}
+              {...fieldProps("address")}
             />
+            <FieldError id="addressInput-error" message={errorFor("address")} />
           </label>
           <fieldset className="membership-options wide">
             <legend>Membership type</legend>
@@ -221,11 +288,12 @@ export default function MemberDialog() {
               type="number"
               min="0"
               step="1"
-              required
               inputMode="numeric"
               value={fee}
               onChange={(event) => setFee(event.target.value)}
+              {...fieldProps("fee")}
             />
+            <FieldError id="feeInput-error" message={errorFor("fee")} />
           </label>
           <label>
             Admission fee
@@ -239,7 +307,9 @@ export default function MemberDialog() {
               inputMode="numeric"
               value={admissionFee}
               onChange={(event) => setAdmissionFee(event.target.value)}
+              {...fieldProps("admissionFee")}
             />
+            <FieldError id="admissionFeeInput-error" message={errorFor("admissionFee")} />
             <small className="field-hint">One-time joining charge. Leave blank if the gym doesn't collect one.</small>
           </label>
           <label id="admissionModeField" hidden={!(Number(admissionFee) > 0)}>
@@ -265,13 +335,15 @@ export default function MemberDialog() {
               name="packageMonths"
               type="number"
               min="1"
+              max="60"
               step="1"
               inputMode="numeric"
               disabled={!isPackage}
-              required={isPackage}
               value={packageMonths}
               onChange={(event) => setPackageMonths(event.target.value)}
+              {...fieldProps("packageMonths")}
             />
+            <FieldError id="packageMonthsInput-error" message={errorFor("packageMonths")} />
           </label>
           <label>
             Start date
@@ -279,10 +351,11 @@ export default function MemberDialog() {
               id="startDateInput"
               name="startDate"
               type="date"
-              required
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
+              {...fieldProps("startDate")}
             />
+            <FieldError id="startDateInput-error" message={errorFor("startDate")} />
           </label>
           <fieldset className="membership-options wide">
             <legend>Payment collection</legend>
@@ -332,6 +405,12 @@ export default function MemberDialog() {
           </label>
         </div>
 
+        {formError ? (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
+
         <div className="form-actions">
           <button
             className={"secondary-action" + (busy ? " is-busy" : "")}
@@ -344,7 +423,7 @@ export default function MemberDialog() {
             Delete
           </button>
           <button className={"primary-action" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
-            Save member
+            {busy ? "Saving..." : "Save member"}
           </button>
         </div>
       </form>
