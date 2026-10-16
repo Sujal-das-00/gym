@@ -133,11 +133,29 @@
     </section>
 
     <!-- ---------------- Live numbers ---------------- -->
-    <section class="stats" id="stats" aria-label="Gymboo in numbers" hidden>
+    <section class="stats" id="stats" aria-label="Gymboo in numbers">
       <div class="wrap">
-        <div class="stat"><strong data-stat="gyms">0</strong><span>Gyms served</span></div>
-        <div class="stat"><strong data-stat="members">0</strong><span>Members managed</span></div>
-        <div class="stat"><strong data-stat="dailyActiveUsers">0</strong><span>Daily active users</span></div>
+        <div class="stat"><strong data-stat="gyms" data-suffix="">0</strong><span>Gyms served</span></div>
+        <div class="stat"><strong data-stat="members" data-suffix="+">0</strong><span>Members managed</span></div>
+        <div class="stat"><strong data-stat="dailyActiveUsers" data-suffix="+">0</strong><span>Daily active users</span></div>
+      </div>
+    </section>
+
+    <!-- ---------------- Testimonials ---------------- -->
+    <section class="band tint" id="testimonials">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Testimonials</p>
+          <h2 class="display">What gym owners say</h2>
+          <p>Gyms that moved their records, fees and attendance onto Gymboo.</p>
+        </div>
+        <div class="quote-carousel">
+          <div class="quote-grid" id="quoteGrid" tabindex="0" aria-label="Gym owner testimonials"></div>
+          <div class="quote-dots" id="quoteDots" aria-hidden="true"></div>
+        </div>
+        <div class="review-cta reveal">
+          <button class="btn btn-primary" type="button" id="reviewOpen">Give a review</button>
+        </div>
       </div>
     </section>
 
@@ -330,21 +348,28 @@
       </div>
     </section>
 
+    <dialog class="terms review-dialog" id="reviewDialog" aria-labelledby="reviewTitle">
+      <h2 id="reviewTitle">Share your experience</h2>
+      <form id="reviewForm" novalidate>
+        <div class="field-grid">
+          <label class="field wide" for="rvName"><span>Your name</span><input id="rvName" name="name" type="text" maxlength="80" autocomplete="name" required /></label>
+          <label class="field wide" for="rvGym"><span>Gym name</span><input id="rvGym" name="gymName" type="text" maxlength="120" required /></label>
+          <label class="field wide" for="rvMsg"><span>Your review</span><textarea id="rvMsg" name="message" rows="5" maxlength="800" placeholder="How has Gymboo helped your gym?" required></textarea><small class="field-hint">Reviews are checked by our team before they appear on the site.</small></label>
+          <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        </div>
+        <p class="field-error" id="reviewError" role="alert"></p>
+        <p class="review-ok" id="reviewOk" role="status" hidden>Thank you. Your review has been sent and will appear once approved.</p>
+        <div class="review-actions">
+          <button class="btn btn-primary" type="submit" id="reviewSend">Submit review</button>
+          <button class="btn btn-ghost" type="button" id="reviewCancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog class="terms video-modal" id="videoDialog" aria-label="Video tutorial">
       <button class="video-close" type="button" id="videoClose" aria-label="Close video"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#close"/></svg></button>
       <div class="video-frame" id="videoFrame"></div>
     </dialog>
-
-    <!-- ---------------- Testimonials ---------------- -->
-    <section class="band tint" id="testimonials" hidden>
-      <div class="wrap">
-        <div class="section-head reveal">
-          <p class="eyebrow">Testimonials</p>
-          <h2 class="display">What gym owners say</h2>
-        </div>
-        <div class="quote-grid" id="quoteGrid"></div>
-      </div>
-    </section>
 
     <!-- ---------------- Pricing ---------------- -->
     <section class="band" id="pricing">

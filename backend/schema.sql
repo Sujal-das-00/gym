@@ -181,3 +181,16 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   CONSTRAINT fk_push_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
   CONSTRAINT fk_push_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
+
+-- Reviews submitted from the public landing page. Stored as 'pending' and never
+-- shown on the site automatically: they are moderated by hand, then copied into
+-- landing/testimonials.js.
+CREATE TABLE IF NOT EXISTS site_reviews (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  name VARCHAR(80) NOT NULL,
+  gym_name VARCHAR(120) NOT NULL,
+  message TEXT NOT NULL,
+  status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_site_reviews_status (status, created_at)
+);

@@ -99,61 +99,137 @@
   });
   renderVideos("en");
 
-  // ---------------- Live numbers ----------------
-  // Real aggregate counts from /api/public/stats. If the request fails the strip
-  // simply stays hidden; there are no fallback numbers.
+  // ---------------- Numbers ----------------
+  var STATS = { gyms: 280, members: 7000, dailyActiveUsers: 600 };
   var statsEl = document.getElementById("stats");
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var nf = new Intl.NumberFormat("en-IN");
 
   function countUp(el, to) {
-    if (reduce || to < 2) { el.textContent = nf.format(to); return; }
+    var suffix = el.getAttribute("data-suffix") || "";
+    if (reduce) { el.textContent = nf.format(to) + suffix; return; }
     var start = null, ms = 1100;
     function frame(t) {
       if (start === null) start = t;
       var p = Math.min((t - start) / ms, 1);
-      el.textContent = nf.format(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      el.textContent = nf.format(Math.round(to * (1 - Math.pow(1 - p, 3)))) + (p < 1 ? "" : suffix);
       if (p < 1) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
   }
 
-  fetch("/api/public/stats").then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (data) {
-    statsEl.hidden = false;
-    var run = function () {
-      Array.prototype.forEach.call(statsEl.querySelectorAll("[data-stat]"), function (el) {
-        countUp(el, Number(data[el.getAttribute("data-stat")]) || 0);
-      });
-    };
-    if (!("IntersectionObserver" in window)) return run();
+  var runStats = function () {
+    Array.prototype.forEach.call(statsEl.querySelectorAll("[data-stat]"), function (el) {
+      countUp(el, STATS[el.getAttribute("data-stat")] || 0);
+    });
+  };
+  if ("IntersectionObserver" in window) {
     var once = new IntersectionObserver(function (entries) {
-      if (entries[0].isIntersecting) { once.disconnect(); run(); }
+      if (entries[0].isIntersecting) { once.disconnect(); runStats(); }
     }, { threshold: 0.4 });
     once.observe(statsEl);
-  }).catch(function () { /* stays hidden */ });
+  } else {
+    runStats();
+  }
 
   // ---------------- Testimonials ----------------
+  // A grid on wide screens, a swipeable carousel on phones (see landing.css).
   var quotes = window.GYMBOO_TESTIMONIALS || [];
+  var quoteGrid = document.getElementById("quoteGrid");
+  var quoteDots = document.getElementById("quoteDots");
   if (quotes.length) {
-    var quoteGrid = document.getElementById("quoteGrid");
-    quotes.forEach(function (q) {
+    var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.7L12 17.5 6 20.9l1.3-6.7-5-4.7 6.8-.8z"/></svg>';
+    quotes.forEach(function (q, i) {
       var card = document.createElement("figure");
-      card.className = "quote reveal";
+      card.className = "quote";
+      var stars = document.createElement("div");
+      stars.className = "quote-stars";
+      stars.setAttribute("role", "img");
+      stars.setAttribute("aria-label", "Rated 5 out of 5");
+      stars.innerHTML = STAR + STAR + STAR + STAR + STAR;
       var text = document.createElement("blockquote");
       text.textContent = q.quote;
       var cap = document.createElement("figcaption");
+      var initials = document.createElement("span");
+      initials.className = "quote-avatar";
+      initials.setAttribute("aria-hidden", "true");
+      initials.textContent = String(q.name || "").split(/\s+/).map(function (w) { return w.charAt(0); }).join("").slice(0, 2).toUpperCase();
+      var info = document.createElement("div");
       var who = document.createElement("strong");
       who.textContent = q.name;
       var meta = document.createElement("span");
+      meta.className = "quote-topic";
       meta.textContent = [q.role, q.gym, q.city].filter(Boolean).join(", ");
-      cap.appendChild(who);
-      cap.appendChild(meta);
+      info.appendChild(who);
+      info.appendChild(meta);
+      cap.appendChild(initials);
+      cap.appendChild(info);
+      card.appendChild(stars);
       card.appendChild(text);
       card.appendChild(cap);
       quoteGrid.appendChild(card);
+
+      var dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "quote-dot" + (i === 0 ? " active" : "");
+      dot.setAttribute("tabindex", "-1");
+      dot.addEventListener("click", function () {
+        quoteGrid.scrollTo({ left: card.offsetLeft - quoteGrid.offsetLeft, behavior: reduce ? "auto" : "smooth" });
+      });
+      quoteDots.appendChild(dot);
     });
-    document.getElementById("testimonials").hidden = false;
+    var syncDots = function () {
+      var cards = quoteGrid.children, best = 0, bestGap = Infinity;
+      for (var i = 0; i < cards.length; i++) {
+        var gap = Math.abs(cards[i].offsetLeft - quoteGrid.offsetLeft - quoteGrid.scrollLeft);
+        if (gap < bestGap) { bestGap = gap; best = i; }
+      }
+      Array.prototype.forEach.call(quoteDots.children, function (d, i) { d.classList.toggle("active", i === best); });
+    };
+    quoteGrid.addEventListener("scroll", function () { window.requestAnimationFrame(syncDots); }, { passive: true });
+  } else {
+    document.getElementById("testimonials").hidden = true;
   }
+
+  // ---------------- Give a review ----------------
+  var rvDialog = document.getElementById("reviewDialog");
+  var rvForm = document.getElementById("reviewForm");
+  var rvError = document.getElementById("reviewError");
+  var rvOk = document.getElementById("reviewOk");
+  var rvSend = document.getElementById("reviewSend");
+
+  document.getElementById("reviewOpen").addEventListener("click", function () {
+    rvForm.reset();
+    rvError.textContent = "";
+    rvOk.hidden = true;
+    rvSend.hidden = false;
+    rvSend.disabled = false;
+    if (rvDialog.showModal) rvDialog.showModal(); else rvDialog.setAttribute("open", "");
+  });
+  document.getElementById("reviewCancel").addEventListener("click", function () { rvDialog.close(); });
+  rvDialog.addEventListener("click", function (e) { if (e.target === rvDialog) rvDialog.close(); });
+
+  rvForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var data = {
+      name: rvForm.name.value.trim(),
+      gymName: rvForm.gymName.value.trim(),
+      message: rvForm.message.value.trim(),
+      website: rvForm.website.value,
+    };
+    if (!data.name || !data.gymName) { rvError.textContent = "Please enter your name and your gym's name."; return; }
+    if (data.message.length < 20) { rvError.textContent = "Please write at least a couple of sentences."; return; }
+    rvError.textContent = "";
+    rvSend.disabled = true;
+    fetch("/api/public/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || "Something went wrong. Please try again.");
+        });
+      })
+      .then(function () { rvOk.hidden = false; rvSend.hidden = true; })
+      .catch(function (err) { rvError.textContent = err.message; rvSend.disabled = false; });
+  });
 
   // ---------------- Team ----------------
   var team = window.GYMBOO_TEAM || {};
