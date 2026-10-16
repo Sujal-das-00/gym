@@ -7,6 +7,7 @@ const {
   SUPERADMIN_DIR,
   CHECKIN_DIST,
   ICONS_DIR,
+  LANDING_DIR,
   PROJECT_ROOT,
   UPLOAD_DIR,
 } = require("../config/constants");
@@ -192,7 +193,13 @@ function mountFrontendRoutes(app) {
   app.get("/checkin", (req, res) => sendCheckinShell(res, ""));
   app.get("/checkin/:slug", (req, res) => sendCheckinShell(res, req.params.slug));
 
-  app.get("/", (req, res) => res.redirect("/admin"));
+  // Public marketing site: the landing page is the front door; login and signup
+  // are its own pages so every entry to the product shares one look.
+  const landingPage = (file) => (req, res) => res.sendFile(path.join(LANDING_DIR, file));
+  app.get("/", landingPage("index.html"));
+  app.get("/login", landingPage("login.html"));
+  app.get("/signup", landingPage("signup.html"));
+  app.use("/landing", express.static(LANDING_DIR));
 }
 
 module.exports = mountFrontendRoutes;

@@ -13,6 +13,7 @@ const CHECKIN_DIR = path.join(PROJECT_ROOT, "checkin-frontend");
 // The member check-in app is a React app built by Vite, like the admin dashboard.
 // Run `npm install && npm run build` in checkin-frontend/.
 const CHECKIN_DIST = path.join(CHECKIN_DIR, "dist");
+const LANDING_DIR = path.join(PROJECT_ROOT, "landing");
 const ICONS_DIR = path.join(PROJECT_ROOT, "icons");
 // Digital Asset Links: proves the members' Android app and this site share an
 // owner, which is what lets the app run without Chrome's URL bar.
@@ -56,6 +57,7 @@ module.exports = {
   CHECKIN_DIR,
   CHECKIN_DIST,
   ICONS_DIR,
+  LANDING_DIR,
   ASSET_LINKS_PATH,
   DATA_DIR,
   UPLOAD_DIR,

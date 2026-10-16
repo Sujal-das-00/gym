@@ -70,6 +70,40 @@ async function createGymWithAdmin({ gymName, slug, adminEmail, adminPassword, ad
   return { gym, admin: userModel.publicUser(admin) };
 }
 
+const NAME_PATTERN = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+
+// Self-service signup from the public landing page: a gym and its owner login in
+// one step, returning a session so the owner lands in the dashboard signed in.
+// The landing form checks the same rules for instant feedback; these are the ones
+// that count.
+async function signupOwner({ gymName, ownerName, email, password }) {
+  if (!NAME_PATTERN.test(gymName) || gymName.length < 2 || gymName.length > 30) {
+    throw createHttpError(400, "Gym name must be 2-30 letters, with no numbers or symbols");
+  }
+  if (!NAME_PATTERN.test(ownerName) || ownerName.length < 2 || ownerName.length > 30) {
+    throw createHttpError(400, "Your name must be 2-30 letters, with no numbers or symbols");
+  }
+  if (email.length > 120 || email.includes("..") || !EMAIL_PATTERN.test(email)) {
+    throw createHttpError(400, "Enter a valid email address");
+  }
+  if (password.length < 8 || password.length > 72 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+    throw createHttpError(400, "Password must be 8-72 characters with at least one letter and one number");
+  }
+  // Checked before the gym is created, so a taken email never leaves an owner-less gym behind.
+  if (await userModel.findUserByEmail(email)) {
+    throw createHttpError(409, "An account with this email already exists. Try logging in.");
+  }
+  const { gym, admin } = await createGymWithAdmin({
+    gymName,
+    adminEmail: email,
+    adminPassword: password,
+    adminName: ownerName,
+  });
+  await userModel.setLastLogin(admin.id);
+  return { token: tokenFor(admin), user: admin, gym: { id: gym.id, slug: gym.slug, name: gym.name } };
+}
+
 async function createStaff(tenantId, { email, password, name, role }) {
   if (!email || !password) throw createHttpError(400, "Email and password are required");
   const staffRole = role === "gym_admin" ? "gym_admin" : "staff";
@@ -93,5 +127,6 @@ module.exports = {
   createStaff,
   login,
   me,
+  signupOwner,
   tokenFor,
 };

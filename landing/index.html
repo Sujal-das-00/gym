@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073f2d" />
+  <title>Gymboo: Gym Management Software with QR Check-in and Fee Tracking</title>
+  <meta name="description" content="Gym management software with a desktop app, an owner mobile app and a branded member app. Start free. ₹5,999 one-time licence (was ₹6,999) with server free in year one, then ₹1,299 a year. Or ₹249 a month, all inclusive." />
+  <link rel="canonical" href="/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Gymboo: Gym management, check-in and fees" />
+  <meta property="og:description" content="Desktop app, owner app and branded member app. Start free. ₹5,999 one-time licence, now ₹1,000 off (server free in year one, then ₹1,299 a year) or ₹249 a month all inclusive." />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Gymboo","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Gym management software for members, attendance, QR check-in, fees and expenses.","offers":[{"@type":"Offer","name":"Lifetime","price":"5999","priceCurrency":"INR","description":"One-time licence. Server and maintenance free in the first year, then ₹1,299 per year."},{"@type":"Offer","name":"Monthly","price":"249","priceCurrency":"INR","description":"All-inclusive monthly plan with licence, server and maintenance."}]}
+  </script>
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" href="/icons/icon-192.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="/landing/landing.css" />
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="offer-banner" role="region" aria-label="Limited-time offer">
+    <p><span class="ob-tag">Limited-time offer</span> Get Gymboo for <strong>₹5,999</strong> <s>₹6,999</s> and save ₹1,000 on your one-time licence. <a href="#pricing">View pricing</a></p>
+  </div>
+
+  <header class="site-header" id="siteHeader">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+        Gymboo
+      </a>
+      <nav class="site-nav" id="siteNav" aria-label="Page sections">
+        <a href="#offer">What we offer</a>
+        <a href="#why">Why Gymboo</a>
+        <a href="#videos">Videos</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-ghost" href="/login">Log in</a>
+        <a class="btn btn-primary" href="/signup">Get started</a>
+        <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="siteNav">
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#menu"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ---------------- Hero ---------------- -->
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <h1 class="display">Run your gym from <em>one dashboard</em>, not a register book.</h1>
+          <p class="hero-sub">
+            Members, attendance, fees, expenses and trainers in one place, plus a QR check-in app your
+            members install on their own phones.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-white btn-lg" href="/signup">Get started for free <span class="arrow"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#arrow"/></svg></span></a>
+            <a class="btn btn-light btn-lg" href="#videos"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#play"/></svg> Watch videos</a>
+          </div>
+          <ul class="hero-points">
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Start free · ₹249/month or ₹5,999 one-time</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Desktop, owner and member apps</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> You own your data</li>
+          </ul>
+        </div>
+
+        <div class="mock-wrap">
+          <div class="hero-card" aria-hidden="true">
+            <div class="hero-card-head">
+              <span class="brand-mark"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+              <div><strong>Iron Works Fitness</strong><small>Dashboard · Today</small></div>
+            </div>
+            <div class="mock-stats">
+              <div class="mock-stat total"><span>Members</span><strong>184</strong></div>
+              <div class="mock-stat due"><span>Fees due</span><strong>12</strong></div>
+              <div class="mock-stat paid"><span>Collected</span><strong>₹96k</strong></div>
+            </div>
+            <div class="mock-row">
+              <span class="mock-avatar">RM</span>
+              <div><strong>Rahul Mehta</strong><small>Monthly · ₹1,200</small></div>
+              <span class="chip paid">Paid</span>
+            </div>
+            <div class="mock-row">
+              <span class="mock-avatar">SK</span>
+              <div><strong>Sneha Kulkarni</strong><small>Package · 6 months</small></div>
+              <span class="chip today">Checked in</span>
+            </div>
+            <div class="mock-row">
+              <span class="mock-avatar">AV</span>
+              <div><strong>Arjun Verma</strong><small>Monthly · due 3 days ago</small></div>
+              <span class="chip due">Overdue</span>
+            </div>
+            <p class="mock-note">Illustrative sample data</p>
+          </div>
+          <div class="float-card" aria-hidden="true">
+            <span class="tick"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#qr"/></svg></span>
+            <div>Member checked in<small>via QR · just now</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Highlights ---------------- -->
+    <section class="highlights" aria-label="Highlights">
+      <div class="wrap">
+        <div class="highlight reveal">
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#shield"/></svg>
+          <div><strong>You own your data</strong><span>Your members and records belong to you, not us.</span></div>
+        </div>
+        <div class="highlight reveal" style="--d:60ms">
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#receipt"/></svg>
+          <div><strong>Export in one click</strong><span>Download your records as CSV any time.</span></div>
+        </div>
+        <div class="highlight reveal" style="--d:120ms">
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#wallet"/></svg>
+          <div><strong>Made for Indian gyms</strong><span>Rupees, cash and UPI collections, monthly plans.</span></div>
+        </div>
+        <div class="highlight reveal" style="--d:180ms">
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#dashboard"/></svg>
+          <div><strong>No need to change how you work</strong><span>The software adjusts to your gym.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Live numbers ---------------- -->
+    <section class="stats" id="stats" aria-label="Gymboo in numbers" hidden>
+      <div class="wrap">
+        <div class="stat"><strong data-stat="gyms">0</strong><span>Gyms served</span></div>
+        <div class="stat"><strong data-stat="members">0</strong><span>Members managed</span></div>
+        <div class="stat"><strong data-stat="dailyActiveUsers">0</strong><span>Daily active users</span></div>
+      </div>
+    </section>
+
+    <!-- ---------------- What we offer ---------------- -->
+    <section class="band" id="offer">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">What we offer</p>
+          <h2 class="display">Everything your gym runs on, in three apps</h2>
+          <p>One system for you, your staff and your members.</p>
+        </div>
+        <div class="offer-grid">
+          <article class="offer-card reveal">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#phone"/></svg></div>
+            <h3>Branded app for your members</h3>
+            <p>Members get an app that carries your gym's name and logo. It installs on their phone with no app store.</p>
+            <ul class="check-list">
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> QR check-in at the door</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Next due date and payment history</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Receipts and a digital membership card</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Fee reminders as push notifications</li>
+            </ul>
+          </article>
+          <article class="offer-card reveal" style="--d:80ms">
+            <div class="feature-icon b"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#desktop"/></svg></div>
+            <h3>Apps for gym owners</h3>
+            <p>Run the gym from the front-desk computer or from your own phone. Both apps work on the same live data.</p>
+            <ul class="check-list">
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Desktop app for the front desk</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Mobile app for the owner and admin</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Members, fees, expenses and attendance</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Staff logins with limited access</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- USP 1: adapts ---------------- -->
+    <section class="band tint" id="why">
+      <div class="wrap split">
+        <div class="reveal">
+          <p class="eyebrow">Built to adapt</p>
+          <h2 class="display">Software that adjusts to your gym</h2>
+          <p>Most gym software is built on a fixed structure and expects every gym to work the same way. Real gyms don't. Each one has its own plans, billing habits, collection days and house rules.</p>
+          <p>Gymboo is flexible by design. You set the rules for memberships, billing, fee collection, check-in and holidays, and the software follows them. You never have to change how you run your gym to suit the software.</p>
+        </div>
+        <div class="rules-card reveal" style="--d:80ms" aria-hidden="true">
+          <p class="rules-title">Your gym's rules</p>
+          <div class="rule"><span>Membership check-in policy</span><b class="opt on">Set by you</b></div>
+          <div class="rule"><span>Billing cycle</span><b class="opt">Month start · 30 days · Custom</b></div>
+          <div class="rule"><span>Fee collection</span><b class="opt">At joining · Fixed day</b></div>
+          <div class="rule"><span>Weekly holidays</span><b class="opt">You choose</b></div>
+          <p class="mock-note">Settings you control in the dashboard</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- USP 2: ledger ---------------- -->
+    <section class="band" id="ledger">
+      <div class="wrap split split-rev">
+        <div class="ledger-card reveal" aria-hidden="true">
+          <div class="ledger-day"><strong>Tuesday, 14 Oct</strong><span><b class="in">In ₹8,400</b> · <b class="out">Out ₹2,100</b></span></div>
+          <div class="ledger-row"><span class="dot in"></span><div><strong>Rahul Mehta</strong><small>Monthly membership</small></div><b class="in">+₹1,200</b></div>
+          <div class="ledger-row"><span class="dot in"></span><div><strong>Sneha Kulkarni</strong><small>6-month package</small></div><b class="in">+₹5,400</b></div>
+          <div class="ledger-row"><span class="dot out"></span><div><strong>Equipment service</strong><small>Equipment</small></div><b class="out">−₹1,500</b></div>
+          <div class="ledger-row"><span class="dot out"></span><div><strong>Electricity</strong><small>Utilities</small></div><b class="out">−₹600</b></div>
+          <p class="mock-note">Illustrative sample data</p>
+        </div>
+        <div class="reveal" style="--d:80ms">
+          <p class="eyebrow">Ledger &amp; insights</p>
+          <h2 class="display">Track every penny of your gym</h2>
+          <p>Get a detailed ledger in one place. See the transactions for each day, and know exactly where your money comes from and where it goes.</p>
+          <ul class="check-list">
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Every payment and expense, day by day</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Earnings and spending side by side</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Insights by category and your top-paying members</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Export to CSV for your accountant</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Trainers ---------------- -->
+    <section class="band tint" id="trainers">
+      <div class="wrap split">
+        <div class="reveal">
+          <p class="eyebrow">Trainers</p>
+          <h2 class="display">Manage your trainers without the paperwork</h2>
+          <p>Keep every trainer's details, shift and attendance in one place, and see at a glance who is on the floor today.</p>
+          <ul class="check-list">
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Add trainers with their specialty and shift</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Assign trainers to members</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Mark trainer attendance for any day</li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Search and filter active trainers</li>
+          </ul>
+        </div>
+        <div class="rules-card reveal" style="--d:80ms" aria-hidden="true">
+          <p class="rules-title">Trainers · Today</p>
+          <div class="ledger-row"><span class="mock-avatar">AS</span><div><strong>Amit Singh</strong><small>Strength · Morning · 18 members</small></div><span class="chip paid">Present</span></div>
+          <div class="ledger-row"><span class="mock-avatar">PN</span><div><strong>Priya Nair</strong><small>Yoga · Evening · 12 members</small></div><span class="chip paid">Present</span></div>
+          <div class="ledger-row"><span class="mock-avatar">KD</span><div><strong>Karan Desai</strong><small>Cardio · Morning · 9 members</small></div><span class="chip due">Absent</span></div>
+          <p class="mock-note">Illustrative sample data</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Features ---------------- -->
+    <section class="band" id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Everything in one place</p>
+          <h2 class="display">The whole front desk, on one screen</h2>
+          <p>Every part of the gym's day is a click away.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card reveal">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#users"/></svg></div>
+            <h3>Members &amp; plans</h3>
+            <p>Monthly or package memberships, photos, admission fees and the full payment history of every member.</p>
+          </article>
+          <article class="feature-card b reveal" style="--d:60ms">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#qr"/></svg></div>
+            <h3>QR self check-in</h3>
+            <p>Members scan the code at the door and mark themselves present. Attendance fills in without anyone calling out names.</p>
+          </article>
+          <article class="feature-card reveal" style="--d:120ms">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#receipt"/></svg></div>
+            <h3>Fees &amp; dues</h3>
+            <p>See who owes what today, record cash or UPI collections, and issue a receipt. The next due date updates itself.</p>
+          </article>
+          <article class="feature-card g reveal">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#wallet"/></svg></div>
+            <h3>Expense tracker</h3>
+            <p>Rent, equipment, trainer payouts and utilities in one ledger, so the month's real profit is never a guess.</p>
+          </article>
+          <article class="feature-card b reveal" style="--d:60ms">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#bell"/></svg></div>
+            <h3>Push reminders</h3>
+            <p>Send fee reminders or a gym-wide announcement straight to your members' phones.</p>
+          </article>
+          <article class="feature-card reveal" style="--d:120ms">
+            <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#badge"/></svg></div>
+            <h3>Trainers &amp; staff</h3>
+            <p>Assign trainers to members, track their attendance, and give the front desk a staff login with limited access.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- How it works ---------------- -->
+    <section class="band tint" id="how">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">How it works</p>
+          <h2 class="display">Three steps to a paperless gym</h2>
+          <p>Register your gym, add your members, and share the check-in link.</p>
+        </div>
+        <div class="steps">
+          <article class="step reveal">
+            <h3>Register your gym</h3>
+            <p>Sign up with your gym's name and your email. Your dashboard and owner login are created together.</p>
+          </article>
+          <article class="step reveal" style="--d:60ms">
+            <h3>Add your members</h3>
+            <p>Add members with their plan, fee and start date. Everyone gets a member ID and a check-in QR code automatically.</p>
+          </article>
+          <article class="step reveal" style="--d:120ms">
+            <h3>Share the check-in link</h3>
+            <p>Put the link or QR code at the front desk. Members install it as an app and check themselves in from then on.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Videos ---------------- -->
+    <section class="band" id="videos">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Video tutorials</p>
+          <h2 class="display">See Gymboo in action</h2>
+          <p>Step-by-step tutorials in Hindi and English, so you and your staff can get started quickly.</p>
+        </div>
+        <div class="video-tabs" role="tablist" aria-label="Tutorial language">
+          <button class="video-tab active" type="button" role="tab" aria-selected="true" data-lang="en">English</button>
+          <button class="video-tab" type="button" role="tab" aria-selected="false" data-lang="hi">हिंदी</button>
+        </div>
+        <div class="video-grid" id="videoGrid"></div>
+        <noscript><p class="price-fine">Turn on JavaScript to browse the video tutorials.</p></noscript>
+      </div>
+    </section>
+
+    <dialog class="terms video-modal" id="videoDialog" aria-label="Video tutorial">
+      <button class="video-close" type="button" id="videoClose" aria-label="Close video"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#close"/></svg></button>
+      <div class="video-frame" id="videoFrame"></div>
+    </dialog>
+
+    <!-- ---------------- Testimonials ---------------- -->
+    <section class="band tint" id="testimonials" hidden>
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Testimonials</p>
+          <h2 class="display">What gym owners say</h2>
+        </div>
+        <div class="quote-grid" id="quoteGrid"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- Pricing ---------------- -->
+    <section class="band" id="pricing">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Pricing</p>
+          <h2 class="display">Two ways to pay. Both clear.</h2>
+          <p>Pay once for the licence and a small yearly fee for the server, or pay one monthly fee that covers everything. Start free either way.</p>
+        </div>
+        <div class="plan-switch reveal" role="group" aria-label="Billing plan">
+          <button type="button" class="plan-opt" data-plan-btn="monthly" aria-pressed="false">Monthly</button>
+          <button type="button" class="plan-opt active" data-plan-btn="lifetime" aria-pressed="true">One-time <span class="plan-pop">Most popular</span></button>
+        </div>
+        <div class="pricing-card reveal" id="pricingCard" data-plan="lifetime">
+          <div class="price-main">
+            <div class="plan-pane" data-plan-pane="lifetime">
+              <span class="price-tag">One-time licence · Most popular</span>
+              <p class="price-amount"><strong>₹5,999</strong><s class="price-was">₹6,999</s><span>one-time licence</span></p>
+              <p class="price-save">Limited-time offer: you save ₹1,000</p>
+              <p class="price-caption">A one-time payment for the licence to the Gymboo software and all its apps. Yours to keep.</p>
+            </div>
+            <div class="plan-pane" data-plan-pane="monthly" hidden>
+              <span class="price-tag">Monthly plan</span>
+              <p class="price-amount"><strong>₹249</strong><span>per month</span></p>
+              <p class="price-caption">One simple monthly fee. The licence, all apps, server cost and maintenance are all included.</p>
+            </div>
+            <p class="price-caption price-lead">Included in both plans:</p>
+            <ul class="check-list price-list">
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Desktop app for the front desk</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Mobile app for the owner and admin</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Branded member app with QR check-in</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Complete setup of your gym</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Members, fees, expenses and attendance</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Day-by-day ledger, insights and trainer management</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> You own your data, export it in one click</li>
+            </ul>
+          </div>
+          <div class="price-side">
+            <div class="plan-pane" data-plan-pane="lifetime">
+              <span class="offer-badge">Server free in year 1</span>
+              <p class="label">First year</p>
+              <p class="renewal"><strong>₹0</strong><span>server and maintenance</span></p>
+              <p>Hosting and maintenance are free for the first year after you buy the licence.</p>
+              <p class="label">From year 2</p>
+              <p class="renewal"><strong>₹1,299</strong><span>per year</span></p>
+              <p>A yearly charge for server hosting and maintenance, so your gym stays online, backed up and up to date.</p>
+            </div>
+            <div class="plan-pane" data-plan-pane="monthly" hidden>
+              <span class="offer-badge">Everything included</span>
+              <p class="label">Every month</p>
+              <p class="renewal"><strong>₹249</strong><span>all-inclusive</span></p>
+              <p>Software licence, all three apps, server cost and maintenance are covered by the monthly fee. Nothing else to pay.</p>
+              <p class="label">How long</p>
+              <p>The plan renews each month for as long as you choose to continue.</p>
+            </div>
+            <a class="btn btn-white btn-lg btn-block" href="/signup">Get started for free <svg class="i arrow" aria-hidden="true"><use href="/landing/icons.svg#arrow"/></svg></a>
+            <p class="price-note">Register your gym today and explore the dashboard before you choose a plan.</p>
+          </div>
+        </div>
+        <p class="price-fine reveal">Prices are in Indian rupees. Questions about billing? See the FAQ below.</p>
+      </div>
+    </section>
+
+    <!-- ---------------- Team ---------------- -->
+    <section class="band tint" id="team" hidden>
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Our team</p>
+          <h2 class="display">The people behind Gymboo</h2>
+        </div>
+        <div id="teamRoot"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- FAQ ---------------- -->
+    <section class="band" id="faq">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">FAQ</p>
+          <h2 class="display">Questions gym owners ask</h2>
+        </div>
+        <div class="faq reveal">
+          <details>
+            <summary>How much does Gymboo cost? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>You can get started for free. After that, choose one of two plans. The one-time plan is ₹5,999 for the licence (₹1,000 off the regular ₹6,999), with server and maintenance free in the first year and ₹1,299 a year from year two. The monthly plan is ₹249 a month with everything included.</p>
+          </details>
+          <details>
+            <summary>Do my members need an app store? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>No. Members open your gym's check-in link and install it to their home screen from the browser, like any other app.</p>
+          </details>
+          <details>
+            <summary>How do members check in? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>They scan the check-in QR code at your front desk, or open the app they installed. Attendance is recorded automatically.</p>
+          </details>
+          <details>
+            <summary>Can my front-desk staff use it? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>Yes. As the owner you can add staff logins, which have more limited access than yours.</p>
+          </details>
+          <details>
+            <summary>What is included in both plans? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>A desktop app, a mobile app for the admin, a branded member app, the setup of your gym, plus server and maintenance: free in the first year of the one-time plan, then ₹1,299 a year. The monthly plan includes all of it.</p>
+          </details>
+          <details>
+            <summary>Who owns my members' data? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>You do. You can export your records as CSV from the dashboard whenever you want.</p>
+          </details>
+          <details>
+            <summary>Will it work the way my gym works? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>Yes. You choose how check-in works for memberships, how your billing cycle runs, when fees are collected and which days you are closed.</p>
+          </details>
+          <details>
+            <summary>How do I get started? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+            <p>Register your gym with its name and your email. Your dashboard and owner login are created straight away, and you can add your first member right after.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Final CTA ---------------- -->
+    <section class="band">
+      <div class="wrap">
+        <div class="cta reveal">
+          <h2 class="display">Ready to run a paperless gym?</h2>
+          <p>Register your gym in a few fields, or log in if you already have an account.</p>
+          <div class="cta-actions">
+            <a class="btn btn-white btn-lg" href="/signup">Register your gym <svg class="i arrow" aria-hidden="true"><use href="/landing/icons.svg#arrow"/></svg></a>
+            <a class="btn btn-light btn-lg" href="/login"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#login"/></svg> Log in</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-about">
+          <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+        Gymboo
+      </a>
+          <p>Gym management made simple: members, check-in, fees and expenses in one place.</p>
+        </div>
+        <nav class="footer-col" aria-label="Product">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <nav class="footer-col" aria-label="Account">
+          <h4>Account</h4>
+          <a href="/signup">Register your gym</a>
+          <a href="/login">Log in</a>
+          <a href="/checkin">Member check-in</a>
+        </nav>
+      </div>
+      <div class="footer-base">© <span id="year">2026</span> Gymboo. All rights reserved.</div>
+    </div>
+  </footer>
+
+  <script src="/landing/testimonials.js"></script>
+  <script src="/landing/team.js"></script>
+  <script src="/landing/site.js" defer></script>
+</body>
+
+</html>

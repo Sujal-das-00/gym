@@ -8,20 +8,26 @@ const memberController = require("../controllers/memberController");
 const publicController = require("../controllers/publicController");
 const pushController = require("../controllers/pushController");
 const settingsController = require("../controllers/settingsController");
+const statsController = require("../controllers/statsController");
 const superRoutes = require("./superRoutes");
 const { authenticate, requireRole, resolveTenant } = require("../middleware/auth");
 const { authenticateMember } = require("../middleware/memberAuth");
 const { checkinThrottle } = require("../middleware/checkinThrottle");
 const { memberLoginThrottle } = require("../middleware/memberLoginThrottle");
+const { authThrottle } = require("../middleware/authThrottle");
 const { notifyThrottle } = require("../middleware/notifyThrottle");
 const { asyncHandler } = require("../utils/http");
 
 const router = express.Router();
 
 // --- Authentication (no login required) ---
-router.post("/auth/login", asyncHandler(authController.postLogin));
+router.post("/auth/login", authThrottle, asyncHandler(authController.postLogin));
+router.post("/auth/signup", authThrottle, asyncHandler(authController.postSignup));
 router.post("/auth/logout", asyncHandler(authController.postLogout));
 router.get("/auth/me", authenticate, asyncHandler(authController.getMe));
+
+// Aggregate counts for the public landing page (gyms, members, today's attendance).
+router.get("/public/stats", asyncHandler(statsController.getPublicStats));
 
 // QR image of a check-in URL. Loaded as an <img> (can't send auth/tenant headers)
 // and only renders the URL it is given, so it stays outside the auth wall.

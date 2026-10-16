@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073f2d" />
+  <title>Log in · Gymboo</title>
+  <meta name="description" content="Log in to your Gymboo dashboard to manage members, attendance and fees." />
+  <meta name="robots" content="noindex" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" href="/icons/icon-192.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="/landing/landing.css" />
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+
+<body>
+  <div class="auth-page">
+    <aside class="auth-aside">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+        Gymboo
+      </a>
+      <h2 class="display">Welcome back to your gym.</h2>
+      <p>Log in to see today's check-ins, dues and collections.</p>
+      <ul class="check-list"><li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Members and attendance in one list</li><li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Fees, dues and receipts</li><li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Expenses and trainers</li></ul>
+      <p class="aside-foot">New to Gymboo? <a href="/signup">Register your gym</a>.</p>
+    </aside>
+
+    <main class="auth-main" id="main">
+      <div class="auth-card">
+        <p class="eyebrow">Gym owner &amp; staff</p>
+        <h1 class="display">Log in</h1>
+        <p class="lede">Use the email and password for your gym's dashboard.</p>
+
+        <p class="form-note error" id="formError" role="alert" hidden></p>
+
+        <form id="loginForm" novalidate>
+          <div class="field-grid">
+            <label class="field wide" for="email">
+              <span>Email</span>
+              <input id="email" name="email" type="email" maxlength="120" autocomplete="username" placeholder="you@yourgym.in" aria-describedby="email-error" />
+              <small class="field-error" id="email-error"></small>
+            </label>
+            <label class="field wide" for="password">
+              <span>Password</span>
+              <div class="password-wrap">
+                <input id="password" name="password" type="password" maxlength="72" autocomplete="current-password" aria-describedby="password-error" />
+                <button class="password-toggle" type="button" data-toggle="password" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#eye"/></svg></button>
+              </div>
+              <small class="field-error" id="password-error"></small>
+            </label>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block auth-submit" id="submitBtn" type="submit">
+            <span class="label">Log in</span>
+          </button>
+        </form>
+
+        <p class="auth-alt">Don't have a gym yet? <a href="/signup">Register your gym</a></p>
+        <p class="auth-alt"><a href="/">&larr; Back to home</a></p>
+      </div>
+    </main>
+  </div>
+  <script src="/landing/auth.js" defer></script>
+</body>
+
+</html>

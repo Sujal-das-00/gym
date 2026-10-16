@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073f2d" />
+  <meta name="description"
+    content="Gym management software for members, attendance, QR check-in, fees and expenses — with a free member app." />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" href="/icons/icon-192.svg" />
+  <title>Gymboo — Gym Management, Check-in and Fees</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link rel="stylesheet" href="/landing/landing.css" />
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><span class="material-symbols-outlined">exercise</span></span>
+        Gymboo
+      </a>
+      <nav class="site-nav" aria-label="Page sections">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#members">Member app</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-ghost" href="/admin">Log in</a>
+        <a class="btn btn-primary" href="/signup">Sign up</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------------- Hero ---------------- -->
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <span class="pill">
+            <span class="material-symbols-outlined">bolt</span>
+            Set up your gym in under a minute
+          </span>
+          <h1 class="display">Run your gym from <em>one dashboard</em>, not a register book.</h1>
+          <p class="hero-sub">
+            Members, attendance, fees, expenses and trainers in a single place — plus a QR check-in
+            app your members install on their own phones. Built for small and mid-size gyms.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" href="/signup">
+              <span class="material-symbols-outlined">rocket_launch</span>
+              Create your gym
+            </a>
+            <a class="btn btn-light btn-lg" href="/admin">
+              <span class="material-symbols-outlined">login</span>
+              Log in to dashboard
+            </a>
+          </div>
+          <ul class="hero-points">
+            <li><span class="material-symbols-outlined">check_circle</span> No card needed</li>
+            <li><span class="material-symbols-outlined">check_circle</span> Works on any phone</li>
+            <li><span class="material-symbols-outlined">check_circle</span> Your data stays yours</li>
+          </ul>
+        </div>
+
+        <!-- Dashboard preview, drawn in CSS so the page loads with no images. -->
+        <div class="hero-card" aria-hidden="true">
+          <div class="hero-card-head">
+            <span class="brand-mark"><span class="material-symbols-outlined">exercise</span></span>
+            <div>
+              <strong>Iron Works Fitness</strong>
+              <span>Dashboard · Today</span>
+            </div>
+          </div>
+          <div class="mock-stats">
+            <div class="mock-stat total"><span>Members</span><strong>184</strong></div>
+            <div class="mock-stat due"><span>Fees due</span><strong>12</strong></div>
+            <div class="mock-stat paid"><span>Collected</span><strong>₹96k</strong></div>
+          </div>
+          <div class="mock-row">
+            <span class="mock-avatar">RM</span>
+            <div><strong>Rahul Mehta</strong><small>Monthly · ₹1,200</small></div>
+            <span class="chip paid">Paid</span>
+          </div>
+          <div class="mock-row">
+            <span class="mock-avatar">SK</span>
+            <div><strong>Sneha Kulkarni</strong><small>Package · 6 months</small></div>
+            <span class="chip today">Checked in</span>
+          </div>
+          <div class="mock-row">
+            <span class="mock-avatar">AV</span>
+            <div><strong>Arjun Verma</strong><small>Monthly · due 3 days ago</small></div>
+            <span class="chip due">Overdue</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Features ---------------- -->
+    <section class="band tint" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Everything in one place</p>
+          <h2 class="display">The whole front desk, on one screen</h2>
+          <p>Stop juggling notebooks, spreadsheets and WhatsApp reminders. Every part of the gym's day
+            is a click away.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon"><span class="material-symbols-outlined">groups_3</span></div>
+            <h3>Members &amp; plans</h3>
+            <p>Monthly or package memberships, photos, admission fees and the full payment history of
+              every member.</p>
+          </article>
+          <article class="feature-card b">
+            <div class="feature-icon"><span class="material-symbols-outlined">qr_code_scanner</span></div>
+            <h3>QR self check-in</h3>
+            <p>Members scan the code at the door and mark themselves present. Attendance fills in
+              without anyone calling out names.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon"><span class="material-symbols-outlined">payments</span></div>
+            <h3>Fees &amp; dues</h3>
+            <p>See who owes what today, collect in cash or UPI, and print a receipt — the next due date
+              updates itself.</p>
+          </article>
+          <article class="feature-card g">
+            <div class="feature-icon"><span class="material-symbols-outlined">account_balance_wallet</span></div>
+            <h3>Expense tracker</h3>
+            <p>Rent, equipment, trainer payouts and utilities in one ledger, so the month's real profit
+              is never a guess.</p>
+          </article>
+          <article class="feature-card b">
+            <div class="feature-icon"><span class="material-symbols-outlined">notifications_active</span></div>
+            <h3>Push reminders</h3>
+            <p>Send fee reminders or a gym-wide announcement straight to your members' phones — no
+              bulk-SMS bill.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon"><span class="material-symbols-outlined">exercise</span></div>
+            <h3>Trainers &amp; staff</h3>
+            <p>Assign trainers to members, track their attendance, and give the front desk a staff
+              login that can't see everything.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- How it works ---------------- -->
+    <section class="band" id="how">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2 class="display">Three steps to a paperless gym</h2>
+          <p>Sign up today, and take your first check-in the same evening.</p>
+        </div>
+
+        <div class="steps">
+          <article class="step">
+            <h3>Create your gym</h3>
+            <p>Sign up with your gym's name and your email. Your dashboard and your owner login are
+              ready straight away.</p>
+          </article>
+          <article class="step">
+            <h3>Add your members</h3>
+            <p>Add members with their plan, fee and start date. Everyone gets a Gym ID and a check-in
+              QR code automatically.</p>
+          </article>
+          <article class="step">
+            <h3>Share the check-in link</h3>
+            <p>Put the link or QR code at the front desk. Members install it as an app and check
+              themselves in from then on.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Member app ---------------- -->
+    <section class="band tint" id="members">
+      <div class="wrap split">
+        <div>
+          <p class="eyebrow">For your members</p>
+          <h2 class="display">An app your members actually keep</h2>
+          <p>The check-in page installs on a phone like any other app — no app store, no download,
+            nothing for you to maintain.</p>
+          <ul class="check-list">
+            <li><span class="material-symbols-outlined">check_circle</span> Scan and check in at the
+              door in two seconds</li>
+            <li><span class="material-symbols-outlined">check_circle</span> See the next due date and
+              past payments</li>
+            <li><span class="material-symbols-outlined">check_circle</span> Download receipts and a
+              digital membership card</li>
+            <li><span class="material-symbols-outlined">check_circle</span> Get fee reminders as a
+              phone notification</li>
+          </ul>
+        </div>
+
+        <div class="phone" aria-hidden="true">
+          <div class="phone-head">
+            <span class="phone-dot"><span class="material-symbols-outlined">exercise</span></span>
+            <div>
+              <strong>Iron Works Fitness</strong>
+              <small>Member check-in</small>
+            </div>
+          </div>
+          <div class="scan-box">
+            <span class="material-symbols-outlined">qr_code_scanner</span>
+            Scan to check in
+          </div>
+          <div class="phone-row"><span>Today</span><span>Present ✓</span></div>
+          <div class="phone-row"><span>Next due</span><span>12 Oct</span></div>
+          <div class="phone-row"><span>Plan</span><span>Monthly</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- CTA ---------------- -->
+    <section class="band">
+      <div class="wrap">
+        <div class="cta">
+          <h2 class="display">Ready when you are</h2>
+          <p>Create your gym's account now, or sign in if you already have one. Setting up takes a
+            name and an email.</p>
+          <div class="cta-actions">
+            <a class="btn btn-primary btn-lg" href="/signup">
+              <span class="material-symbols-outlined">person_add</span>
+              Sign up free
+            </a>
+            <a class="btn btn-light btn-lg" href="/admin">
+              <span class="material-symbols-outlined">login</span>
+              Log in
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <small>© <span id="year">2026</span> Gymboo · Gym management made simple.</small>
+      <nav aria-label="Footer">
+        <a href="/admin">Admin dashboard</a>
+        <a href="/checkin">Member check-in</a>
+        <a href="/signup">Create a gym</a>
+        <a href="/superadmin">Platform owner</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // The only script the landing page needs: keep the footer year current.
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+
+</html>

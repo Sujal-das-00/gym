@@ -19,6 +19,17 @@ async function postLogin(req, res) {
   res.json({ user, token });
 }
 
+async function postSignup(req, res) {
+  const result = await authService.signupOwner({
+    gymName: String(req.body?.gymName || "").trim(),
+    ownerName: String(req.body?.ownerName || "").trim(),
+    email: String(req.body?.email || "").trim(),
+    password: String(req.body?.password || ""),
+  });
+  setSessionCookie(res, result.token);
+  res.status(201).json(result);
+}
+
 async function postLogout(req, res) {
   const { cookieName, cookieSecure } = authConfig();
   res.setHeader("Set-Cookie", clearCookie(cookieName, { secure: cookieSecure }));
@@ -72,6 +83,7 @@ module.exports = {
   postGym,
   postLogin,
   postLogout,
+  postSignup,
   postStaff,
   setGymStatus,
 };
