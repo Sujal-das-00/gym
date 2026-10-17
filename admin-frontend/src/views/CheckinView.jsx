@@ -107,7 +107,7 @@ export default function CheckinView() {
           <div className="panel-head compact">
             <div>
               <h2>Today's QR</h2>
-              <p>Place this on the front desk. The code and QR both change every day.</p>
+              <p>Display at the front desk.</p>
             </div>
           </div>
           <div className="today-code">
@@ -124,12 +124,6 @@ export default function CheckinView() {
               Copy
             </button>
           </div>
-          <ol className="checkin-steps">
-            <li>Member scans the QR — today's code fills in for them.</li>
-            <li>Or they open the URL and type the code above by hand.</li>
-            <li>They enter their mobile number or Gym ID and confirm.</li>
-            <li>The check-in appears here and is added to attendance automatically.</li>
-          </ol>
         </section>
 
         <section className="panel checkin-feed-panel">
@@ -160,7 +154,7 @@ export default function CheckinView() {
                 </div>
               ))
             ) : (
-              <p className="history-empty">No check-ins yet today. Scanned entries will show up here.</p>
+              <p className="history-empty">No check-ins yet today.</p>
             )}
           </div>
         </section>

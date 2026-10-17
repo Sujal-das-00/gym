@@ -96,7 +96,7 @@ export default function InsightsView() {
         <div className="panel-head">
           <div>
             <h2>Period</h2>
-            <p>Pick a month, a full year, or your own date range.</p>
+            <p>Choose a month, year or custom range.</p>
           </div>
           <button className="secondary-action" type="button" onClick={exportCsv}>
             Export CSV
@@ -265,7 +265,7 @@ export default function InsightsView() {
         <div className="panel-head">
           <div>
             <h2>Day by day</h2>
-            <p>{`${days.length} active day${days.length === 1 ? "" : "s"} in ${periodLabel} · tap a day for the full breakdown`}</p>
+            <p>{`${days.length} active day${days.length === 1 ? "" : "s"} in ${periodLabel}`}</p>
           </div>
         </div>
         {days.length ? (

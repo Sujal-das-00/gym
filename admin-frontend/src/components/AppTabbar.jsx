@@ -1,11 +1,12 @@
 import { useApp } from "../store/AppContext.jsx";
+import Icon from "./Icon.jsx";
 
 const TABS = [
-  { view: "dashboard", icon: "🏠", label: "Home" },
-  { view: "members", icon: "👥", label: "Members" },
-  { view: "attendance", icon: "✅", label: "Attend" },
-  { view: "payments", icon: "💰", label: "Billing" },
-  { view: "settings", icon: "⚙️", label: "Settings" },
+  { view: "dashboard", icon: "home", label: "Home" },
+  { view: "members", icon: "groups", label: "Members" },
+  { view: "attendance", icon: "how_to_reg", label: "Attendance" },
+  { view: "payments", icon: "payments", label: "Payments" },
+  { view: "settings", icon: "settings", label: "Settings" },
 ];
 
 /** App-only bottom tab bar (shown when launched as an installed PWA). */
@@ -21,7 +22,9 @@ export default function AppTabbar() {
           type="button"
           onClick={() => setView(tab.view)}
         >
-          <span className="tab-ico">{tab.icon}</span>
+          <span className="tab-ico">
+            <Icon name={tab.icon} />
+          </span>
           {tab.label}
         </button>
       ))}

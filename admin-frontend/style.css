@@ -509,7 +509,7 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 .stat-card.trainers { background: linear-gradient(135deg, #f9fbff, var(--blue-soft)); border-color: #d7d8ff; }
 .stat-card.trainers .stat-icon { background: #dedfff; color: var(--blue); }
 
-.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .left-stack, .right-stack { display: grid; gap: 16px; }
 .panel { padding: 16px; }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -1702,6 +1702,7 @@ html.pwa .date-pill { display: none !important; }
     font-size: 20px;
     line-height: 1;
   }
+  html.pwa .app-tabbar .tab-link .tab-ico .material-symbols-outlined { font-size: 24px; }
 
   html.pwa .app-tabbar .tab-link:active { transform: scale(0.92); }
 

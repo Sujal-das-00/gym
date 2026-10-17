@@ -114,7 +114,7 @@ export default function MembersView() {
         <div className="panel-head">
           <div>
             <h2>Members</h2>
-            <p>Tap a card to manage attendance, payment, and reminders.</p>
+            <p>Tap a member to manage attendance and fees.</p>
           </div>
           <span id="monthLabel">{currentMonthLabel()}</span>
         </div>

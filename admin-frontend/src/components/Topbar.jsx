@@ -1,6 +1,7 @@
 import { useApp } from "../store/AppContext.jsx";
 import { VIEW_COPY } from "../lib/constants.js";
 import { todayLabel } from "../lib/dates.js";
+import Icon from "./Icon.jsx";
 import PlanBadge from "./PlanBadge.jsx";
 import useInstallPrompt from "../hooks/useInstallPrompt.js";
 
@@ -14,13 +15,7 @@ export default function Topbar() {
       <div>
         <h1 id="pageTitle">{title}</h1>
         <p id="pageSubtitle">
-          {activeView === "dashboard" ? (
-            <>
-              Here is what is happening at <span id="headerGymName">{settings.gymName || "your gym"}</span> today.
-            </>
-          ) : (
-            subtitle
-          )}
+          {activeView === "dashboard" && settings.gymName ? settings.gymName : subtitle}
         </p>
       </div>
       <div className="topbar-actions">
@@ -38,7 +33,7 @@ export default function Topbar() {
           Install app
         </button>
         <button className="primary-action" id="openAddMember" type="button" onClick={() => openMemberDialog()}>
-          <span>+</span>
+          <Icon name="add" />
           Add member
         </button>
       </div>

@@ -51,7 +51,7 @@ const NAV_SECTIONS = [
   },
   {
     label: "Support",
-    links: [{ view: "help", icon: "help", text: "Need Help" }],
+    links: [{ view: "help", icon: "help", text: "Help" }],
   },
 ];
 
@@ -68,7 +68,7 @@ export default function Sidebar() {
         </div>
         <div>
           <strong id="sidebarGymName">{name}</strong>
-          <span>Dashboard</span>
+          <span>Admin</span>
         </div>
       </div>
 
@@ -98,11 +98,6 @@ export default function Sidebar() {
           </Fragment>
         ))}
       </nav>
-
-      <button className="support-card" data-view="help" type="button" onClick={() => setView("help")}>
-        <strong>Need help?</strong>
-        <span>Video tutorials &amp; step-by-step guide</span>
-      </button>
 
       {/* Auth: account bar, docked in the sidebar on all screen sizes
           (below the support card on desktop, drawer footer on mobile). */}

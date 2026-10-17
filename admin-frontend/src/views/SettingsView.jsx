@@ -121,7 +121,7 @@ export default function SettingsView() {
       <div className="panel-head compact">
         <div>
           <h2>Settings</h2>
-          <p>Update gym profile, logo, and billing cycle.</p>
+          <p>Gym profile, logo and billing cycle.</p>
         </div>
       </div>
       <form id="settingsForm" className="settings-form" onSubmit={onSubmit}>

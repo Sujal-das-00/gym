@@ -4,7 +4,7 @@ import Icon from "../components/Icon.jsx";
 const STAT_ICON_STYLE = { fontSize: "1.15rem" };
 
 export default function DashboardView() {
-  const { members, trainers, domain, setView } = useApp();
+  const { members, trainers, domain } = useApp();
 
   const total = members.length;
   const overdue = members.filter((member) => domain.isOverdue(member)).length;
@@ -22,7 +22,7 @@ export default function DashboardView() {
           </div>
           <span>Total Members</span>
           <strong id="totalMembers">{total}</strong>
-          <small>Registered members</small>
+          <small>Registered</small>
         </article>
         <article className="stat-card due">
           <div className="stat-icon">
@@ -30,7 +30,7 @@ export default function DashboardView() {
           </div>
           <span>Overdue Fees</span>
           <strong id="overdueMembers">{overdue}</strong>
-          <small>Members with dues</small>
+          <small>Fees pending</small>
         </article>
         <article className="stat-card paid">
           <div className="stat-icon">
@@ -65,7 +65,7 @@ export default function DashboardView() {
           <div className="panel-head compact">
             <div>
               <h2>Activity Summary</h2>
-              <p>This month overview</p>
+              <p>This month</p>
             </div>
           </div>
           <div className="summary-list">
@@ -77,36 +77,6 @@ export default function DashboardView() {
               <span>Attendance rate</span>
               <strong id="summaryRate">{total ? `${Math.round((present / total) * 100)}%` : "0%"}</strong>
             </div>
-            <div>
-              <span>Active members</span>
-              <strong id="summaryActive">{total}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel quick-panel">
-          <div className="panel-head compact">
-            <div>
-              <h2>Quick Actions</h2>
-              <p>Open the daily workflows from the sidebar.</p>
-            </div>
-          </div>
-          <div className="quick-actions-grid">
-            <button className="secondary-action nav-shortcut" type="button" onClick={() => setView("attendance")}>
-              Mark Attendance
-            </button>
-            <button className="secondary-action nav-shortcut" type="button" onClick={() => setView("history")}>
-              View History
-            </button>
-            <button className="secondary-action nav-shortcut" type="button" onClick={() => setView("members")}>
-              Manage Members
-            </button>
-            <button className="secondary-action nav-shortcut" type="button" onClick={() => setView("trainers")}>
-              Manage Trainers
-            </button>
-            <button className="secondary-action nav-shortcut" type="button" onClick={() => setView("settings")}>
-              Settings
-            </button>
           </div>
         </section>
       </section>

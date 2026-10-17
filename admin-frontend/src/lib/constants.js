@@ -44,19 +44,19 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const VIEW_COPY = {
-  dashboard: ["Welcome back, Admin!", "Here is what is happening at your gym today."],
-  attendance: ["Mark Attendance", "Select a date and update daily member attendance."],
-  checkin: ["QR Check-in", "Members scan the desk QR to mark their own attendance."],
-  history: ["Attendance History", "Review attendance records for any selected date."],
-  members: ["Members", "Search, edit, and manage all registered members."],
-  payments: ["Payment History", "Review customer-wise payment records."],
-  expenses: ["Expense Tracker", "Track every expense and earning of the gym in one ledger."],
-  insights: ["Detailed Insights", "Pick any month, year or date range and see exactly where the money came from and went."],
-  trainers: ["Trainers", "Manage trainer profiles, specialties, shifts, and contact details."],
-  plan: ["Plan & Billing", "Your plan, what is due next, and every payment you have made to us."],
-  notifications: ["Send Notification", "Push fee reminders and announcements to your members' phones."],
-  settings: ["Settings", "Update your gym profile and logo."],
-  help: ["Need Help", "Video tutorials in Hindi & English, plus a step-by-step text guide."],
+  dashboard: ["Dashboard", "Today at your gym."],
+  attendance: ["Mark Attendance", "Mark attendance for any date."],
+  checkin: ["QR Check-in", "Members scan the desk QR to check in."],
+  history: ["Attendance History", "Attendance records by date."],
+  members: ["Members", "Search and manage members."],
+  payments: ["Payment History", "Payment records by member."],
+  expenses: ["Expense Tracker", "Expenses and earnings in one ledger."],
+  insights: ["Detailed Insights", "Income and spending for any period."],
+  trainers: ["Trainers", "Trainer profiles and shifts."],
+  plan: ["Plan & Billing", "Your plan and payment history."],
+  notifications: ["Send Notification", "Send reminders and announcements to members."],
+  settings: ["Settings", "Gym profile and logo."],
+  help: ["Help", "Video tutorials and step-by-step guide."],
 };
 
 // Short labels used by the mobile app bar — the sidebar link text for each view.
@@ -73,14 +73,14 @@ export const VIEW_SHORT_TITLE = {
   insights: "Detailed Insights",
   notifications: "Send Notification",
   settings: "Settings",
-  help: "Need Help",
+  help: "Help",
 };
 
 export const CHECKIN_STATUS_COPY = {
-  checking: ["Checking check-in server...", "Looking for the shared backend service."],
-  online: ["Check-in server is running", "Members can scan the QR to check in. Attendance updates automatically."],
+  checking: ["Connecting…", "Checking the check-in server."],
+  online: ["Check-in is live", "Attendance updates automatically."],
   offline: [
-    "Check-in server is offline",
-    "Start it with: npm start - then press Retry.",
+    "Check-in is offline",
+    "Check your connection, then press Retry.",
   ],
 };
