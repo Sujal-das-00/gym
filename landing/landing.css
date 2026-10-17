@@ -260,6 +260,11 @@ button { cursor: pointer; }
 .hero h1 em { font-style: normal; color: var(--mint); }
 .hero-sub { max-width: 52ch; margin-bottom: 30px; color: rgba(255, 255, 255, .82); font-size: 1.1rem; line-height: 1.6; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+.store-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+.store-btn { display: inline-flex; align-items: center; gap: 10px; padding: 9px 18px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 12px; background: rgba(0, 0, 0, .35); color: #fff; font-size: 1.05rem; font-weight: 700; line-height: 1.1; text-decoration: none; transition: background .15s, transform .15s; }
+.store-btn:hover { background: rgba(0, 0, 0, .55); transform: translateY(-1px); }
+.store-btn svg { width: 26px; height: 26px; flex: none; }
+.store-btn small { display: block; font-size: .62rem; font-weight: 600; letter-spacing: .04em; opacity: .85; }
 .hero-points { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; padding: 0; list-style: none; }
 .hero-points li { display: flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, .8); font-size: .86rem; font-weight: 600; }
 .hero-points .i { width: 18px; height: 18px; color: var(--mint); }

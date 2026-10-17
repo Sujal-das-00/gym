@@ -1,11 +1,13 @@
-/// Where the Gym Boo web app lives. Override at build time without editing code:
-///   flutter run --dart-define=APP_URL=https://app.yourgym.com/
+/// Where the Gym Boo web app lives. Defaults to production; override at build
+/// time without editing code (e.g. local dev on the Android emulator):
+///   flutter run --dart-define=APP_URL=http://10.0.2.2:5051/
+/// (use your PC's LAN IP instead of 10.0.2.2 on a real phone)
 /// Must be https in production. Members open /checkin/<gym-slug>, admins open
 /// /admin — both are reached by navigating inside this one WebView, so the start
 /// URL is normally the site root.
 const String kAppUrl = String.fromEnvironment(
   'APP_URL',
-  defaultValue: 'https://CHANGE-ME.example.com/',
+  defaultValue: 'https://gymbot.toolszila.com/',
 );
 
 /// Must match ANDROID_CHANNEL_ID in backend/src/services/fcmService.js.
