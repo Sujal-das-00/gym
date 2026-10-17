@@ -75,6 +75,37 @@ function pushConfig() {
   };
 }
 
+// Firebase Cloud Messaging, for the native Android/iOS wrapper app (Flutter
+// WebView). A WebView has no Web Push, so the wrapper registers an FCM token and
+// the backend delivers through the Firebase Admin SDK. Provide a Firebase
+// service-account key either inline (FIREBASE_SERVICE_ACCOUNT, raw JSON or
+// base64 of it) or as a file path (FIREBASE_SERVICE_ACCOUNT_FILE). Missing is
+// not fatal: native delivery is simply off.
+function firebaseConfig() {
+  return {
+    serviceAccount: String(process.env.FIREBASE_SERVICE_ACCOUNT || "").trim(),
+    serviceAccountFile: String(process.env.FIREBASE_SERVICE_ACCOUNT_FILE || "").trim(),
+  };
+}
+
+// Automatic notifications (fee reminders, expiring soon, check-in, payment, welcome).
+// AUTO_NOTIFICATIONS=false switches every automatic one off; manual sends from the
+// admin panel are unaffected. The scheduled ones run once a day at AUTO_NOTIFY_HOUR
+// o'clock in AUTO_NOTIFY_TZ (default 10 AM India time).
+function autoNotifyConfig() {
+  const hour = Number(process.env.AUTO_NOTIFY_HOUR ?? 10);
+  return {
+    enabled: String(process.env.AUTO_NOTIFICATIONS || "true").toLowerCase() !== "false",
+    hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 10,
+    timeZone: String(process.env.AUTO_NOTIFY_TZ || "Asia/Kolkata").trim() || "Asia/Kolkata",
+    // Days before a renewal on which "expiring soon" goes out.
+    expiringDays: String(process.env.AUTO_NOTIFY_EXPIRING_DAYS || "3,1")
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isInteger(value) && value >= 0),
+  };
+}
+
 // Referral programme money, in rupees. LICENCE_PRICE is the undiscounted one-time
 // licence; the referred gym pays LICENCE_PRICE - REFERRAL_DISCOUNT on its first
 // one-time purchase, and the partner who referred it earns REFERRER_REWARD.
@@ -118,7 +149,9 @@ function getPublicBaseUrl(req) {
 
 module.exports = {
   authConfig,
+  autoNotifyConfig,
   dbConfig,
+  firebaseConfig,
   getPublicBaseUrl,
   pushConfig,
   referralConfig,

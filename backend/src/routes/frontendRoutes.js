@@ -191,7 +191,7 @@ function mountFrontendRoutes(app) {
       // invalid — the browser then offers no install at all on the bare page.
       scope: "/checkin",
       display: "standalone",
-      background_color: "#ffffff",
+      background_color: "#000000",
       theme_color: "#f86a10",
       orientation: "portrait",
       icons: [

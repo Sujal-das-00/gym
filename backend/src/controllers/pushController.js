@@ -1,8 +1,10 @@
 const { createHttpError } = require("../utils/http");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
-const { publicVapidKey, pushAvailable } = require("../services/pushService");
+const { nativePushAvailable, publicVapidKey, pushAvailable, webPushAvailable } = require("../services/pushService");
+const { nativeEndpoint } = require("../services/fcmService");
 const notificationService = require("../services/notificationService");
+const { notifyWelcome } = require("../services/autoNotificationService");
 
 // A subscription endpoint is a URL issued by the browser's push service. Only
 // https is ever legitimate, and the length cap keeps a hostile client from
@@ -47,10 +49,41 @@ async function resolveMemberGym(req) {
   return gym;
 }
 
+// Welcome message once a member's first phone is registered. Fire and forget; the
+// service remembers it was sent, so re-registering never repeats it.
+async function welcomeMember(gymId, memberId) {
+  const member = await repo().getMemberById(gymId, memberId);
+  if (member) notifyWelcome(gymId, member);
+}
+
 // Public by design: the VAPID public key is what the browser encrypts to, and
 // it is useless without the private key, which never leaves this process.
 async function getPublicKey(req, res) {
-  res.json({ available: pushAvailable(), publicKey: pushAvailable() ? publicVapidKey() : "" });
+  // `available`/`publicKey` describe browser Web Push only; the Flutter wrapper
+  // checks `nativeAvailable` instead, since it never uses the VAPID key.
+  res.json({
+    available: webPushAvailable(),
+    publicKey: webPushAvailable() ? publicVapidKey() : "",
+    nativeAvailable: nativePushAvailable(),
+  });
+}
+
+// FCM registration tokens are ~150-200 chars of [A-Za-z0-9:_-]. Anything else is
+// junk, and the cap keeps a hostile client from storing an unbounded string.
+async function postNativeSubscribe(req, res) {
+  if (!nativePushAvailable()) throw createHttpError(503, "Push notifications are not available");
+  const gym = await resolveMemberGym(req);
+  const token = String(req.body?.token || "").trim();
+  if (token.length < 20 || token.length > 4096 || !/^[A-Za-z0-9:_.-]+$/.test(token)) {
+    throw createHttpError(400, "Invalid device token");
+  }
+  const saved = await repo().savePushSubscription(gym.id, req.memberAuth.memberId, {
+    endpoint: nativeEndpoint(token),
+    keys: { p256dh: "fcm", auth: "fcm" },
+    userAgent: "Gym Boo app",
+  });
+  welcomeMember(gym.id, req.memberAuth.memberId);
+  res.status(201).json({ ok: true, id: saved?.id || "", endpoint: nativeEndpoint(token) });
 }
 
 async function postSubscribe(req, res) {
@@ -59,6 +92,7 @@ async function postSubscribe(req, res) {
   const subscription = validateSubscription(req.body?.subscription || req.body);
   subscription.userAgent = String(req.headers["user-agent"] || "").slice(0, 255);
   const saved = await repo().savePushSubscription(gym.id, req.memberAuth.memberId, subscription);
+  welcomeMember(gym.id, req.memberAuth.memberId);
   res.status(201).json({ ok: true, id: saved?.id || "" });
 }
 
@@ -102,6 +136,7 @@ module.exports = {
   getPublicKey,
   postCustomNotification,
   postFeeReminders,
+  postNativeSubscribe,
   postSubscribe,
   validateSubscription,
 };

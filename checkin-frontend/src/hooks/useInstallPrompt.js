@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNativeApp } from "../lib/native.js";
 
 const isStandalone = () =>
   window.matchMedia("(display-mode: standalone)").matches ||
@@ -27,7 +28,8 @@ function readPlatform() {
 export default function useInstallPrompt(slug = "") {
   const promptEvent = useRef(null);
   const [canPrompt, setCanPrompt] = useState(false);
-  const [installed, setInstalled] = useState(isStandalone);
+  // Inside the Gym Boo app there is nothing to install — it already is the app.
+  const [installed, setInstalled] = useState(() => isNativeApp() || isStandalone());
   const [platform] = useState(readPlatform);
   // A page served over plain http:// (a LAN IP during local testing, say) can only
   // ever produce a browser bookmark — no service worker, no install. Worth saying

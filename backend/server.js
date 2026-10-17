@@ -7,6 +7,7 @@ const { createApp } = require("./src/app");
 const { setModelMode } = require("./src/models");
 const { bootstrapDatabase } = require("./src/services/bootstrapService");
 const { getLocalIp } = require("./src/services/networkService");
+const { startScheduler } = require("./src/services/autoNotificationService");
 
 async function start() {
   const boot = await bootstrapDatabase();
@@ -26,6 +27,8 @@ async function start() {
     console.log(`Admin frontend: http://localhost:${PORT}/admin`);
     console.log(`Check-in frontend: http://localhost:${PORT}/checkin`);
     console.log(`Phone check-in URL: http://${getLocalIp()}:${PORT}/checkin`);
+    // Daily 10 AM fee reminders + renewal notices. Needs MySQL (settings + push tokens).
+    if (boot.mode !== "json") startScheduler();
   });
 }
 

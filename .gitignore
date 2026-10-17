@@ -7,3 +7,5 @@ npm-debug.log*
 backend/uploads/
 admin-frontend/dist/
 checkin-frontend/dist/
+firebase.json
+gym-boo-302efbf83e3f.json

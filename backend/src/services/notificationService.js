@@ -281,6 +281,10 @@ async function sendCustomNotification(gymId, input = {}) {
 
 module.exports = {
   AUDIENCES,
+  dueText,
+  firstName,
+  memberAppUrl,
+  rupees,
   feeReminderPreview,
   membersWithPendingFees,
   safeClickUrl,

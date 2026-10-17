@@ -46,3 +46,12 @@
 ::-webkit-scrollbar {
   display: none;
 }
+
+/* Mobile app WebView: backdrop blur and infinite pulses cost a lot of GPU for no gain. */
+.native-app * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.native-app .animate-pulse {
+  animation: none !important;
+}

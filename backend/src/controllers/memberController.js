@@ -1,6 +1,7 @@
 const { publicMember } = require("../utils/member");
 const { repo } = require("../models");
 const { createMember, updateMember } = require("../services/memberService");
+const { notifyPayment } = require("../services/autoNotificationService");
 
 async function listMembers(req, res) {
   res.json((await repo().getAllMembers(req.gymId)).map(publicMember));
@@ -27,6 +28,7 @@ async function addPayments(req, res) {
   if (!member) return res.status(404).json({ error: "Member not found" });
   const payments = Array.isArray(req.body.payments) ? req.body.payments : [];
   await repo().addPayments(member, payments);
+  notifyPayment(req.gymId, member, payments);
   return res.json(publicMember(await repo().getMemberById(req.gymId, member.id)));
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchPushPublicKey, postPushSubscribe, postPushUnsubscribe } from "../lib/api.js";
+import { fetchPushPublicKey, postNativePushToken, postPushSubscribe, postPushUnsubscribe } from "../lib/api.js";
+import { isNativeApp, nativeCall } from "../lib/native.js";
 import {
   currentSubscription,
   permissionState,
@@ -20,8 +21,11 @@ const IDLE = { status: "idle", error: "" };
  * signed in now, and is also what repairs a row lost to a rotated key.
  */
 export default function usePushNotifications(slug, memberId) {
-  const [supported] = useState(() => pushSupported());
-  const [permission, setPermission] = useState(() => permissionState());
+  // Inside the Gym Boo app notifications are native (FCM) and the wrapper does
+  // the permission/token work; everything below branches on this.
+  const [native] = useState(() => isNativeApp());
+  const [supported] = useState(() => native || pushSupported());
+  const [permission, setPermission] = useState(() => (native ? "default" : permissionState()));
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(false);
   const [state, setState] = useState(IDLE);
@@ -38,7 +42,7 @@ export default function usePushNotifications(slug, memberId) {
    * browsers (notably older Safari) where that query isn't available.
    */
   useEffect(() => {
-    if (!supported) return undefined;
+    if (!supported || native) return undefined;
     const sync = () => setPermission(permissionState());
 
     document.addEventListener("visibilitychange", sync);
@@ -61,19 +65,21 @@ export default function usePushNotifications(slug, memberId) {
       window.removeEventListener("focus", sync);
       status?.removeEventListener("change", sync);
     };
-  }, [supported]);
+  }, [supported, native]);
 
   // Does this deployment have VAPID keys at all? Without them the UI should not
   // offer a switch that can only fail.
   useEffect(() => {
     let active = true;
     fetchPushPublicKey()
-      .then((data) => active && setAvailable(Boolean(data.available && data.publicKey)))
+      .then((data) =>
+        active && setAvailable(native ? Boolean(data.nativeAvailable) : Boolean(data.available && data.publicKey)),
+      )
       .catch(() => active && setAvailable(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [native]);
 
   useEffect(() => {
     if (!supported || !slug || !memberId) {
@@ -81,6 +87,27 @@ export default function usePushNotifications(slug, memberId) {
       return undefined;
     }
     let active = true;
+    if (native) {
+      // Re-register the device token silently on every sign-in (no OS prompt:
+      // "status" never asks), same reasoning as the browser path below.
+      nativeCall("status")
+        .then(async (info) => {
+          if (!active) return;
+          // First sign-in inside the app: ask for permission straight away, as a
+          // native app would. Only while still undecided, so a member who said
+          // "no" is never nagged (they can still use the card to turn it on).
+          if (info.permission === "default") info = await nativeCall("enable");
+          if (!active) return;
+          setPermission(info.permission);
+          if (info.permission !== "granted" || !info.token) return setEnabled(false);
+          await postNativePushToken(slug, info.token);
+          if (active) setEnabled(true);
+        })
+        .catch(() => active && setEnabled(false));
+      return () => {
+        active = false;
+      };
+    }
     currentSubscription()
       .then(async (subscription) => {
         if (!active || !subscription) {
@@ -99,7 +126,7 @@ export default function usePushNotifications(slug, memberId) {
     return () => {
       active = false;
     };
-  }, [supported, slug, memberId]);
+  }, [supported, native, slug, memberId]);
 
   // Must be called straight from a click — browsers only show the permission
   // prompt during a user gesture.
@@ -107,6 +134,21 @@ export default function usePushNotifications(slug, memberId) {
     if (!supported || !slug) return;
     setState({ status: "busy", error: "" });
     try {
+      if (native) {
+        const info = await nativeCall("enable");
+        setPermission(info.permission);
+        if (!info.token) {
+          throw new Error(
+            info.permission === "denied"
+              ? "Notifications are blocked. Turn them on for Gym Boo in your phone settings."
+              : "Could not get a notification token. Check your connection and try again.",
+          );
+        }
+        await postNativePushToken(slug, info.token);
+        setEnabled(true);
+        setState({ status: "done", error: "" });
+        return;
+      }
       const { publicKey, available: ready } = await fetchPushPublicKey();
       if (!ready || !publicKey) throw new Error("Notifications are not set up for this gym yet");
       const subscription = await subscribeToPush(publicKey);
@@ -118,7 +160,7 @@ export default function usePushNotifications(slug, memberId) {
       setPermission(permissionState());
       setState({ status: "error", error: error.message || "Could not turn on notifications" });
     }
-  }, [supported, slug]);
+  }, [supported, native, slug]);
 
   /**
    * Drops the browser subscription first, then the stored row. If the network
@@ -129,6 +171,15 @@ export default function usePushNotifications(slug, memberId) {
     if (!supported || !slug) return;
     setState({ status: "busy", error: "" });
     try {
+      if (native) {
+        // The device token itself is kept; only the backend row is dropped, so
+        // turning notifications back on is instant and needs no new prompt.
+        const info = await nativeCall("status");
+        if (info.token) await postPushUnsubscribe(slug, `fcm://${info.token}`);
+        setEnabled(false);
+        setState({ status: "done", error: "" });
+        return;
+      }
       const subscription = await currentSubscription();
       if (subscription) {
         const { endpoint } = subscription;
@@ -140,7 +191,7 @@ export default function usePushNotifications(slug, memberId) {
     } catch (error) {
       setState({ status: "error", error: error.message || "Could not turn off notifications" });
     }
-  }, [supported, slug]);
+  }, [supported, native, slug]);
 
   return {
     available: available && supported,

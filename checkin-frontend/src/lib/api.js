@@ -100,6 +100,19 @@ export async function postPushSubscribe(slug, subscription) {
   return data;
 }
 
+// Mobile app (Flutter WebView) registers its FCM token instead of a Web Push subscription.
+export async function postNativePushToken(slug, token) {
+  const res = await fetch(`${publicBase(slug)}/account/push/native`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(data.error || "Could not turn on notifications");
+  return data;
+}
+
 export async function postPushUnsubscribe(slug, endpoint) {
   const res = await fetch(`${publicBase(slug)}/account/push/unsubscribe`, {
     method: "POST",

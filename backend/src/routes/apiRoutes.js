@@ -67,6 +67,8 @@ router.get("/push/public-key", asyncHandler(pushController.getPublicKey));
 // Registering a device requires a member session: a subscription is only useful
 // once it is tied to a member, and only that member may create or revoke it.
 router.post("/public/:slug/account/push/subscribe", authenticateMember, asyncHandler(pushController.postSubscribe));
+// The Flutter wrapper app has no Web Push, so it registers its FCM token here.
+router.post("/public/:slug/account/push/native", authenticateMember, asyncHandler(pushController.postNativeSubscribe));
 router.post("/public/:slug/account/push/unsubscribe", authenticateMember, asyncHandler(pushController.deleteSubscribe));
 router.get("/public/:slug/account/push/devices", authenticateMember, asyncHandler(pushController.getMySubscriptions));
 

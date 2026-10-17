@@ -2,6 +2,7 @@ const webpush = require("web-push");
 const { pushConfig } = require("../config/env");
 const { deletePushSubscriptionByEndpoint } = require("../models/pushSubscriptionModel");
 const { usingFallback } = require("../models");
+const { fcmReady, isNativeEndpoint, sendToNative } = require("./fcmService");
 
 // How many pushes are in flight at once. Web Push is one HTTPS request per
 // device, so a 400-member gym would otherwise open 400 sockets at once.
@@ -67,7 +68,17 @@ function publicVapidKey() {
 // Push subscriptions live in MySQL only; in JSON-fallback mode there is nowhere
 // to read them from, so the feature reports itself unavailable instead of 500ing.
 function pushAvailable() {
+  return (pushReady() || fcmReady()) && !usingFallback();
+}
+
+// Browser-only: whether a PWA can subscribe through the Push API (needs VAPID).
+function webPushAvailable() {
   return pushReady() && !usingFallback();
+}
+
+// Whether the Flutter wrapper app can register an FCM token.
+function nativePushAvailable() {
+  return fcmReady() && !usingFallback();
 }
 
 function clamp(value, limit) {
@@ -124,8 +135,35 @@ async function sendToSubscriptions(subscriptions, payloadInput) {
   const payload = buildPayload(payloadInput);
   const summary = { attempted: 0, sent: 0, failed: 0, expired: 0 };
 
-  for (let index = 0; index < subscriptions.length; index += BATCH_SIZE) {
-    const batch = subscriptions.slice(index, index + BATCH_SIZE);
+  const native = subscriptions.filter((subscription) => isNativeEndpoint(subscription.endpoint));
+  const web = subscriptions.filter((subscription) => !isNativeEndpoint(subscription.endpoint));
+
+  if (native.length) {
+    const parsed = JSON.parse(payload);
+    const result = await sendToNative(native, parsed);
+    summary.attempted += native.length;
+    summary.sent += result.sent;
+    summary.failed += result.failed;
+    summary.expired += result.expired;
+    for (const endpoint of result.expiredEndpoints) {
+      try {
+        await deletePushSubscriptionByEndpoint(endpoint);
+      } catch (cleanupError) {
+        console.warn(`Could not remove expired push subscription: ${cleanupError.message}`);
+      }
+    }
+  }
+
+  // No VAPID keys: browser subscriptions cannot be delivered to, but that must
+  // not stop the native ones above (or throw for each row below).
+  if (!pushReady()) {
+    summary.attempted += web.length;
+    summary.failed += web.length;
+    return summary;
+  }
+
+  for (let index = 0; index < web.length; index += BATCH_SIZE) {
+    const batch = web.slice(index, index + BATCH_SIZE);
     const results = await Promise.allSettled(
       batch.map((subscription) =>
         webpush.sendNotification(
@@ -165,8 +203,10 @@ module.exports = {
   buildPayload,
   pushDisabledReason,
   isPermanentFailure,
+  nativePushAvailable,
   publicVapidKey,
   pushAvailable,
+  webPushAvailable,
   pushReady,
   sendToSubscriptions,
 };

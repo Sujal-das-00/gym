@@ -3,6 +3,7 @@ const { isValidDailyCode } = require("../utils/dailyCode");
 const { isMembershipExpired, memberBillingSummary } = require("../utils/billing");
 const { publicMember } = require("../utils/member");
 const { repo } = require("../models");
+const { notifyCheckin } = require("./autoNotificationService");
 
 async function checkInMember(gymId, identifier, code) {
   // The code is checked before anything else is looked up: without today's code
@@ -43,6 +44,8 @@ async function checkInMember(gymId, identifier, code) {
 
   const checkin = await repo().createCheckin(gymId, member, date, expired);
   const updated = await repo().getMemberById(gymId, member.id);
+  // Fire and forget: the member's check-in must never wait on, or fail from, a push.
+  notifyCheckin(gymId, updated);
   return {
     member: publicMember(updated),
     billing: memberBillingSummary(updated, settings),
