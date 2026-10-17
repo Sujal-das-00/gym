@@ -4,6 +4,7 @@ const { hashPassword, verifyPassword } = require("../utils/password");
 const { createHttpError } = require("../utils/http");
 const userModel = require("../models/userModel");
 const gymModel = require("../models/gymModel");
+const referralService = require("./referralService");
 
 function tokenFor(user) {
   const { jwtSecret, tokenTtlSeconds } = authConfig();
@@ -36,18 +37,22 @@ async function me(userId) {
   const result = userModel.publicUser(user);
   if (user.tenantId) {
     const gym = await gymModel.getGymById(user.tenantId);
-    result.gym = gym ? { id: gym.id, slug: gym.slug, name: gym.name, status: gym.status } : null;
+    result.gym = gym
+      ? { id: gym.id, slug: gym.slug, name: gym.name, status: gym.status, access: gymModel.accessOf(gym) }
+      : null;
   }
   return result;
 }
 
-async function createGymWithAdmin({ gymName, slug, adminEmail, adminPassword, adminName }) {
+async function createGymWithAdmin({ gymName, slug, adminEmail, adminPassword, adminName, referralCode, registeredOn, trialDays }) {
   if (!gymName) throw createHttpError(400, "Gym name is required");
   if (!adminEmail || !adminPassword) throw createHttpError(400, "Admin email and password are required");
+  // Validated before anything is created, so a bad code never leaves a half-made gym.
+  const partner = await referralService.resolveCode(referralCode, adminEmail);
 
   let gym;
   try {
-    gym = await gymModel.createGym({ name: gymName, slug });
+    gym = await gymModel.createGym({ name: gymName, slug, registeredOn, trialDays });
   } catch (error) {
     if (gymModel.duplicateGymError(error)) throw createHttpError(409, "A gym with this slug already exists");
     throw error;
@@ -67,6 +72,7 @@ async function createGymWithAdmin({ gymName, slug, adminEmail, adminPassword, ad
     throw error;
   }
 
+  await referralService.attachReferral(partner, gym.id);
   return { gym, admin: userModel.publicUser(admin) };
 }
 
@@ -77,7 +83,7 @@ const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-
 // one step, returning a session so the owner lands in the dashboard signed in.
 // The landing form checks the same rules for instant feedback; these are the ones
 // that count.
-async function signupOwner({ gymName, ownerName, email, password }) {
+async function signupOwner({ gymName, ownerName, email, password, referralCode }) {
   if (!NAME_PATTERN.test(gymName) || gymName.length < 2 || gymName.length > 30) {
     throw createHttpError(400, "Gym name must be 2-30 letters, with no numbers or symbols");
   }
@@ -99,6 +105,7 @@ async function signupOwner({ gymName, ownerName, email, password }) {
     adminEmail: email,
     adminPassword: password,
     adminName: ownerName,
+    referralCode,
   });
   await userModel.setLastLogin(admin.id);
   return { token: tokenFor(admin), user: admin, gym: { id: gym.id, slug: gym.slug, name: gym.name } };

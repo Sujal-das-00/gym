@@ -9,7 +9,26 @@ CREATE TABLE IF NOT EXISTS gyms (
   slug VARCHAR(60) NOT NULL UNIQUE,
   name VARCHAR(160) NOT NULL,
   status ENUM('active', 'suspended') NOT NULL DEFAULT 'active',
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- The day the gym started its free trial. Normally the signup day; a super-admin can
+  -- set or correct it. NULL (older rows) reads as DATE(created_at).
+  registered_at DATE NULL,
+  -- Length of the free trial in days. Per gym so a super-admin can extend one.
+  trial_days INT UNSIGNED NOT NULL DEFAULT 7,
+  -- Temporary access after the trial: each time the owner says "I have paid" on a day
+  -- they are locked out, they get 24 hours (grace_until) and grace_days_used goes up,
+  -- until the cap is reached. Super-admin can reset the counter.
+  grace_days_used INT UNSIGNED NOT NULL DEFAULT 0,
+  grace_until DATETIME NULL,
+  -- A fixed amount this gym pays for any plan, instead of the standard price (e.g. a Rs 1
+  -- test price). NULL = standard pricing. It can only lower the price, never raise it.
+  price_override DECIMAL(10,2) NULL,
+  -- Yearly server & maintenance fee. NULL = the platform defaults (MAINTENANCE_PRICE, and the
+  -- 1-15 January window). maintenance_price is a custom yearly amount for this gym;
+  -- maintenance_due is a custom next due date (e.g. a gym that pays one year after it
+  -- activated). Recording a payment moves a custom due date forward a year.
+  maintenance_price DECIMAL(10,2) NULL,
+  maintenance_due DATE NULL
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -193,4 +212,108 @@ CREATE TABLE IF NOT EXISTS site_reviews (
   status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_site_reviews_status (status, created_at)
+);
+
+-- ---------------------------------------------------------------------------
+-- Referral programme.
+-- Partners are people (not gyms) who join the programme from the website, get a
+-- referral code, and earn a reward when a gym they referred buys the one-time
+-- licence and the super-admin approves that purchase.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS referral_partners (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  name VARCHAR(160) NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  phone VARCHAR(30) NOT NULL DEFAULT '',
+  password_hash VARCHAR(255) NOT NULL,
+  referral_code VARCHAR(20) NOT NULL,
+  status ENUM('active', 'disabled') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_partner_email (email),
+  UNIQUE KEY uniq_partner_code (referral_code)
+);
+
+-- One row per referred gym. UNIQUE(tenant_id) is what makes a referral a
+-- one-time thing: a gym can only ever be referred (and rewarded) once.
+-- reward_amount is frozen at conversion so later price changes never rewrite history.
+CREATE TABLE IF NOT EXISTS gym_referrals (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  partner_id CHAR(36) NOT NULL,
+  tenant_id CHAR(36) NOT NULL,
+  code VARCHAR(20) NOT NULL,
+  status ENUM('pending', 'successful') NOT NULL DEFAULT 'pending',
+  reward_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  converted_at TIMESTAMP NULL,
+  UNIQUE KEY uniq_referral_gym (tenant_id),
+  INDEX idx_referral_partner (partner_id, status),
+  CONSTRAINT fk_referral_partner FOREIGN KEY (partner_id) REFERENCES referral_partners(id) ON DELETE CASCADE,
+  CONSTRAINT fk_referral_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
+-- Licence purchases awaiting (or past) super-admin approval. Payment is collected
+-- offline; a row here is the record that a gym bought a plan. list_price / discount /
+-- amount are re-computed and frozen at approval, so they only describe a quote while
+-- the row is still 'pending'.
+CREATE TABLE IF NOT EXISTS licence_purchases (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  plan ENUM('lifetime', 'monthly') NOT NULL,
+  list_price DECIMAL(10,2) NOT NULL,
+  discount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- Reduction from the gym's price_override. amount = list_price - discount - adjustment.
+  adjustment DECIMAL(10,2) NOT NULL DEFAULT 0,
+  amount DECIMAL(10,2) NOT NULL,
+  referral_id CHAR(36) NULL,
+  status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+  note VARCHAR(255) NOT NULL DEFAULT '',
+  -- Set when the owner says they have paid by UPI. Until the super-admin verifies the
+  -- payment and approves, the row stays 'pending'. payment_ref is the optional UTR.
+  claimed_at TIMESTAMP NULL,
+  payment_ref VARCHAR(40) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  decided_at TIMESTAMP NULL,
+  INDEX idx_purchase_status (status, created_at),
+  INDEX idx_purchase_gym (tenant_id),
+  CONSTRAINT fk_purchase_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
+-- Payout requests. A partner's available balance is
+--   SUM(successful referral rewards) - SUM(payouts that are requested or paid).
+-- Rejected payouts hand the money back to the balance.
+CREATE TABLE IF NOT EXISTS partner_payouts (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  partner_id CHAR(36) NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  payout_details VARCHAR(190) NOT NULL,
+  status ENUM('requested', 'paid', 'rejected') NOT NULL DEFAULT 'requested',
+  note VARCHAR(255) NOT NULL DEFAULT '',
+  requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  settled_at TIMESTAMP NULL,
+  INDEX idx_payout_partner (partner_id, status),
+  INDEX idx_payout_status (status, requested_at),
+  CONSTRAINT fk_payout_partner FOREIGN KEY (partner_id) REFERENCES referral_partners(id) ON DELETE CASCADE
+);
+
+-- Platform-wide settings edited from the super-admin console (e.g. the UPI id that
+-- licence payments go to).
+CREATE TABLE IF NOT EXISTS platform_settings (
+  name VARCHAR(60) NOT NULL PRIMARY KEY,
+  value VARCHAR(255) NOT NULL DEFAULT ''
+);
+
+-- Yearly server & maintenance payments received from a gym (collected offline, recorded by
+-- the super-admin). period_year is the year of the due date the payment settled.
+CREATE TABLE IF NOT EXISTS maintenance_payments (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  period_year INT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  paid_on DATE NOT NULL,
+  payment_mode VARCHAR(20) NOT NULL DEFAULT 'upi',
+  payment_ref VARCHAR(60) NOT NULL DEFAULT '',
+  note VARCHAR(255) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_maint_gym (tenant_id, period_year),
+  CONSTRAINT fk_maint_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );

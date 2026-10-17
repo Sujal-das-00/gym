@@ -25,6 +25,7 @@ async function postSignup(req, res) {
     ownerName: String(req.body?.ownerName || "").trim(),
     email: String(req.body?.email || "").trim(),
     password: String(req.body?.password || ""),
+    referralCode: String(req.body?.referralCode || ""),
   });
   setSessionCookie(res, result.token);
   res.status(201).json(result);

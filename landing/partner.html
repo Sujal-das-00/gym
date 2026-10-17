@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073f2d" />
+  <title>Gymboo Referral Partners · Earn ₹1,000 per gym</title>
+  <meta name="description" content="Join the Gymboo referral programme for free. Share your code with gym owners and earn ₹1,000 every time a gym you refer buys the one-time licence. Payouts settled within 24 hours." />
+  <link rel="canonical" href="/partner" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="/landing/landing.css" />
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" id="siteHeader">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+        Gymboo <span class="brand-tag">Partners</span>
+      </a>
+      <nav class="site-nav" id="siteNav" aria-label="Page sections" data-marketing>
+        <a href="#how">How it works</a>
+        <a href="#earnings">Earnings</a>
+        <a href="#rules">Rules</a>
+        <a href="#payouts">Payouts</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-ghost" href="#join" data-mode="login" data-marketing>Log in</a>
+        <a class="btn btn-primary" href="#join" data-mode="join" data-marketing>Join free</a>
+        <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="siteNav" data-marketing>
+          <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#menu"/></svg>
+        </button>
+        <a class="btn btn-ghost" href="/" id="homeLink" hidden>&larr; Gymboo home</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- =============== Marketing page (hidden once a partner is signed in) =============== -->
+    <div id="marketing">
+
+      <!-- Hero + join -->
+      <section class="hero partner-hero">
+        <div class="wrap">
+          <div>
+            <p class="pill"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#wallet"/></svg> Gymboo referral programme</p>
+            <h1 class="display">Know a gym owner? <em>Earn ₹<span data-fill="reward">1,000</span></em> when they join.</h1>
+            <p class="hero-sub">
+              Get your own referral code in a minute. Every gym that signs up with it and buys the one-time licence
+              earns you ₹<span data-fill="reward">1,000</span>, and saves them ₹<span data-fill="discount">2,000</span>. Free to join, no limit on referrals.
+            </p>
+            <ul class="hero-points">
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Free to join, nothing to buy</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Track every referral live</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Payouts settled within 24 hours</li>
+            </ul>
+          </div>
+
+          <!-- Join / log in -->
+          <div class="join-panel" id="join">
+            <div class="auth-card" id="authCard">
+              <p class="eyebrow">Referral partners</p>
+              <h2 class="display" id="authTitle">Join the programme</h2>
+              <p class="lede" id="authLede">Create a partner account to get your referral code. It's free.</p>
+              <p class="form-note error" id="formError" role="alert" hidden></p>
+
+              <form id="joinForm" novalidate>
+                <div class="field-grid">
+                  <label class="field wide" for="jName"><span>Your name</span>
+                    <input id="jName" type="text" maxlength="40" autocomplete="name" /><small class="field-error" id="jName-error"></small></label>
+                  <label class="field" for="jEmail"><span>Email</span>
+                    <input id="jEmail" type="email" maxlength="120" autocomplete="email" /><small class="field-error" id="jEmail-error"></small></label>
+                  <label class="field" for="jPhone"><span>Phone</span>
+                    <input id="jPhone" type="tel" maxlength="15" autocomplete="tel" inputmode="numeric" /><small class="field-error" id="jPhone-error"></small></label>
+                  <label class="field wide" for="jPassword"><span>Password</span>
+                    <input id="jPassword" type="password" maxlength="72" autocomplete="new-password" />
+                    <small class="field-hint">At least 8 characters, with a letter and a number.</small>
+                    <small class="field-error" id="jPassword-error"></small></label>
+                </div>
+                <button class="btn btn-primary btn-lg btn-block auth-submit" type="submit"><span class="label">Join and get my code</span></button>
+              </form>
+
+              <form id="loginForm" novalidate hidden>
+                <div class="field-grid">
+                  <label class="field wide" for="lEmail"><span>Email</span>
+                    <input id="lEmail" type="email" maxlength="120" autocomplete="username" /></label>
+                  <label class="field wide" for="lPassword"><span>Password</span>
+                    <input id="lPassword" type="password" maxlength="72" autocomplete="current-password" /></label>
+                </div>
+                <button class="btn btn-primary btn-lg btn-block auth-submit" type="submit"><span class="label">Log in</span></button>
+              </form>
+
+              <p class="auth-alt" id="toggleLine">Already a partner? <a href="#" id="toggleMode">Log in</a></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Numbers at a glance -->
+      <section class="partner-stats" aria-label="Programme at a glance">
+        <div class="wrap">
+          <div><strong>₹<span data-fill="reward">1,000</span></strong><span>earned per successful referral</span></div>
+          <div><strong>₹<span data-fill="discount">2,000</span></strong><span>off for the gym you refer</span></div>
+          <div><strong>24 hrs</strong><span>to settle a payout request</span></div>
+          <div><strong>₹0</strong><span>to join, no cap on referrals</span></div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="band" id="how">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <p class="eyebrow">How it works</p>
+            <h2 class="display">From sharing a code to cash in hand</h2>
+            <p>Four simple steps. You never handle payments from the gym. We do all of that.</p>
+          </div>
+          <div class="steps steps-4">
+            <article class="step reveal">
+              <h3>Join and get your code</h3>
+              <p>Create a free partner account. Your personal referral code, like <strong>GYMK7P2QX</strong>, and share link are ready straight away.</p>
+            </article>
+            <article class="step reveal" style="--d:60ms">
+              <h3>Share it with gym owners</h3>
+              <p>Send the code or your link to gym owners you know. They enter the code in the <em>Referral code</em> box when they register their gym.</p>
+            </article>
+            <article class="step reveal" style="--d:120ms">
+              <h3>They buy the licence</h3>
+              <p>The gym gets ₹<span data-fill="discount">2,000</span> off the one-time licence. Once we approve their purchase, your referral turns <strong>successful</strong>.</p>
+            </article>
+            <article class="step reveal" style="--d:180ms">
+              <h3>You earn and withdraw</h3>
+              <p>₹<span data-fill="reward">1,000</span> is added to your balance. Request a payout whenever you like and we settle it within 24 hours.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Earnings -->
+      <section class="band tint" id="earnings">
+        <div class="wrap earn-grid">
+          <div class="reveal">
+            <p class="eyebrow">Earnings</p>
+            <h2 class="display">Every gym you bring is ₹<span data-fill="reward">1,000</span></h2>
+            <p class="earn-lede">A referral counts once the gym you referred buys the <strong>one-time licence</strong> and we approve it. Drag the slider to see what a few gyms add up to.</p>
+            <div class="calc" aria-live="polite">
+              <label for="calcRange"><span>Gyms you refer</span><strong id="calcCount">5</strong></label>
+              <input id="calcRange" type="range" min="1" max="50" value="5" />
+              <p class="calc-out">You'd earn <strong id="calcTotal">₹5,000</strong></p>
+            </div>
+          </div>
+          <div class="earn-card reveal" style="--d:80ms">
+            <p class="earn-tag">What the gym you refer pays</p>
+            <div class="earn-price">
+              <s>₹<span data-fill="licencePrice">6,999</span></s>
+              <strong>₹<span data-fill="effectivePrice">4,999</span></strong>
+              <span>one-time licence</span>
+            </div>
+            <ul class="earn-list">
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> ₹<span data-fill="discount">2,000</span> off, applied automatically with your code</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Desktop app, owner app and branded member app</li>
+              <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#check-circle"/></svg> Server and maintenance included in year one</li>
+            </ul>
+            <p class="earn-note">The discount is a one-time offer on the first one-time licence purchase. It does not apply to the monthly plan.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Who can join + rules -->
+      <section class="band" id="rules">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <p class="eyebrow">Eligibility &amp; rules</p>
+            <h2 class="display">Who can join, and the ground rules</h2>
+            <p>Simple and fair. Read these once and you know exactly how you earn.</p>
+          </div>
+          <div class="rules-grid">
+            <article class="rule-card reveal">
+              <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#users"/></svg></div>
+              <h3>Who can join</h3>
+              <ul>
+                <li>Anyone with an email address and a phone number. No gym required.</li>
+                <li>Great for trainers, fitness consultants, equipment sellers, gym staff, creators and friends of gym owners.</li>
+                <li>The gym you refer must be <strong>new to Gymboo</strong>. A gym that has already bought a licence cannot be tagged to a code.</li>
+              </ul>
+            </article>
+            <article class="rule-card b reveal" style="--d:80ms">
+              <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#shield"/></svg></div>
+              <h3>What counts as a successful referral</h3>
+              <ul>
+                <li>The gym enters your code <strong>while registering</strong>. If they forgot, they can message us before buying and we can add it.</li>
+                <li>The gym buys the <strong>one-time licence</strong> and we approve the purchase.</li>
+                <li>Each gym can earn you a reward <strong>once</strong>. There is no reward for renewals or repeat purchases.</li>
+                <li>The monthly plan does <strong>not</strong> qualify, and does not use up the referral. If the gym buys the one-time licence later, it still counts.</li>
+              </ul>
+            </article>
+            <article class="rule-card g reveal" style="--d:160ms">
+              <div class="feature-icon"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#alert"/></svg></div>
+              <h3>What isn't allowed</h3>
+              <ul>
+                <li>Using your own code for a gym you own or run, or one registered with your own email.</li>
+                <li>Fake or duplicate sign-ups made only to collect rewards.</li>
+                <li>Misleading gym owners about price or features.</li>
+                <li>We may pause an account and hold rewards while we look into suspected misuse.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Payment policy -->
+      <section class="band tint" id="payouts">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <p class="eyebrow">Payment policy</p>
+            <h2 class="display">When you get paid</h2>
+            <p>Your balance and every referral are visible in your dashboard at all times.</p>
+          </div>
+          <div class="pay-timeline">
+            <div class="pay-step reveal">
+              <span class="pay-badge">Pending</span>
+              <h3>Gym registers</h3>
+              <p>The gym shows up in your dashboard as <strong>Pending</strong>. No money is added yet.</p>
+            </div>
+            <div class="pay-step reveal" style="--d:70ms">
+              <span class="pay-badge">Approved</span>
+              <h3>Licence approved</h3>
+              <p>When we approve their one-time licence purchase, the referral turns <strong>Successful</strong> and ₹<span data-fill="reward">1,000</span> is added to your available balance.</p>
+            </div>
+            <div class="pay-step reveal" style="--d:140ms">
+              <span class="pay-badge">Request</span>
+              <h3>You request a payout</h3>
+              <p>Any time your balance is above ₹0, tap <em>Withdraw</em> and give your UPI ID or bank details. There is no minimum amount.</p>
+            </div>
+            <div class="pay-step reveal" style="--d:210ms">
+              <span class="pay-badge done">Paid</span>
+              <h3>Settled in 24 hours</h3>
+              <p>We send the money to the account you gave us within 24 hours, and mark it <strong>Paid</strong> in your dashboard.</p>
+            </div>
+          </div>
+          <ul class="pay-facts reveal">
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#wallet"/></svg><span>Payouts are made in Indian rupees (INR) by UPI or bank transfer.</span></li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#receipt"/></svg><span>A payout request withdraws your whole available balance. Earnings from later referrals go into your next payout.</span></li>
+            <li><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#bell"/></svg><span>Need it sorted faster, or something looks wrong? Message us at <a href="mailto:support@gymboo.app" data-fill-mail>support@gymboo.app</a>.</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="band" id="faq">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <p class="eyebrow">FAQ</p>
+            <h2 class="display">Partner questions, answered</h2>
+          </div>
+          <div class="faq reveal">
+            <details>
+              <summary>When can I withdraw my balance? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>As soon as you have a balance. Your balance is credited the moment we approve the referred gym's one-time licence purchase, and from then on you can request a payout whenever you like. There is no minimum amount and no waiting period.</p>
+            </details>
+            <details>
+              <summary>How long does a payout take? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>We settle payout requests within 24 hours. The request shows as <strong>Processing</strong> in your dashboard and changes to <strong>Paid</strong> once the money is sent. If you want to follow up, message us at <a href="mailto:support@gymboo.app" data-fill-mail>support@gymboo.app</a>.</p>
+            </details>
+            <details>
+              <summary>Why does my referral say Pending? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>Pending means the gym registered with your code but hasn't bought the one-time licence yet, or we haven't approved the purchase yet. It becomes Successful, and your reward is added, after approval. A pending referral doesn't expire.</p>
+            </details>
+            <details>
+              <summary>Do monthly plans earn a reward? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>No. Only the one-time licence earns the ₹<span data-fill="reward">1,000</span> reward, and only the one-time licence gets the ₹<span data-fill="discount">2,000</span> discount. If a referred gym starts on the monthly plan and buys the one-time licence later, your referral still counts then.</p>
+            </details>
+            <details>
+              <summary>Is the reward paid more than once for the same gym? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>No. Each referred gym earns a reward once, on its first one-time licence purchase. Refer more gyms to keep earning, as there is no limit.</p>
+            </details>
+            <details>
+              <summary>What if the gym forgets to enter my code? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>The easiest way is to send your share link. It opens the registration page with your code already filled in. If a gym still forgot, ask them to message us before they buy and we can attach your code to their account. Once a referral has been rewarded it can't be changed.</p>
+            </details>
+            <details>
+              <summary>Can I use my own code? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>No. A code can't be used for a gym registered with the same email as the partner account. The programme is for introducing new gyms to Gymboo.</p>
+            </details>
+            <details>
+              <summary>Does it cost anything to join? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>No. Joining is free, and there are no fees on your earnings or payouts.</p>
+            </details>
+            <details>
+              <summary>Where do I see my earnings? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>In your partner dashboard: total referrals, successful referrals, total earned, available balance, every referred gym with its status, and your payout history. Log in on this page any time.</p>
+            </details>
+            <details>
+              <summary>How do I join? <svg class="i" aria-hidden="true"><use href="/landing/icons.svg#chevron"/></svg></summary>
+              <p>Fill in your name, email, phone and a password in the form at the top of this page. Your referral code is created immediately.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final CTA -->
+      <section class="band">
+        <div class="wrap">
+          <div class="cta reveal">
+            <h2 class="display">Start earning with Gymboo</h2>
+            <p>Join free, share your code, and get ₹<span data-fill="reward">1,000</span> for every gym that buys the one-time licence.</p>
+            <div class="cta-actions">
+              <a class="btn btn-white btn-lg" href="#join" data-mode="join">Join the programme <svg class="i arrow" aria-hidden="true"><use href="/landing/icons.svg#arrow"/></svg></a>
+              <a class="btn btn-light btn-lg" href="#join" data-mode="login"><svg class="i" aria-hidden="true"><use href="/landing/icons.svg#login"/></svg> Partner log in</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- =============== Partner dashboard (shown once signed in) =============== -->
+    <div id="dashView" class="auth-page dash-page" hidden>
+      <div class="auth-main">
+        <div class="auth-card partner-dash" id="dashCard">
+          <div class="dash-head">
+            <div><p class="eyebrow">Referral partner</p><h1 class="display" id="dashName">Welcome</h1></div>
+            <button class="btn btn-ghost" type="button" id="logoutBtn">Log out</button>
+          </div>
+
+          <p class="field-hint">Your referral code</p>
+          <div class="code-box"><strong id="codeText">—</strong><button class="btn btn-ghost" type="button" id="copyCode">Copy code</button></div>
+          <p class="field-hint">Or share this link: <span id="shareLink"></span> <button class="link-btn" type="button" id="copyLink">Copy link</button></p>
+
+          <div class="dash-stats">
+            <div><strong id="stTotal">0</strong><span>Referrals</span></div>
+            <div><strong id="stSuccess">0</strong><span>Successful</span></div>
+            <div><strong id="stEarned">₹0</strong><span>Earned</span></div>
+            <div><strong id="stAvail">₹0</strong><span>Available</span></div>
+          </div>
+          <p class="field-hint" id="programNote"></p>
+
+          <h2 class="dash-h">Request a payout</h2>
+          <p class="form-note error" id="payError" role="alert" hidden></p>
+          <p class="form-note ok" id="payOk" role="status" hidden></p>
+          <form id="payoutForm" novalidate>
+            <label class="field" for="payDetails"><span>UPI ID or bank details</span>
+              <input id="payDetails" type="text" maxlength="190" placeholder="name@upi" autocomplete="off" /></label>
+            <button class="btn btn-primary btn-block" type="submit" id="payBtn"><span class="label">Withdraw available balance</span></button>
+          </form>
+          <p class="field-hint" id="supportNote">Payouts are settled within 24 hours.</p>
+
+          <h2 class="dash-h">Your referrals</h2>
+          <div id="refList" class="dash-list"></div>
+          <h2 class="dash-h">Payouts</h2>
+          <div id="payList" class="dash-list"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-base">© <span id="year">2026</span> Gymboo. All rights reserved. · <a href="/">Home</a> · <a href="/signup">Register your gym</a> · <a href="/login">Log in</a></div>
+    </div>
+  </footer>
+
+  <script src="/landing/partner.js" defer></script>
+</body>
+
+</html>

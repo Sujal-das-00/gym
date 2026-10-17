@@ -200,7 +200,7 @@ export default function MemberDialog() {
           </div>
           <label>
             <span>Take or upload photo</span>
-            <input id="photoInput" name="photo" type="file" accept="image/*" onChange={onPhotoChange} />
+            <input id="photoInput" name="photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhotoChange} />
           </label>
         </div>
 

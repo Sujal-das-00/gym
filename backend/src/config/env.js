@@ -47,6 +47,9 @@ function authConfig() {
     // secret (and vice versa) even if one leaked into the other's Bearer header.
     memberCookieName: process.env.MEMBER_AUTH_COOKIE_NAME || "gym_member_session",
     memberJwtSecret: require("crypto").createHmac("sha256", jwtSecret).update("member-session-v1").digest("hex"),
+    // Referral partners get the same treatment as members: own cookie, own derived key.
+    partnerCookieName: process.env.PARTNER_AUTH_COOKIE_NAME || "gym_partner_session",
+    partnerJwtSecret: require("crypto").createHmac("sha256", jwtSecret).update("partner-session-v1").digest("hex"),
     cookieSecure: String(process.env.COOKIE_SECURE || "").toLowerCase() === "true",
     tokenTtlSeconds: Number(process.env.AUTH_TOKEN_TTL || 60 * 60 * 12),
     // "Trust this device" on the member login screen picks between these two.
@@ -72,6 +75,31 @@ function pushConfig() {
   };
 }
 
+// Referral programme money, in rupees. LICENCE_PRICE is the undiscounted one-time
+// licence; the referred gym pays LICENCE_PRICE - REFERRAL_DISCOUNT on its first
+// one-time purchase, and the partner who referred it earns REFERRER_REWARD.
+function referralConfig() {
+  const num = (name, fallback) => {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value >= 0 ? value : fallback;
+  };
+  return {
+    licencePrice: num("LICENCE_PRICE", 6999),
+    monthlyPrice: num("MONTHLY_PRICE", 249),
+    maintenancePrice: num("MAINTENANCE_PRICE", 1999),
+    referralDiscount: num("REFERRAL_DISCOUNT", 2000),
+    referrerReward: num("REFERRER_REWARD", 1000),
+    supportEmail: String(process.env.SUPPORT_EMAIL || "support@gymboo.app").trim(),
+  };
+}
+
+// How many times a gym past its trial can say "I have paid" and be let back in for a day
+// while the payment is still being verified.
+function trialConfig() {
+  const value = Number(process.env.MAX_GRACE_DAYS);
+  return { maxGraceDays: Number.isInteger(value) && value >= 0 ? value : 3 };
+}
+
 function normalizeBaseUrl(value) {
   const trimmed = String(value || "").trim();
   return trimmed.replace(/\/+$/, "");
@@ -93,4 +121,6 @@ module.exports = {
   dbConfig,
   getPublicBaseUrl,
   pushConfig,
+  referralConfig,
+  trialConfig,
 };

@@ -33,6 +33,12 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    label: "Subscription",
+    // The owner pays for the plan; staff never see what the gym owes.
+    roles: ["gym_admin", "super_admin"],
+    links: [{ view: "plan", icon: "workspace_premium", text: "Plan & Billing" }],
+  },
+  {
     label: "Notifications",
     // Owner-only: a mass push reaches every member's phone, so `staff` never
     // sees the link. NotificationsView and the backend both re-check the role.

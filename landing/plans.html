@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073f2d" />
+  <meta name="robots" content="noindex" />
+  <title>Choose your plan · Gymboo</title>
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="/landing/landing.css" />
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+
+<body class="plans-body">
+  <header class="site-header scrolled">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"><img src="/landing/logo-mark.png" alt="" width="314" height="211"></span>
+        Gymboo
+      </a>
+      <div class="header-actions">
+        <a class="btn btn-ghost" href="/admin" id="dashLink" hidden>Open dashboard</a>
+        <button class="btn btn-ghost" type="button" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="plans-main" id="main">
+    <div class="wrap plans-wrap">
+      <div id="loading" class="plans-loading">Loading your plan…</div>
+      <div id="app" hidden>
+        <section class="plans-notice" id="notice" role="status"></section>
+
+        <div id="chooser">
+          <div class="plans-head">
+            <p class="eyebrow">Step 1</p>
+            <h1 class="display">Choose your plan</h1>
+            <p class="plans-sub" id="gymLine"></p>
+          </div>
+          <div class="plan-grid" id="planGrid"></div>
+        </div>
+
+        <section class="pay-panel" id="payPanel" hidden>
+          <div class="plans-head">
+            <p class="eyebrow">Step 2</p>
+            <h2 class="display">Pay with UPI</h2>
+          </div>
+          <div class="pay-grid">
+            <div class="qr-box">
+              <img id="qrImg" alt="UPI QR code with the amount filled in" width="240" height="240" />
+              <p class="qr-label">Amount to pay</p>
+              <p class="qr-amount">₹<span id="payAmount"></span></p>
+            </div>
+            <div class="pay-side">
+              <div class="breakdown" id="breakdown" aria-label="Payment breakdown"></div>
+              <dl class="pay-details">
+                <div><dt>Pay to</dt><dd><span id="upiId"></span> <button class="link-btn" type="button" id="copyUpi">Copy</button></dd></div>
+                <div><dt>Name</dt><dd id="upiName"></dd></div>
+              </dl>
+              <a class="btn btn-ghost btn-block upi-open" id="upiOpen" href="#">Open my UPI app</a>
+
+              <p class="form-note error" id="claimError" role="alert" hidden></p>
+              <label class="field" for="payRef"><span>UPI transaction ID <em>(optional, helps us verify faster)</em></span>
+                <input id="payRef" type="text" maxlength="40" placeholder="e.g. 412345678901" autocomplete="off" /></label>
+              <button class="btn btn-primary btn-lg btn-block" type="button" id="claimBtn"><span class="label">I've completed the payment</span></button>
+              <button class="link-btn change-plan" type="button" id="changePlan">Choose a different plan</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="verify-card" id="verifyCard" hidden>
+          <div class="success-mark" aria-hidden="true"><svg class="i"><use href="/landing/icons.svg#check-circle"/></svg></div>
+          <h2 class="display">Payment awaiting verification</h2>
+          <p id="verifyText"></p>
+          <div class="breakdown" id="verifyBreakdown" aria-label="Payment breakdown"></div>
+          <p class="verify-meta" id="verifyMeta"></p>
+          <div class="verify-actions">
+            <a class="btn btn-primary btn-lg" href="/admin" id="verifyDash" hidden>Continue to dashboard</a>
+            <button class="btn btn-ghost btn-lg" type="button" id="reclaimBtn" hidden>I've paid, give me today's access</button>
+          </div>
+          <p class="plans-support" id="verifySupport"></p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="/landing/plans.js" defer></script>
+</body>
+
+</html>

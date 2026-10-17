@@ -4,183 +4,276 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Super Admin :: Control Panel</title>
+  <meta name="theme-color" content="#073f2d" />
+  <title>Gymboo Console</title>
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
   <style>
-    /* Deliberately minimal, 1990s-style: system fonts, gray desktop, beveled
-       boxes. No frameworks, no external assets. */
+    :root {
+      --bg: #f4f6f4; --panel: #fff; --ink: #17201b; --muted: #637067; --line: #e2e8e2;
+      --green: #11784a; --green-dark: #073f2d; --green-deep: #052d21; --green-soft: #e8f6ee;
+      --red: #c43d32; --red-soft: #fae9e7; --gold: #a36500; --gold-soft: #fff3d8;
+      --indigo: #4f46e5; --indigo-soft: #ececff;
+      --r: 10px; --shadow: 0 1px 2px rgba(16,31,24,.05), 0 8px 24px rgba(16,31,24,.06);
+    }
     * { box-sizing: border-box; }
-    body {
-      background: #008080;
-      color: #000;
-      font-family: "Times New Roman", Times, serif;
-      font-size: 16px;
-      margin: 0;
-      padding: 16px;
-    }
-    a { color: #0000ee; }
-    h1, h2, h3 { font-family: Arial, Helvetica, sans-serif; margin: 0 0 8px; }
-    h1 { font-size: 22px; }
-    h2 { font-size: 18px; border-bottom: 2px solid #808080; padding-bottom: 4px; }
-    hr { border: 0; border-top: 1px solid #808080; margin: 16px 0; }
-
-    .window {
-      background: #c0c0c0;
-      border: 2px outset #ffffff;
-      max-width: 900px;
-      margin: 0 auto 16px;
-      padding: 0;
-    }
-    .titlebar {
-      background: #000080;
-      color: #fff;
-      font-family: Arial, Helvetica, sans-serif;
-      font-weight: bold;
-      padding: 4px 8px;
-    }
-    .window-body { padding: 12px 16px; }
-
-    fieldset { border: 2px groove #fff; margin: 12px 0; padding: 10px 12px; }
-    legend { font-family: Arial, Helvetica, sans-serif; font-weight: bold; padding: 0 4px; }
-    label { display: block; margin: 6px 0 2px; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
-    input, select {
-      font-family: "Courier New", monospace;
-      font-size: 14px;
-      padding: 3px 4px;
-      border: 2px inset #fff;
-      background: #fff;
-      width: 100%;
-      max-width: 320px;
-    }
-    button {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 13px;
-      padding: 3px 12px;
-      border: 2px outset #fff;
-      background: #c0c0c0;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-    button:active { border-style: inset; }
-    button.link { border: 0; background: transparent; color: #0000ee; text-decoration: underline; padding: 0; margin: 0; }
-
-    table { border-collapse: collapse; width: 100%; background: #fff; margin-top: 8px; font-size: 14px; }
-    th, td { border: 1px solid #808080; padding: 4px 8px; text-align: left; }
-    th { background: #000080; color: #fff; font-family: Arial, Helvetica, sans-serif; }
-    tr:nth-child(even) td { background: #eee; }
-
-    .status-active { color: #006600; font-weight: bold; }
-    .status-disabled, .status-suspended { color: #cc0000; font-weight: bold; }
-    .msg { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 6px 8px; margin: 8px 0; }
-    .msg.error { background: #ffe0e0; border: 1px solid #cc0000; color: #900; }
-    .msg.ok { background: #e0ffe0; border: 1px solid #006600; color: #060; }
-    .muted { color: #555; font-size: 12px; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    html, body { margin: 0; }
+    body { background: var(--bg); color: var(--ink); font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, p { margin: 0; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
     [hidden] { display: none !important; }
+    code { padding: 1px 6px; border-radius: 5px; background: #eef2ee; font-size: 12px; }
+    :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 600; white-space: nowrap; transition: background .12s, border-color .12s; }
+    .btn:hover { background: #f7faf7; border-color: #cbd8cd; }
+    .btn.primary { border-color: var(--green); background: var(--green); color: #fff; }
+    .btn.primary:hover { background: #0e6640; }
+    .btn.danger { color: var(--red); }
+    .btn.danger:hover { background: var(--red-soft); border-color: #efc6c1; }
+    .btn.sm { min-height: 30px; padding: 0 10px; font-size: 13px; }
+    .btn:disabled { opacity: .55; cursor: progress; }
+
+    /* Login */
+    .login { display: grid; place-items: center; min-height: 100vh; padding: 20px; background: linear-gradient(160deg, var(--green-dark), var(--green-deep)); }
+    .login-card { width: min(400px, 100%); padding: 30px; border-radius: 16px; background: #fff; box-shadow: 0 30px 70px rgba(0,0,0,.28); }
+    .login-card h1 { margin: 14px 0 4px; font-size: 22px; }
+    .login-card p { margin-bottom: 18px; color: var(--muted); }
+    .logo { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: linear-gradient(150deg, var(--green), var(--green-deep)); color: #fff; font-weight: 800; }
+
+    /* Forms */
+    label.f { display: grid; gap: 5px; margin-bottom: 12px; font-size: 13px; font-weight: 600; }
+    label.f span em { color: var(--muted); font-style: normal; font-weight: 500; }
+    input, select, textarea { width: 100%; min-height: 38px; padding: 7px 11px; border: 1px solid #d3ddd4; border-radius: 8px; background: #fff; }
+    input:focus, select:focus, textarea:focus { border-color: var(--green); outline: 0; box-shadow: 0 0 0 3px rgba(17,120,74,.16); }
+    .err { margin-bottom: 12px; padding: 9px 12px; border: 1px solid #efc6c1; border-radius: 8px; background: var(--red-soft); color: var(--red); font-weight: 600; }
+
+    /* Shell */
+    .shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+    aside.side { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 18px 12px; background: linear-gradient(180deg, var(--green-dark), var(--green-deep)); color: #fff; }
+    .side .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; font-weight: 800; font-size: 16px; }
+    .side .brand small { display: block; color: rgba(255,255,255,.6); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+    .side .logo { background: rgba(255,255,255,.14); }
+    .nav { display: grid; gap: 2px; }
+    .nav a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 8px; color: rgba(255,255,255,.78); font-weight: 600; text-decoration: none; }
+    .nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+    .nav a.on { background: rgba(255,255,255,.16); color: #fff; }
+    .nav .count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: #f5b83d; color: #3a2700; font-size: 11px; font-weight: 800; text-align: center; line-height: 20px; }
+    .nav .sep { margin: 12px 12px 4px; color: rgba(255,255,255,.42); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .side .who { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid rgba(255,255,255,.14); font-size: 12px; color: rgba(255,255,255,.7); }
+    .side .who strong { display: block; color: #fff; font-size: 13px; }
+    .side .who button { margin-top: 10px; width: 100%; justify-content: center; background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.2); color: #fff; }
+    main.main { padding: 26px 30px 60px; min-width: 0; }
+    .head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .head h1 { font-size: 24px; letter-spacing: -.02em; }
+    .head p { margin-top: 2px; color: var(--muted); }
+    .menu-btn { display: none; }
+
+    /* Cards, stats */
+    .card { border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); box-shadow: var(--shadow); }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat { padding: 16px 18px; }
+    .stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .stat strong { display: block; margin: 4px 0 2px; font-size: 26px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .stat small { color: var(--muted); }
+    .stat.warn { border-color: #f1d9a2; background: #fffaf0; }
+    .attn { display: grid; gap: 8px; padding: 16px 18px; }
+    .attn h2 { font-size: 15px; margin-bottom: 4px; }
+    .attn a { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--bg); color: inherit; font-weight: 600; text-decoration: none; }
+    .attn a:hover { background: var(--green-soft); }
+    .attn .ok { color: var(--muted); }
+
+    /* Toolbar + tables */
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toolbar .search { flex: 1 1 220px; max-width: 340px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; font-weight: 600; color: var(--muted); }
+    .chip.on { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 11px 14px; border-bottom: 1px solid var(--line); background: #fafcfa; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 12px 14px; border-bottom: 1px solid #eef2ee; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: #fafcfa; }
+    td .sub { display: block; color: var(--muted); font-size: 12px; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.actions { text-align: right; white-space: nowrap; }
+    td.actions .btn + .btn { margin-left: 6px; }
+    .empty { padding: 36px 16px; color: var(--muted); text-align: center; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eef1ef; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .badge.green { background: var(--green-soft); color: var(--green-dark); }
+    .badge.gold { background: var(--gold-soft); color: var(--gold); }
+    .badge.red { background: var(--red-soft); color: var(--red); }
+    .badge.indigo { background: var(--indigo-soft); color: var(--indigo); }
+
+    /* Reviews */
+    .reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+    .review { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+    .review header { display: flex; align-items: center; gap: 12px; }
+    .avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
+    .review header > div:not(.avatar) { min-width: 0; flex: 1; }
+    .review header strong { display: block; }
+    .review header small { color: var(--muted); }
+    .review blockquote { margin: 0; flex: 1; color: #2c3830; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .review footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid #eef2ee; }
+    .review footer .row { display: flex; gap: 6px; }
+    .hint { margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; background: var(--indigo-soft); color: #3730a3; }
+
+    /* Dialog + toast */
+    dialog { width: min(440px, calc(100% - 32px)); padding: 0; border: 0; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.3); }
+    dialog::backdrop { background: rgba(5,45,33,.5); }
+    dialog form { padding: 22px; }
+    dialog h2 { margin-bottom: 14px; font-size: 18px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .warn-note { margin: -4px 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--gold-soft); color: var(--gold); font-size: 12px; }
+    .muted-note { margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+    td .trial { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    #toast { position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 340px; padding: 12px 16px; border-radius: 10px; background: var(--green-dark); color: #fff; font-weight: 600; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
+    #toast.bad { background: var(--red); }
+
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: 1fr; }
+      aside.side { position: fixed; z-index: 30; inset: 0 auto 0 0; width: 250px; transform: translateX(-100%); transition: transform .2s; }
+      aside.side.open { transform: none; }
+      main.main { padding: 16px 14px 50px; }
+      .menu-btn { display: inline-flex; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- ===================== LOGIN ===================== -->
-  <div class="window" id="loginView" style="max-width:420px;">
-    <div class="titlebar">Super Admin &mdash; Sign In</div>
-    <div class="window-body">
-      <p class="muted">Restricted area. Platform owner access only.</p>
-      <div class="msg error" id="loginError" hidden></div>
-      <form id="loginForm" autocomplete="off">
-        <label for="loginEmail">Email</label>
-        <input id="loginEmail" name="email" type="email" required />
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" name="password" type="password" required />
-        <br />
-        <button type="submit">Log In</button>
-      </form>
-    </div>
+  <!-- Login -->
+  <div class="login" id="loginView">
+    <form class="login-card" id="loginForm" autocomplete="off">
+      <div class="logo">G</div>
+      <h1>Gymboo Console</h1>
+      <p>Platform owner access only.</p>
+      <div class="err" id="loginError" hidden></div>
+      <label class="f"><span>Email</span><input id="loginEmail" type="email" required /></label>
+      <label class="f"><span>Password</span><input id="loginPassword" type="password" required /></label>
+      <button class="btn primary" type="submit" style="width:100%;justify-content:center;min-height:42px">Sign in</button>
+    </form>
   </div>
 
-  <!-- ===================== PANEL ===================== -->
-  <div id="panelView" hidden>
-    <div class="window">
-      <div class="titlebar">Super Admin &mdash; Control Panel</div>
-      <div class="window-body">
-        <div class="topbar">
-          <h1>Platform Control Panel</h1>
-          <div>
-            <span class="muted" id="whoami"></span>
-            <button type="button" id="logoutBtn">Log Out</button>
-          </div>
+  <!-- Console -->
+  <div class="shell" id="appView" hidden>
+    <aside class="side" id="side">
+      <div class="brand"><div class="logo">G</div><div>Gymboo<small>Console</small></div></div>
+      <nav class="nav" id="nav">
+        <a href="#overview" data-page="overview">Overview</a>
+        <div class="sep">Customers</div>
+        <a href="#gyms" data-page="gyms">Gyms <span class="count" data-count="gyms" hidden></span></a>
+        <a href="#admins" data-page="admins">Admin accounts</a>
+        <div class="sep">Revenue</div>
+        <a href="#purchases" data-page="purchases">Licence purchases <span class="count" data-count="purchases" hidden></span></a>
+        <div class="sep">Referrals</div>
+        <a href="#partners" data-page="partners">Partners</a>
+        <a href="#payouts" data-page="payouts">Payout requests <span class="count" data-count="payouts" hidden></span></a>
+        <div class="sep">Website</div>
+        <a href="#reviews" data-page="reviews">Reviews <span class="count" data-count="reviews" hidden></span></a>
+        <div class="sep">Platform</div>
+        <a href="#settings" data-page="settings">Payment settings</a>
+      </nav>
+      <div class="who"><strong id="whoami">Super admin</strong>Platform owner<button class="btn sm" type="button" id="logoutBtn">Sign out</button></div>
+    </aside>
+
+    <main class="main">
+      <div class="head">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn menu-btn" type="button" id="menuBtn" aria-label="Menu">&#9776;</button>
+          <div><h1 id="pageTitle">Overview</h1><p id="pageSub"></p></div>
         </div>
-        <div class="msg ok" id="globalMsg" hidden></div>
+        <div id="pageActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
-    </div>
-
-    <!-- Gyms -->
-    <div class="window">
-      <div class="titlebar">Gyms (Tenants)</div>
-      <div class="window-body">
-        <table id="gymsTable">
-          <thead>
-            <tr><th>Name</th><th>Check-in slug</th><th>Status</th><th>Action</th></tr>
-          </thead>
-          <tbody id="gymsBody"></tbody>
-        </table>
-
-        <fieldset>
-          <legend>Create a new gym (with its first admin)</legend>
-          <div class="msg error" id="gymError" hidden></div>
-          <form id="gymForm" autocomplete="off">
-            <label>Gym name</label>
-            <input name="gymName" required />
-            <label>First admin name</label>
-            <input name="adminName" />
-            <label>First admin email</label>
-            <input name="adminEmail" type="email" required />
-            <label>First admin password</label>
-            <input name="adminPassword" type="password" required />
-            <br />
-            <button type="submit">Create Gym</button>
-          </form>
-        </fieldset>
-      </div>
-    </div>
-
-    <!-- Admin users -->
-    <div class="window">
-      <div class="titlebar">Admin Accounts</div>
-      <div class="window-body">
-        <table id="adminsTable">
-          <thead>
-            <tr><th>Gym</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr>
-          </thead>
-          <tbody id="adminsBody"></tbody>
-        </table>
-
-        <fieldset>
-          <legend>Add an admin user</legend>
-          <div class="msg error" id="adminError" hidden></div>
-          <form id="adminForm" autocomplete="off">
-            <label>Gym</label>
-            <select name="tenantId" id="adminGymSelect" required></select>
-            <label>Name</label>
-            <input name="name" />
-            <label>Email</label>
-            <input name="email" type="email" required />
-            <label>Password</label>
-            <input name="password" type="password" required />
-            <label>Role</label>
-            <select name="role">
-              <option value="gym_admin">Gym Admin</option>
-              <option value="staff">Staff</option>
-            </select>
-            <br />
-            <button type="submit">Add Admin</button>
-          </form>
-        </fieldset>
-      </div>
-    </div>
-
-    <p class="muted" style="text-align:center;">Super Admin Console &middot; sessions are separate from the regular admin panel.</p>
+      <div id="page"></div>
+    </main>
   </div>
 
+  <!-- Dialogs -->
+  <dialog id="gymDlg"><form id="gymForm" autocomplete="off">
+    <h2>Create a gym</h2><div class="err" id="gymError" hidden></div>
+    <label class="f"><span>Gym name</span><input name="gymName" required /></label>
+    <label class="f"><span>Owner name</span><input name="adminName" /></label>
+    <label class="f"><span>Owner email</span><input name="adminEmail" type="email" required /></label>
+    <label class="f"><span>Owner password</span><input name="adminPassword" type="password" required /></label>
+    <label class="f"><span>Referral code <em>(optional)</em></span><input name="referralCode" maxlength="20" /></label>
+    <div class="two">
+      <label class="f"><span>Registration date</span><input name="registeredOn" type="date" required /></label>
+      <label class="f"><span>Free trial (days)</span><input name="trialDays" type="number" min="0" max="365" value="7" required /></label>
+    </div>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Create gym</button></div>
+  </form></dialog>
+
+  <dialog id="editGymDlg"><form id="editGymForm" autocomplete="off">
+    <h2>Edit gym</h2><div class="err" id="editGymError" hidden></div>
+    <input type="hidden" name="id" />
+    <label class="f"><span>Gym name</span><input name="name" required maxlength="160" /></label>
+    <label class="f"><span>Check-in link</span><input name="slug" required maxlength="50" pattern="[a-z0-9\-]+" /></label>
+    <p class="warn-note">Changing the link breaks the old QR codes and any app members have already installed.</p>
+    <div class="two">
+      <label class="f"><span>Registration date</span><input name="registeredOn" type="date" required /></label>
+      <label class="f"><span>Free trial (days)</span><input name="trialDays" type="number" min="0" max="365" required /></label>
+    </div>
+    <label class="f"><span>Special price, ₹ <em>(blank = standard price; lowers what this gym pays for any plan)</em></span><input name="priceOverride" type="number" min="1" max="100000" step="0.01" placeholder="e.g. 1 for a test" /></label>
+    <div class="two">
+      <label class="f"><span>Yearly maintenance, ₹ <em>(blank = standard)</em></span><input name="maintenancePrice" type="number" min="1" max="1000000" step="0.01" placeholder="standard price" /></label>
+      <label class="f"><span>Next maintenance day <em>(blank = default window)</em></span><input name="maintenanceDue" type="date" /></label>
+    </div>
+    <label class="f"><span>Referral / promo code <em id="refHint">(optional)</em></span><input name="referralCode" maxlength="20" autocapitalize="characters" /></label>
+    <div class="two">
+      <label class="f"><span>Temporary access days used</span><input name="graceDaysUsed" type="number" min="0" max="100" required /></label>
+      <label class="f"><span>Status</span><select name="status"><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
+    </div>
+    <p class="muted-note" id="editGymInfo"></p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Save changes</button></div>
+  </form></dialog>
+
+  <dialog id="maintDlg"><form id="maintForm" autocomplete="off">
+    <h2>Record maintenance payment</h2><div class="err" id="maintError" hidden></div>
+    <input type="hidden" name="id" />
+    <p class="muted-note" id="maintInfo"></p>
+    <div class="two">
+      <label class="f"><span>Amount received, ₹</span><input name="amount" type="number" min="1" step="0.01" required /></label>
+      <label class="f"><span>Received on</span><input name="paidOn" type="date" required /></label>
+    </div>
+    <div class="two">
+      <label class="f"><span>Mode</span><select name="mode"><option value="upi">UPI</option><option value="bank">Bank transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="card">Card</option><option value="other">Other</option></select></label>
+      <label class="f"><span>Reference <em>(UTR, optional)</em></span><input name="ref" maxlength="60" /></label>
+    </div>
+    <label class="f"><span>Next maintenance day <em>(optional; blank = one year on)</em></span><input name="nextDue" type="date" /></label>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Record payment</button></div>
+  </form></dialog>
+
+  <dialog id="adminDlg"><form id="adminForm" autocomplete="off">
+    <h2>Add an admin user</h2><div class="err" id="adminError" hidden></div>
+    <label class="f"><span>Gym</span><select name="tenantId" data-gyms required></select></label>
+    <label class="f"><span>Name</span><input name="name" /></label>
+    <label class="f"><span>Email</span><input name="email" type="email" required /></label>
+    <label class="f"><span>Password</span><input name="password" type="password" required /></label>
+    <label class="f"><span>Role</span><select name="role"><option value="gym_admin">Gym admin</option><option value="staff">Staff</option></select></label>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Add admin</button></div>
+  </form></dialog>
+
+  <dialog id="purchaseDlg"><form id="purchaseForm" autocomplete="off">
+    <h2>Record a licence purchase</h2><div class="err" id="purchaseError" hidden></div>
+    <label class="f"><span>Gym</span><select name="tenantId" data-gyms required></select></label>
+    <label class="f"><span>Plan</span><select name="plan"><option value="lifetime">One-time licence</option><option value="monthly">Monthly</option></select></label>
+    <p style="margin-bottom:12px;color:var(--muted)">It stays pending until you approve it. Approving a referred gym's one-time purchase credits its partner.</p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Record purchase</button></div>
+  </form></dialog>
+
+  <dialog id="noteDlg"><form id="noteForm" method="dialog">
+    <h2 id="noteTitle">Add a note</h2>
+    <label class="f"><span id="noteLabel">Note <em>(optional)</em></span><input id="noteInput" maxlength="255" /></label>
+    <div class="dlg-actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit" id="noteOk">Confirm</button></div>
+  </form></dialog>
+
+  <div id="toast" hidden></div>
   <script src="/superadmin/superadmin.js"></script>
 </body>
 </html>

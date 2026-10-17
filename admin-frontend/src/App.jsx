@@ -3,6 +3,8 @@ import Toast from "./components/Toast.jsx";
 import MobileAppbar from "./components/MobileAppbar.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Topbar from "./components/Topbar.jsx";
+import PlanBanner from "./components/PlanBanner.jsx";
+import MaintenanceNotice from "./components/MaintenanceNotice.jsx";
 import AppTabbar from "./components/AppTabbar.jsx";
 import DashboardView from "./views/DashboardView.jsx";
 import AttendanceView from "./views/AttendanceView.jsx";
@@ -13,6 +15,7 @@ import TrainersView from "./views/TrainersView.jsx";
 import PaymentsView from "./views/PaymentsView.jsx";
 import ExpensesView from "./views/ExpensesView.jsx";
 import InsightsView from "./views/InsightsView.jsx";
+import PlanBillingView from "./views/PlanBillingView.jsx";
 import NotificationsView from "./views/NotificationsView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
 import HelpView from "./views/HelpView.jsx";
@@ -39,6 +42,7 @@ const VIEWS = [
   ["payments", PaymentsView],
   ["expenses", ExpensesView],
   ["insights", InsightsView],
+  ["plan", PlanBillingView],
   ["notifications", NotificationsView],
   ["settings", SettingsView],
   ["help", HelpView],
@@ -59,6 +63,8 @@ export default function App() {
         <Sidebar />
 
         <main className="main-content" id="dashboard">
+          <PlanBanner />
+          <MaintenanceNotice />
           <Topbar />
 
           {VIEWS.map(([name, View]) => (

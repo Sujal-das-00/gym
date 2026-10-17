@@ -9,7 +9,8 @@
   <meta name="description" content="Register your gym on Gymboo and start managing members, attendance and fees." />
   <meta name="robots" content="noindex" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-  <link rel="icon" href="/icons/icon-192.svg" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" />
@@ -54,6 +55,12 @@
               <span>Email</span>
               <input id="email" name="email" type="email" maxlength="120" placeholder="you@yourgym.in" autocomplete="email" aria-describedby="email-error" />
               <small class="field-error" id="email-error"></small>
+            </label>
+            <label class="field wide" for="referralCode">
+              <span>Referral code <em>(optional)</em></span>
+              <input id="referralCode" name="referralCode" type="text" maxlength="20" placeholder="GYMXXXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="referralCode-error" />
+              <small class="field-hint" id="referralHint">Got a code from a Gymboo partner? Enter it to save ₹2,000 on the one-time licence.</small>
+              <small class="field-error" id="referralCode-error"></small>
             </label>
             <label class="field" for="password">
               <span>Password</span>

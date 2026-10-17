@@ -221,3 +221,44 @@ body.auth-locked {
     font-size: 13px;
   }
 }
+
+/* Free-trial / plan status strip above the page header */
+.plan-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding: 10px 14px; border: 1px solid #d7d8ff; border-radius: 10px; background: #ececff; color: #3730a3; font-size: 14px; font-weight: 600; }
+.plan-banner.warn { border-color: #f1d9a2; background: #fff3d8; color: #7a4c00; }
+.plan-banner a { flex: none; padding: 5px 12px; border-radius: 8px; background: #fff; color: inherit; font-weight: 700; text-decoration: none; }
+@media (max-width: 640px) { .plan-banner { flex-direction: column; align-items: flex-start; } }
+
+.plan-badge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #d7d8ff; border-radius: 999px; background: #ececff; color: #3730a3; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.plan-badge-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.plan-badge.lifetime { border-color: #f1d9a2; background: #fff3d8; color: #7a4c00; }
+.plan-badge.monthly { border-color: #bfe6cf; background: #e3f6ec; color: #11633a; }
+.plan-badge.grace { border-color: #f1d9a2; background: #fff3d8; color: #7a4c00; }
+.plan-badge.expired { border-color: #f3c3c3; background: #fde8e8; color: #9b1c1c; }
+
+button.plan-badge { font-family: inherit; cursor: pointer; }
+.plan-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.plan-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid #e3e8e4; border-radius: 14px; background: #fff; }
+.plan-card span { color: #5b6b62; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.plan-card strong { font-size: 1.5rem; line-height: 1.15; }
+.plan-card strong em { color: #5b6b62; font-size: .85rem; font-style: normal; font-weight: 700; }
+.plan-card small { color: #5b6b62; font-size: 13px; }
+.plan-link { align-self: flex-start; margin-top: 6px; padding: 6px 12px; border-radius: 8px; background: #ececff; color: #3730a3; font-size: 13px; font-weight: 700; text-decoration: none; }
+.maint-pill { align-self: flex-start; margin-top: 4px; padding: 4px 10px; border-radius: 999px; background: #ececff; color: #3730a3; font-size: 12px; }
+.plan-card.maint.due { border-color: #f1d9a2; } .plan-card.maint.due .maint-pill { background: #fff3d8; color: #7a4c00; }
+.plan-card.maint.overdue { border-color: #f3c3c3; } .plan-card.maint.overdue .maint-pill { background: #fde8e8; color: #9b1c1c; }
+.plan-table-wrap { overflow-x: auto; }
+.plan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.plan-table th, .plan-table td { padding: 10px 12px; border-bottom: 1px solid #edf0ee; text-align: left; white-space: nowrap; }
+.plan-table th { color: #5b6b62; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.plan-table .num { text-align: right; }
+.plan-status { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #e3f6ec; color: #11633a; }
+.plan-status.verifying { background: #fff3d8; color: #7a4c00; }
+.plan-status.rejected { background: #fde8e8; color: #9b1c1c; }
+.plan-note { margin: 12px 4px 4px; color: #5b6b62; font-size: 13px; }
+
+.plan-banner-btn { flex: none; padding: 5px 12px; border: 0; border-radius: 8px; background: #fff; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.maint-lock { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 20, .72); }
+.maint-lock-card { max-width: 460px; padding: 26px; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); }
+.maint-lock-card h2 { margin: 0 0 10px; }
+.maint-lock-card p { margin: 0 0 12px; line-height: 1.5; color: #35443b; }
+.maint-pay { padding: 10px 12px; border-radius: 10px; background: #f3f6f4; }

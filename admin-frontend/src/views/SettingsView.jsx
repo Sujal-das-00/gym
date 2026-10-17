@@ -76,8 +76,8 @@ export default function SettingsView() {
   const handleLogoChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const logo = await readPhoto(file, 512);
     try {
+      const logo = await readPhoto(file, 256);
       await saveSettings({ ...settings, logo });
       showToast("Logo updated");
     } catch (error) {
@@ -131,7 +131,7 @@ export default function SettingsView() {
           </div>
           <label className="logo-upload">
             Upload logo
-            <input id="gymLogoInput" type="file" accept="image/*" onChange={handleLogoChange} />
+            <input id="gymLogoInput" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleLogoChange} />
           </label>
         </div>
         <label>

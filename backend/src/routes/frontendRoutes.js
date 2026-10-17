@@ -144,7 +144,18 @@ function mountFrontendRoutes(app) {
 
   app.use(express.static(PROJECT_ROOT));
   app.use("/icons", express.static(ICONS_DIR));
-  app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "30d" }));
+  // Uploads are only ever our own re-encoded .webp files. Serve nothing else from here,
+  // never let a browser sniff or run a file as another type, and never render it inline as a page.
+  app.use(
+    "/uploads",
+    (req, res, next) => {
+      if (!/\.webp$/i.test(req.path)) return res.status(404).end();
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+      return next();
+    },
+    express.static(UPLOAD_DIR, { maxAge: "30d", dotfiles: "deny", index: false, redirect: false }),
+  );
 
   // Admin dashboard: the Vite/React build output (admin-frontend/dist).
   app.get("/admin", (req, res) => res.sendFile(path.join(ADMIN_DIST, "index.html")));
@@ -199,6 +210,8 @@ function mountFrontendRoutes(app) {
   app.get("/", landingPage("index.html"));
   app.get("/login", landingPage("login.html"));
   app.get("/signup", landingPage("signup.html"));
+  app.get("/partner", landingPage("partner.html"));
+  app.get("/plans", landingPage("plans.html"));
   app.use("/landing", express.static(LANDING_DIR));
 }
 

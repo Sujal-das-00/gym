@@ -161,10 +161,44 @@
         password: $("password").value,
         confirm: $("confirm").value,
         terms: $("terms").checked,
+        referralCode: $("referralCode").value.trim().toUpperCase(),
       };
     };
 
-    var checkSignup = wireForm(["gymName", "ownerName", "email", "password", "confirm", "terms"], function () {
+    // ?ref=CODE links from a partner prefill the box.
+    try {
+      var ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref) $("referralCode").value = ref.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20);
+    } catch (e) { /* no prefill */ }
+
+    // Tell the owner straight away whether the code works; the server re-checks on submit.
+    var codeValid = null;
+    var codeTimer;
+    var CODE_HINT = "Got a code from a Gymboo partner? Enter it to save ₹2,000 on the one-time licence.";
+    function checkCode() {
+      var code = $("referralCode").value.trim().toUpperCase();
+      var hint = $("referralHint");
+      codeValid = null;
+      if (!code) { hint.textContent = CODE_HINT; return; }
+      fetch("/api/public/referral/" + encodeURIComponent(code), { credentials: "same-origin" })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if ($("referralCode").value.trim().toUpperCase() !== code) return;
+          codeValid = Boolean(data.valid);
+          hint.textContent = codeValid
+            ? "Code applied. You'll save ₹" + Number(data.discount).toLocaleString("en-IN") + " on the one-time licence."
+            : "This code isn't valid. Check it, or leave it blank.";
+        })
+        .catch(function () { /* the server still validates on submit */ });
+    }
+    $("referralCode").addEventListener("input", function () {
+      this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      clearTimeout(codeTimer);
+      codeTimer = setTimeout(checkCode, 350);
+    });
+    if ($("referralCode").value) checkCode();
+
+    var checkSignup = wireForm(["gymName", "ownerName", "email", "referralCode", "password", "confirm", "terms"], function () {
       var v = values();
       var errors = {
         gymName: nameError(v.gymName, "Enter your gym's name.", "Gym name"),
@@ -177,6 +211,7 @@
       if (!v.confirm) errors.confirm = "Re-type your password.";
       else if (v.confirm !== v.password) errors.confirm = "Both passwords must match.";
       if (!v.terms) errors.terms = "Please accept the terms to continue.";
+      if (v.referralCode && codeValid === false) errors.referralCode = "This referral code isn't valid. Clear it to continue without one.";
       Object.keys(errors).forEach(function (k) { if (!errors[k]) delete errors[k]; });
       return errors;
     });
@@ -209,7 +244,7 @@
       if (!checkSignup()) return;
       var v = values();
       setBusy(true, "Register my gym");
-      post("/api/auth/signup", { gymName: v.gymName, ownerName: v.ownerName, email: v.email, password: v.password })
+      post("/api/auth/signup", { gymName: v.gymName, ownerName: v.ownerName, email: v.email, password: v.password, referralCode: v.referralCode })
         .then(function (data) {
           saveToken(data.token);
           var gym = data.gym || {};

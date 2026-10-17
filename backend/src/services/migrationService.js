@@ -149,6 +149,38 @@ async function tightenConstraints() {
 }
 
 async function ensureFeatureColumns() {
+  // Free-trial tracking. Existing gyms are dated from when they were created.
+  if (!(await columnExists("gyms", "registered_at"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN registered_at DATE NULL AFTER created_at", "gyms.registered_at");
+    await tryRaw("UPDATE gyms SET registered_at = DATE(created_at) WHERE registered_at IS NULL", "backfill gyms.registered_at");
+  }
+  if (!(await columnExists("gyms", "price_override"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN price_override DECIMAL(10,2) NULL", "gyms.price_override");
+  }
+  if (!(await columnExists("gyms", "maintenance_price"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN maintenance_price DECIMAL(10,2) NULL", "gyms.maintenance_price");
+  }
+  if (!(await columnExists("gyms", "maintenance_due"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN maintenance_due DATE NULL", "gyms.maintenance_due");
+  }
+  if (!(await columnExists("licence_purchases", "adjustment"))) {
+    await tryRaw("ALTER TABLE licence_purchases ADD COLUMN adjustment DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER discount", "licence_purchases.adjustment");
+  }
+  if (!(await columnExists("gyms", "grace_days_used"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN grace_days_used INT UNSIGNED NOT NULL DEFAULT 0", "gyms.grace_days_used");
+  }
+  if (!(await columnExists("gyms", "grace_until"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN grace_until DATETIME NULL", "gyms.grace_until");
+  }
+  if (!(await columnExists("licence_purchases", "claimed_at"))) {
+    await tryRaw("ALTER TABLE licence_purchases ADD COLUMN claimed_at TIMESTAMP NULL AFTER note", "licence_purchases.claimed_at");
+  }
+  if (!(await columnExists("licence_purchases", "payment_ref"))) {
+    await tryRaw("ALTER TABLE licence_purchases ADD COLUMN payment_ref VARCHAR(40) NOT NULL DEFAULT '' AFTER claimed_at", "licence_purchases.payment_ref");
+  }
+  if (!(await columnExists("gyms", "trial_days"))) {
+    await tryRaw("ALTER TABLE gyms ADD COLUMN trial_days INT UNSIGNED NOT NULL DEFAULT 7 AFTER registered_at", "gyms.trial_days");
+  }
   if (!(await columnExists("gym_settings", "allow_expired_checkin"))) {
     await tryRaw(
       "ALTER TABLE gym_settings ADD COLUMN allow_expired_checkin TINYINT(1) NOT NULL DEFAULT 1 AFTER default_collection_timing",

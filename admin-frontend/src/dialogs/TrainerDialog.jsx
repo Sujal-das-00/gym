@@ -160,7 +160,7 @@ export default function TrainerDialog() {
           </div>
           <label>
             <span>Take or upload photo</span>
-            <input id="trainerPhotoInput" name="photo" type="file" accept="image/*" onChange={onPhotoChange} />
+            <input id="trainerPhotoInput" name="photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhotoChange} />
           </label>
         </div>
 

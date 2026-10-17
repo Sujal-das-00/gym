@@ -10,7 +10,10 @@ const pushController = require("../controllers/pushController");
 const settingsController = require("../controllers/settingsController");
 const reviewController = require("../controllers/reviewController");
 const statsController = require("../controllers/statsController");
+const partnerController = require("../controllers/partnerController");
 const superRoutes = require("./superRoutes");
+const { authenticatePartner } = require("../middleware/partnerAuth");
+const { enforceAccess } = require("../middleware/access");
 const { authenticate, requireRole, resolveTenant } = require("../middleware/auth");
 const { authenticateMember } = require("../middleware/memberAuth");
 const { checkinThrottle } = require("../middleware/checkinThrottle");
@@ -38,6 +41,15 @@ router.post("/public/reviews", reviewThrottle, asyncHandler(reviewController.pos
 // and only renders the URL it is given, so it stays outside the auth wall.
 router.get("/qr", appController.getQr);
 
+// --- Referral programme ---
+router.get("/public/referral-program", asyncHandler(partnerController.getProgram));
+router.get("/public/referral/:code", authThrottle, asyncHandler(partnerController.getCodeCheck));
+router.post("/partner/signup", authThrottle, asyncHandler(partnerController.postSignup));
+router.post("/partner/login", authThrottle, asyncHandler(partnerController.postLogin));
+router.post("/partner/logout", asyncHandler(partnerController.postLogout));
+router.get("/partner/dashboard", authenticatePartner, asyncHandler(partnerController.getDashboard));
+router.post("/partner/payouts", authenticatePartner, asyncHandler(partnerController.postPayout));
+
 // --- Public, gym-scoped member check-in (no login; the slug picks the gym) ---
 router.get("/public/:slug/settings", asyncHandler(publicController.getPublicSettings));
 router.post("/public/:slug/checkin", checkinThrottle, asyncHandler(publicController.postPublicCheckin));
@@ -63,6 +75,17 @@ router.use("/super", superRoutes);
 
 // --- Everything below requires a login and is scoped to a single gym ---
 router.use(authenticate, resolveTenant);
+
+// Licence: the owner sees their price (referral discount included) and asks to buy.
+// Nothing counts until the super-admin approves the purchase.
+router.get("/licence", requireRole("gym_admin", "staff"), asyncHandler(partnerController.getLicence));
+router.get("/billing", requireRole("gym_admin"), asyncHandler(partnerController.getBilling));
+router.post("/licence/purchase", requireRole("gym_admin"), asyncHandler(partnerController.postLicence));
+router.post("/licence/claim", requireRole("gym_admin"), asyncHandler(partnerController.postClaim));
+
+// Everything below needs an active gym: suspended gyms and gyms whose free trial has run
+// out (with no licence or temporary access) are stopped here.
+router.use(enforceAccess);
 
 router.get("/config", asyncHandler(appController.getConfig));
 

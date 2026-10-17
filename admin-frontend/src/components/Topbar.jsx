@@ -1,6 +1,7 @@
 import { useApp } from "../store/AppContext.jsx";
 import { VIEW_COPY } from "../lib/constants.js";
 import { todayLabel } from "../lib/dates.js";
+import PlanBadge from "./PlanBadge.jsx";
 import useInstallPrompt from "../hooks/useInstallPrompt.js";
 
 export default function Topbar() {
@@ -23,6 +24,7 @@ export default function Topbar() {
         </p>
       </div>
       <div className="topbar-actions">
+        <PlanBadge />
         <span className="date-pill" id="todayLabel">
           {todayLabel()}
         </span>

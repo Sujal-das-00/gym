@@ -58,6 +58,17 @@ export async function api(path, options = {}) {
     apiContext.onUnauthorized();
     throw new Error("Your session has expired. Please sign in again.");
   }
+  // 402 = the free trial has ended and no plan (or temporary access) is in place. Every
+  // dashboard call is refused until then, so send the owner to pick a plan and pay.
+  if (res.status === 402) {
+    const body = await res.clone().json().catch(() => ({}));
+    if (body.code === "MAINTENANCE_OVERDUE") {
+      window.dispatchEvent(new Event("gymboo:maintenance-locked"));
+      throw new Error(body.error);
+    }
+    window.location.href = "/plans";
+    throw new Error("Your free trial has ended. Choose a plan to continue.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;

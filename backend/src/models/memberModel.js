@@ -3,37 +3,66 @@ const { toDateKey } = require("../utils/date");
 const { normalizeMember, normalizePhone } = require("../utils/member");
 const { mapPaymentRow } = require("./paymentModel");
 
-async function hydrateMember(row) {
-  if (!row) return null;
-  const [attendanceRows, paymentRows, expiredCheckinRows] = await Promise.all([
-    query("SELECT attendance_date FROM attendance WHERE member_id = ? ORDER BY attendance_date", [row.id]),
-    query("SELECT * FROM payments WHERE member_id = ? ORDER BY payment_date, created_at", [row.id]),
-    query("SELECT checkin_date FROM checkins WHERE member_id = ? AND expired = 1 ORDER BY checkin_date", [row.id]),
-  ]);
+const CHUNK = 500;
+const placeholders = (n) => new Array(n).fill("?").join(",");
 
-  return normalizeMember({
-    id: row.id,
-    gymId: row.gym_id,
-    name: row.name,
-    phone: row.phone,
-    address: row.address,
-    fee: row.fee,
-    admissionFee: row.admission_fee,
-    membershipType: row.membership_type,
-    packageMonths: row.package_months,
-    collectionTiming: row.collection_timing,
-    startDate: row.start_date,
-    photo: row.photo,
-    createdAt: row.created_at,
-    attendance: attendanceRows.map((item) => toDateKey(item.attendance_date)),
-    expiredCheckins: expiredCheckinRows.map((item) => toDateKey(item.checkin_date)),
-    payments: paymentRows.map(mapPaymentRow),
-  });
+// Builds full members from rows with three queries per chunk of members, however many
+// members there are (the old per-member version ran three queries each, all at once).
+async function hydrateMembers(rows) {
+  const out = [];
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const slice = rows.slice(i, i + CHUNK);
+    const ids = slice.map((row) => row.id);
+    const marks = placeholders(ids.length);
+    const [attendanceRows, paymentRows, expiredRows] = await Promise.all([
+      query(`SELECT member_id, attendance_date FROM attendance WHERE member_id IN (${marks}) ORDER BY attendance_date`, ids),
+      query(`SELECT * FROM payments WHERE member_id IN (${marks}) ORDER BY payment_date, created_at`, ids),
+      query(`SELECT member_id, checkin_date FROM checkins WHERE member_id IN (${marks}) AND expired = 1 ORDER BY checkin_date`, ids),
+    ]);
+    const group = (list, map) => {
+      const byMember = new Map();
+      for (const item of list) {
+        if (!byMember.has(item.member_id)) byMember.set(item.member_id, []);
+        byMember.get(item.member_id).push(map(item));
+      }
+      return byMember;
+    };
+    const attendance = group(attendanceRows, (item) => toDateKey(item.attendance_date));
+    const expired = group(expiredRows, (item) => toDateKey(item.checkin_date));
+    const payments = group(paymentRows, mapPaymentRow);
+    for (const row of slice) {
+      out.push(
+        normalizeMember({
+          id: row.id,
+          gymId: row.gym_id,
+          name: row.name,
+          phone: row.phone,
+          address: row.address,
+          fee: row.fee,
+          admissionFee: row.admission_fee,
+          membershipType: row.membership_type,
+          packageMonths: row.package_months,
+          collectionTiming: row.collection_timing,
+          startDate: row.start_date,
+          photo: row.photo,
+          createdAt: row.created_at,
+          attendance: attendance.get(row.id) || [],
+          expiredCheckins: expired.get(row.id) || [],
+          payments: payments.get(row.id) || [],
+        }),
+      );
+    }
+  }
+  return out;
+}
+
+async function hydrateMember(row) {
+  return row ? (await hydrateMembers([row]))[0] : null;
 }
 
 async function getAllMembers(gymId) {
   const rows = await query("SELECT * FROM members WHERE tenant_id = ? ORDER BY name", [gymId]);
-  return Promise.all(rows.map(hydrateMember));
+  return hydrateMembers(rows);
 }
 
 async function getMemberById(gymId, id) {

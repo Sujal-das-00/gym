@@ -8,6 +8,15 @@
 
   document.getElementById("year").textContent = new Date().getFullYear();
 
+  // Referral-band numbers come from the server's config so they match what is paid.
+  fetch("/api/public/referral-program").then(function (r) { return r.ok ? r.json() : null; }).then(function (p) {
+    if (!p) return;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-fill]"), function (el) {
+      var v = p[el.getAttribute("data-fill")];
+      if (v != null) el.textContent = Number(v).toLocaleString("en-IN");
+    });
+  }).catch(function () { /* defaults stay */ });
+
   function setMenu(open) {
     nav.classList.toggle("open", open);
     toggle.setAttribute("aria-expanded", String(open));
