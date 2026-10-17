@@ -29,7 +29,7 @@ import MemberIdCard from "./views/MemberIdCard.jsx";
 import MemberReceipts from "./views/MemberReceipts.jsx";
 
 const PAGE_TITLES = {
-  home: "Dashboard",
+  home: "Home",
   checkin: "Check-in",
   receipts: "Receipts",
   "id-card": "ID Card",
@@ -110,7 +110,7 @@ export default function App() {
       if (!scanned) {
         setScanNote({
           tone: "err",
-          message: "That code isn't a gym check-in QR. Scan the one on the front desk console.",
+          message: "That isn’t a gym QR code. Please try again.",
         });
         return;
       }
@@ -125,9 +125,7 @@ export default function App() {
       if (code) setScannedCode(code);
       setScanNote({
         tone: "ok",
-        message: code
-          ? "Front desk recognised — today's code filled in. Enter your number to check in."
-          : "Front desk recognised. Enter your number and today's code to check in.",
+        message: code ? "QR scanned. Enter your number to check in." : "QR scanned. Enter your number and code.",
       });
     },
     [slug],
@@ -148,7 +146,7 @@ export default function App() {
     return (
       <main className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
         <BrandHeader gymName="" logo="" />
-        <p className="text-xs text-on-surface-variant">Opening your gym…</p>
+        <p className="text-xs text-on-surface-variant">Loading…</p>
       </main>
     );
   }
@@ -162,7 +160,7 @@ export default function App() {
           gymName={branding.gymName}
           logo={branding.logo}
           onSignOut={signOut}
-          subtitle={PAGE_TITLES[destination] || "Dashboard"}
+          subtitle={PAGE_TITLES[destination] || "Home"}
         />
         <main className="flex-1 w-full max-w-md mx-auto px-margin pb-6 flex flex-col">
           {destination === "home" && (
@@ -220,7 +218,7 @@ export default function App() {
             className="text-[11px] text-on-surface-variant underline text-center py-1"
             href="/checkin?pick=1"
           >
-            Not your gym? Scan another front-desk QR
+            Not your gym? Scan another QR
           </a>
         </>
       ) : (

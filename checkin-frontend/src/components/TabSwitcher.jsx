@@ -1,12 +1,12 @@
 import Icon from "./Icon.jsx";
 
 const TABS = [
-  { id: "checkin", label: "Fast Check-In", icon: "how_to_reg" },
-  { id: "account", label: "Sensitive Login", icon: "lock" },
+  { id: "checkin", label: "Check in", icon: "how_to_reg" },
+  { id: "account", label: "Sign in", icon: "lock" },
 ];
 
 const baseTab =
-  "flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all";
+  "flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-all";
 
 export default function TabSwitcher({ active, onChange }) {
   return (

@@ -37,9 +37,6 @@ export default function AttendanceCard({ gymName, history = [], week = [] }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <h2 className="font-headline-sm text-headline-sm text-on-surface">Attendance</h2>
-          <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-sm">
-            This week
-          </span>
         </div>
         {canExpand && (
           <button
@@ -86,17 +83,15 @@ export default function AttendanceCard({ gymName, history = [], week = [] }) {
                         {row.time ? `, ${displayTime(row.time)}` : ""}
                       </span>
                       <span className="font-body-sm text-body-sm text-secondary truncate">
-                        {gymName} • {row.source === "qr" ? "Self check-in" : "Marked at front desk"}
+                        {gymName}
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full font-label-sm shrink-0 ${
-                      row.expired ? "bg-red-50 text-red-700" : "bg-surface-container text-secondary"
-                    }`}
-                  >
-                    {row.expired ? "Expired" : "Verified"}
-                  </span>
+                  {row.expired && (
+                    <span className="px-2 py-0.5 rounded-full font-label-sm shrink-0 bg-red-50 text-red-700">
+                      Expired
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

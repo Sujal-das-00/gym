@@ -21,8 +21,8 @@ export default function NotificationCard({ push }) {
           <h2 className="font-headline-sm text-headline-sm text-on-surface">Fee reminders</h2>
           <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
             {push.enabled
-              ? "This device will get a reminder when your dues are pending."
-              : "Get a reminder on this device when your dues are pending."}
+              ? "You’ll be reminded when your fee is due."
+              : "Get a reminder when your fee is due."}
           </p>
         </div>
       </div>
@@ -43,9 +43,6 @@ export default function NotificationCard({ push }) {
           <p className="font-body-sm text-body-sm text-red-700">
             <strong>iPhone:</strong> Settings → Notifications → GymBoo → Allow Notifications.
           </p>
-          <p className="font-body-sm text-body-sm text-red-700/80">
-            Come back to this screen afterwards — the button turns on by itself.
-          </p>
         </div>
       ) : null}
       {push.error && !blocked ? (
@@ -54,7 +51,7 @@ export default function NotificationCard({ push }) {
 
       <button
         className={
-          "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.99] disabled:opacity-60 " +
+          "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.99] disabled:opacity-60 " +
           (push.enabled
             ? "bg-white border border-outline-variant text-on-surface-variant"
             : "bg-primary text-white shadow-sm")
@@ -64,7 +61,7 @@ export default function NotificationCard({ push }) {
         type="button"
       >
         <Icon className="text-[17px]" name={push.enabled ? "notifications_off" : "notifications_active"} />
-        {push.busy ? "Working…" : push.enabled ? "Turn off on this device" : "Turn on notifications"}
+        {push.busy ? "Working…" : push.enabled ? "Turn off" : "Turn on"}
       </button>
     </section>
   );

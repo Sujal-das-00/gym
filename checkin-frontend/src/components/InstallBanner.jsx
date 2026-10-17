@@ -30,19 +30,16 @@ export default function InstallBanner({ gymName, onInstall, platform = "desktop"
   return (
     <div className="w-full rounded-xl bg-white border border-primary/25 shadow-sm overflow-hidden">
       <button
-        className="w-full flex items-center justify-center gap-2 py-2.5 px-3 text-primary text-xs font-bold uppercase tracking-wide active:scale-[0.99] transition-all"
+        className="w-full flex items-center justify-center gap-2 py-2.5 px-3 text-primary text-sm font-semibold active:scale-[0.99] transition-all"
         onClick={handleClick}
         type="button"
       >
         <Icon className="text-[17px]" name="install_mobile" />
-        {gymName ? `Install ${gymName} on your phone` : "Install this app on your phone"}
+        Install app
       </button>
 
       {steps && (
         <div className="px-3 pb-3 pt-1 border-t border-primary/15">
-          <p className="text-xs text-on-surface-variant leading-relaxed">
-            Add it from your browser menu — the icon then opens your gym straight away.
-          </p>
           <ol className="mt-1.5 space-y-1 text-xs text-on-surface-variant list-decimal list-inside">
             {steps.map((step) => (
               <li key={step}>{step}</li>

@@ -32,7 +32,7 @@ export default function MemberPanel({ member, history = [], status, onForget }) 
       </div>
 
       <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 pt-3">Recent check-ins</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 pt-3">Recent visits</h3>
         <span className="text-[11px] font-semibold text-gray-400 pt-3">{visitCount(history.length)}</span>
       </div>
 
@@ -69,7 +69,7 @@ export default function MemberPanel({ member, history = [], status, onForget }) 
         type="button"
       >
         <Icon className="text-[15px]" name="delete_sweep" />
-        Forget saved ID on this phone
+        Not you? Clear saved ID
       </button>
     </div>
   );

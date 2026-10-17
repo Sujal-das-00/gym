@@ -101,7 +101,7 @@ export default function MemberIdCard({ billing, gymName, member }) {
       <div className="flex flex-col space-y-2.5">
         <div className="flex items-center justify-between gap-2 px-1">
           <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-semibold">
-            Membership &amp; plan details
+            Membership
           </span>
           <span
             className={`font-label-sm text-label-sm font-semibold px-2 py-0.5 rounded-full shrink-0 ${

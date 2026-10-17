@@ -31,7 +31,7 @@ export default function DashboardHeader({ gymName, logo, expired, onSignOut, sub
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full ${expired ? "bg-red-500" : "bg-primary animate-pulse"}`}
+              className={`w-2 h-2 rounded-full ${expired ? "bg-red-500" : "bg-primary"}`}
             />
             <span
               className={`font-label-sm text-label-sm font-semibold uppercase tracking-wider ${
