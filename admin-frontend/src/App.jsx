@@ -1,5 +1,5 @@
 import { memo, useRef } from "react";
-import { AppContext, useApp } from "./store/AppContext.jsx";
+import { AppContext, useApp, useShell } from "./store/AppContext.jsx";
 import Toast from "./components/Toast.jsx";
 import MobileAppbar from "./components/MobileAppbar.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -49,8 +49,8 @@ const VIEWS = [
   ["help", HelpView],
 ].map(([name, View]) => [name, memo(View)]);
 
-// Hidden views get a frozen copy of the app context, so a toast, the drawer, a
-// poll or an edit on another screen doesn't re-render all of them (that is what
+// Hidden views get a frozen copy of the app context, so a poll, a dialog or an
+// edit on another screen doesn't re-render all of them (that is what
 // made navigation and typing lag on phones). They catch up when shown again.
 function ViewPanel({ name, View }) {
   const live = useApp();
@@ -79,9 +79,14 @@ function ViewPanel({ name, View }) {
   );
 }
 
-export default function App() {
-  const { drawerOpen, closeDrawer } = useApp();
+function SidebarScrim() {
+  const { closeDrawer } = useApp();
+  const { drawerOpen } = useShell();
+  return <div className="sidebar-scrim" id="sidebarScrim" hidden={!drawerOpen} onClick={closeDrawer}></div>;
+}
 
+// Reads no context itself, so a state change re-renders only the parts that use it.
+export default function App() {
   return (
     <>
       <Toast />
@@ -89,7 +94,7 @@ export default function App() {
       <div className="dashboard-shell">
         <MobileAppbar />
 
-        <div className="sidebar-scrim" id="sidebarScrim" hidden={!drawerOpen} onClick={closeDrawer}></div>
+        <SidebarScrim />
 
         <Sidebar />
 

@@ -3,7 +3,7 @@ import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
-import { currency, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { currency, dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { sendFeeReminder, sendLoginDetails } from "../lib/whatsapp.js";
 
 /** Member profile sheet: status, quick actions, key numbers, attendance and payments. */
@@ -35,7 +35,7 @@ export default function DetailDialog() {
   const current = parseDateKey(attendanceDate || todayKey());
   const year = current.getFullYear();
   const month = current.getMonth();
-  const monthName = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(current);
+  const monthName = dateFormatter({ month: "long" }).format(current);
   const attendance = new Set(member.attendance || []);
   const today = todayKey();
   const cells = Array.from({ length: new Date(year, month + 1, 0).getDate() }, (unused, index) => {

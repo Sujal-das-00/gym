@@ -51,6 +51,17 @@ export function buildLedgerEntries({ members = [], expenses = [], domain }) {
   return sortByDateDesc(entries);
 }
 
+// The Dashboard, Expense Tracker, Insights and day-ledger sheet all read the
+// same ledger; build it once per change to members/expenses/settings and share
+// it. The returned list is shared, so callers must not mutate it.
+let lastLedger = null;
+export function getLedgerEntries({ members = [], expenses = [], domain }) {
+  if (!lastLedger || lastLedger.members !== members || lastLedger.expenses !== expenses || lastLedger.domain !== domain) {
+    lastLedger = { members, expenses, domain, entries: buildLedgerEntries({ members, expenses, domain }) };
+  }
+  return lastLedger.entries;
+}
+
 export function sortByDateDesc(entries) {
   return [...entries].sort((a, b) => b.date.localeCompare(a.date));
 }

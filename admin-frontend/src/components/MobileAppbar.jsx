@@ -1,4 +1,4 @@
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useShell } from "../store/AppContext.jsx";
 import { VIEW_SHORT_TITLE } from "../lib/constants.js";
 import useLicence from "../hooks/useLicence.js";
 import { planNotice } from "../lib/plan.js";
@@ -7,7 +7,8 @@ import Icon from "./Icon.jsx";
 const OWNER_ROLES = ["gym_admin", "super_admin"];
 
 export default function MobileAppbar() {
-  const { activeView, drawerOpen, toggleDrawer, openMemberDialog, setView, user } = useApp();
+  const { activeView, toggleDrawer, openMemberDialog, setView, user } = useApp();
+  const { drawerOpen } = useShell();
   const notice = planNotice(useLicence());
   const canOpenPlan = OWNER_ROLES.includes(user?.role);
 

@@ -2,6 +2,25 @@
 // Every date in this app is a local "YYYY-MM-DD" key, never a UTC timestamp, so
 // that a check-in at 11pm never lands on the next day.
 
+// Building an Intl formatter is far slower than using one, and these run once
+// per list row on every render — so each distinct format is built once.
+const formatters = new Map();
+export function dateFormatter(options) {
+  const key = JSON.stringify(options);
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-IN", options);
+    formatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
 export function localDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -50,7 +69,7 @@ export function addMonths(date, months) {
 }
 
 export function monthLabelFromKey(key) {
-  return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(parseDateKey(key + "-01"));
+  return dateFormatter({ month: "short", year: "numeric" }).format(parseDateKey(key + "-01"));
 }
 
 export function getDefaultHistoryRange() {
@@ -62,39 +81,24 @@ export function getDefaultHistoryRange() {
 }
 
 export function currency(value) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
+  return currencyFormatter.format(Number(value || 0));
 }
 
 export function displayDate(value) {
   if (!value) return "Not set";
   const date = parseDateKey(value);
   if (Number.isNaN(date.getTime())) return "Not set";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return dateFormatter({ day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
 export function timeText(iso) {
-  return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return dateFormatter({ hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
 
 export function todayLabel() {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date());
+  return dateFormatter({ day: "2-digit", month: "short", year: "numeric" }).format(new Date());
 }
 
 export function currentMonthLabel() {
-  return new Intl.DateTimeFormat("en-IN", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+  return dateFormatter({ month: "long", year: "numeric" }).format(new Date());
 }

@@ -3,8 +3,8 @@
  * member payments + attendance and the expense list. Money totals come from
  * the shared ledger so they always agree with the Expense Tracker / Insights.
  * ------------------------------------------------------------------------- */
-import { buildLedgerEntries, summarizeEntries } from "./ledger.js";
-import { localDateKey, monthKey, todayKey } from "./dates.js";
+import { getLedgerEntries, summarizeEntries } from "./ledger.js";
+import { dateFormatter, localDateKey, monthKey, todayKey } from "./dates.js";
 
 function addDays(date, days) {
   const copy = new Date(date);
@@ -30,7 +30,7 @@ export function buildDashboard({ members, expenses, domain, now = new Date() }) 
   const dayOfMonth = now.getDate();
 
   // --- Money -------------------------------------------------------------
-  const ledger = buildLedgerEntries({ members, expenses, domain });
+  const ledger = getLedgerEntries({ members, expenses, domain });
   const monthSummary = summarizeEntries(ledger.filter((entry) => entry.date.startsWith(month)));
   // Compare like with like: this month so far vs last month up to the same day.
   const previousToDate = earnedThrough(ledger, prevMonth, Math.min(dayOfMonth, daysInPrevMonth));
@@ -74,8 +74,8 @@ export function buildDashboard({ members, expenses, domain, now = new Date() }) 
       count: attendanceByDay.get(key) || 0,
       holiday: domain.isHoliday(key),
       isToday: key === today,
-      weekday: new Intl.DateTimeFormat("en-IN", { weekday: "short" }).format(date),
-      label: new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short" }).format(date),
+      weekday: dateFormatter({ weekday: "short" }).format(date),
+      label: dateFormatter({ weekday: "long", day: "numeric", month: "short" }).format(date),
     };
   });
   const weekTotal = week.reduce((sum, day) => sum + day.count, 0);
@@ -97,9 +97,9 @@ export function buildDashboard({ members, expenses, domain, now = new Date() }) 
 
   return {
     month: {
-      name: new Intl.DateTimeFormat("en-IN", { month: "long" }).format(now),
-      prevName: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(prevMonthStart),
-      shortName: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(now),
+      name: dateFormatter({ month: "long" }).format(now),
+      prevName: dateFormatter({ month: "short" }).format(prevMonthStart),
+      shortName: dateFormatter({ month: "short" }).format(now),
       daysInMonth,
       dayOfMonth,
     },

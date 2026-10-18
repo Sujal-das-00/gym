@@ -1,16 +1,86 @@
-import { useEffect, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { displayDate, todayKey } from "../lib/dates.js";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import DayBar from "../components/DayBar.jsx";
+import useProgressiveList from "../hooks/useProgressiveList.js";
 
 const CHIPS = [
   { key: "all", label: "All" },
   { key: "pending", label: "Not in" },
   { key: "in", label: "Checked in" },
 ];
+
+// Memoised: checking one member in re-renders that row only, not the sheet.
+const AttendanceRow = memo(function AttendanceRow({
+  member,
+  present,
+  expired,
+  confirming,
+  selectedDate,
+  setMemberAttendanceStatus,
+  setPendingAttendanceRemovalId,
+}) {
+  return (
+    <li>
+      <div className={"contact-row is-static " + (present && !expired ? "is-paid" : "is-pending")}>
+        <span className="contact-avatar">
+          <Photo person={member} />
+        </span>
+        <span className="contact-copy">
+          <strong>
+            <span className="contact-name">{member.name}</span>
+            {expired ? <em className="contact-tag warn">Expired</em> : null}
+          </strong>
+          <small>{expired ? "Membership expired · collect renewal" : member.phone}</small>
+        </span>
+        <span className="contact-state">
+          {present ? (
+            confirming ? (
+              <span className="att-confirm" role="group" aria-label={`Confirm attendance correction for ${member.name}`}>
+                <button
+                  type="button"
+                  className="att-btn danger"
+                  onClick={() => setMemberAttendanceStatus(member.id, selectedDate, false)}
+                >
+                  Mark absent
+                </button>
+                <button
+                  type="button"
+                  className="att-btn icon"
+                  aria-label="Keep checked in"
+                  onClick={() => setPendingAttendanceRemovalId("")}
+                >
+                  <Icon name="close" />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="att-btn in"
+                aria-label={`${member.name} is checked in. Tap to correct.`}
+                onClick={() => setPendingAttendanceRemovalId(member.id)}
+              >
+                <Icon name="check" />
+                In
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              className="att-btn"
+              onClick={() => setMemberAttendanceStatus(member.id, selectedDate, true)}
+            >
+              Check in
+            </button>
+          )}
+        </span>
+      </div>
+    </li>
+  );
+});
 
 export default function AttendanceView() {
   const {
@@ -44,22 +114,42 @@ export default function AttendanceView() {
     setPendingAttendanceRemovalId("");
   };
 
-  const rows = members.map((member) => {
-    const present = domain.hasAttendance(member, selectedDate);
-    return { member, present, expired: present && (member.expiredCheckins || []).includes(selectedDate) };
-  });
+  // Typing stays instant: the list filters against the deferred query.
+  const query = useDeferredValue(search).trim().toLowerCase();
+
+  const rows = useMemo(
+    () =>
+      members.map((member) => {
+        const present = domain.hasAttendance(member, selectedDate);
+        return { member, present, expired: present && (member.expiredCheckins || []).includes(selectedDate) };
+      }),
+    [members, domain, selectedDate],
+  );
   const presentCount = rows.filter((row) => row.present).length;
   const counts = { all: rows.length, pending: rows.length - presentCount, in: presentCount };
 
-  const query = search.trim().toLowerCase();
-  const visible = rows
-    .filter((row) => filter === "all" || (filter === "in") === row.present)
-    .filter((row) => [row.member.name, row.member.phone].some((value) => String(value || "").toLowerCase().includes(query)))
-    .sort((a, b) => Number(a.present) - Number(b.present) || a.member.name.localeCompare(b.member.name));
+  const visible = useMemo(
+    () =>
+      rows
+        .filter((row) => filter === "all" || (filter === "in") === row.present)
+        .filter((row) =>
+          [row.member.name, row.member.phone].some((value) => String(value || "").toLowerCase().includes(query)),
+        )
+        .sort((a, b) => Number(a.present) - Number(b.present) || a.member.name.localeCompare(b.member.name)),
+    [rows, filter, query],
+  );
 
+  // Group headers count every match; the rows themselves stream in.
+  const shown = useProgressiveList(visible);
+  const visiblePresent = visible.filter((row) => row.present).length;
   const groups = [
-    { key: "pending", label: "Not checked in", rows: visible.filter((row) => !row.present) },
-    { key: "in", label: "Checked in", rows: visible.filter((row) => row.present) },
+    {
+      key: "pending",
+      label: "Not checked in",
+      count: visible.length - visiblePresent,
+      rows: shown.filter((row) => !row.present),
+    },
+    { key: "in", label: "Checked in", count: visiblePresent, rows: shown.filter((row) => row.present) },
   ].filter((group) => group.rows.length);
 
   const reason = domain.holidayReason(selectedDate);
@@ -128,69 +218,21 @@ export default function AttendanceView() {
         <section className="contact-group" key={group.key} aria-label={group.label}>
           <h3 className="contact-group-title">
             {group.label}
-            <span>{group.rows.length}</span>
+            <span>{group.count}</span>
           </h3>
           <ul className="contact-list" id={group.key === "pending" ? "attendanceList" : undefined}>
-            {group.rows.map(({ member, present, expired }) => {
-              const confirming = pendingAttendanceRemovalId === member.id && present;
-              return (
-                <li key={member.id}>
-                  <div className={"contact-row is-static " + (present && !expired ? "is-paid" : "is-pending")}>
-                    <span className="contact-avatar">
-                      <Photo person={member} />
-                    </span>
-                    <span className="contact-copy">
-                      <strong>
-                        <span className="contact-name">{member.name}</span>
-                        {expired ? <em className="contact-tag warn">Expired</em> : null}
-                      </strong>
-                      <small>{expired ? "Membership expired · collect renewal" : member.phone}</small>
-                    </span>
-                    <span className="contact-state">
-                      {present ? (
-                        confirming ? (
-                          <span className="att-confirm" role="group" aria-label={`Confirm attendance correction for ${member.name}`}>
-                            <button
-                              type="button"
-                              className="att-btn danger"
-                              onClick={() => setMemberAttendanceStatus(member.id, selectedDate, false)}
-                            >
-                              Mark absent
-                            </button>
-                            <button
-                              type="button"
-                              className="att-btn icon"
-                              aria-label="Keep checked in"
-                              onClick={() => setPendingAttendanceRemovalId("")}
-                            >
-                              <Icon name="close" />
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="att-btn in"
-                            aria-label={`${member.name} is checked in. Tap to correct.`}
-                            onClick={() => setPendingAttendanceRemovalId(member.id)}
-                          >
-                            <Icon name="check" />
-                            In
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          type="button"
-                          className="att-btn"
-                          onClick={() => setMemberAttendanceStatus(member.id, selectedDate, true)}
-                        >
-                          Check in
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
+            {group.rows.map(({ member, present, expired }) => (
+              <AttendanceRow
+                key={member.id}
+                member={member}
+                present={present}
+                expired={expired}
+                confirming={pendingAttendanceRemovalId === member.id && present}
+                selectedDate={selectedDate}
+                setMemberAttendanceStatus={setMemberAttendanceStatus}
+                setPendingAttendanceRemovalId={setPendingAttendanceRemovalId}
+              />
+            ))}
           </ul>
         </section>
       ))}

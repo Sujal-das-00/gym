@@ -6,7 +6,7 @@
  * { start, end } pair of local date keys, so everything downstream only ever
  * deals with two dates.
  * ------------------------------------------------------------------------- */
-import { displayDate, localDateKey, parseDateKey, todayKey } from "./dates.js";
+import { dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "./dates.js";
 
 export const PERIOD_MODES = [
   { value: "month", label: "Month" },
@@ -16,7 +16,7 @@ export const PERIOD_MODES = [
 
 export const MONTH_OPTIONS = Array.from({ length: 12 }, (unused, index) => ({
   value: String(index + 1).padStart(2, "0"),
-  label: new Intl.DateTimeFormat("en-IN", { month: "long" }).format(new Date(2000, index, 1)),
+  label: dateFormatter({ month: "long" }).format(new Date(2000, index, 1)),
 }));
 
 /** Last day of the given year/month, so February and 31-day months both work. */
@@ -62,6 +62,6 @@ export function availableYears(entries = []) {
 export function dayLabel(dateKey) {
   const date = parseDateKey(dateKey);
   if (Number.isNaN(date.getTime())) return dateKey;
-  const weekday = new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(date);
+  const weekday = dateFormatter({ weekday: "long" }).format(date);
   return `${weekday}, ${displayDate(dateKey)}`;
 }

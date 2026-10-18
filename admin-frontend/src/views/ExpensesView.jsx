@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { CATEGORY_ICONS, EXPENSE_CATEGORIES } from "../lib/constants.js";
-import { currency, displayDate, getDefaultHistoryRange, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { currency, dateFormatter, displayDate, getDefaultHistoryRange, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { downloadCsv } from "../lib/csv.js";
-import { buildLedgerEntries, filterEntriesByDate, groupEntriesByDay } from "../lib/ledger.js";
+import { getLedgerEntries, filterEntriesByDate, groupEntriesByDay } from "../lib/ledger.js";
 import Icon from "../components/Icon.jsx";
 
 const TYPE_CHIPS = [
@@ -18,7 +18,7 @@ function dayTitle(key) {
   yesterday.setDate(yesterday.getDate() - 1);
   if (key === today) return "Today";
   if (key === localDateKey(yesterday)) return "Yesterday";
-  return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short" }).format(parseDateKey(key));
+  return dateFormatter({ weekday: "short", day: "numeric", month: "short" }).format(parseDateKey(key));
 }
 
 const signed = (amount) => (amount < 0 ? "−" : "+") + currency(Math.abs(amount));
@@ -36,7 +36,7 @@ export default function ExpensesView() {
 
   // Shared with the Detailed Insights screen (lib/ledger.js) so both always
   // report the same totals from the same records.
-  const entries = filterEntriesByDate(buildLedgerEntries({ members, expenses, domain }), startDate, endDate);
+  const entries = filterEntriesByDate(getLedgerEntries({ members, expenses, domain }), startDate, endDate);
   const earnings = entries.filter((entry) => entry.type === "earning");
   const spending = entries.filter((entry) => entry.type === "expense");
   const earnedTotal = earnings.reduce((sum, entry) => sum + entry.amount, 0);

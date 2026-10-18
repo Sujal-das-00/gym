@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import { currency } from "../lib/dates.js";
 import { CATEGORY_ICONS } from "../lib/constants.js";
-import { buildLedgerEntries, filterEntriesByDate, summarizeEntries } from "../lib/ledger.js";
+import { getLedgerEntries, filterEntriesByDate, summarizeEntries } from "../lib/ledger.js";
 import { dayLabel } from "../lib/period.js";
 import Icon from "../components/Icon.jsx";
 
@@ -18,7 +18,7 @@ export default function DayLedgerDialog() {
 
   const entries = useMemo(() => {
     if (!dayLedgerDate) return [];
-    return filterEntriesByDate(buildLedgerEntries({ members, expenses, domain }), dayLedgerDate, dayLedgerDate);
+    return filterEntriesByDate(getLedgerEntries({ members, expenses, domain }), dayLedgerDate, dayLedgerDate);
   }, [dayLedgerDate, members, expenses, domain]);
 
   const totals = summarizeEntries(entries);

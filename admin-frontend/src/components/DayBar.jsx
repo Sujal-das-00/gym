@@ -1,4 +1,4 @@
-import { displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import Icon from "./Icon.jsx";
 
 export function shiftDay(key, delta) {
@@ -12,7 +12,7 @@ function dayHeading(key) {
   if (key === today) return "Today";
   if (key === shiftDay(today, -1)) return "Yesterday";
   if (key === shiftDay(today, 1)) return "Tomorrow";
-  return new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(parseDateKey(key));
+  return dateFormatter({ weekday: "long" }).format(parseDateKey(key));
 }
 
 /** ‹ Today · 18 Oct 2026 › — step a day either way, or tap the middle to pick a date. */

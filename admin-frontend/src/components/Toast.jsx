@@ -1,7 +1,7 @@
-import { useApp } from "../store/AppContext.jsx";
+import { useShell } from "../store/AppContext.jsx";
 
 export default function Toast() {
-  const { toast } = useApp();
+  const { toast } = useShell();
   return (
     <div className={"toast" + (toast ? " show" : "")} id="toast" role="status" aria-live="polite">
       {toast}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppContext } from "./AppContext.jsx";
+import { AppContext, ShellContext } from "./AppContext.jsx";
 import { api, clearToken, fetchMe, jsonRequest, logout as apiLogout, setApiContext } from "../lib/api.js";
 import { ACTIVE_GYM_KEY, DEFAULT_SETTINGS, VIEW_COPY } from "../lib/constants.js";
 import { localDateKey, monthKey, todayKey } from "../lib/dates.js";
@@ -140,6 +140,19 @@ export function AppProvider({ children }) {
     // Instant: a smooth scroll fights the view-enter animation and the drawer slide.
     window.scrollTo(0, 0);
   }, []);
+
+  /* ---- Dialog openers (stable, so memoised rows don't re-render) ---------- */
+  const openMemberDialog = useCallback((member = null) => setMemberDialog({ open: true, member }), []);
+  const closeMemberDialog = useCallback(() => setMemberDialog(CLOSED_MEMBER_DIALOG), []);
+  const openTrainerDialog = useCallback((trainer = null) => setTrainerDialog({ open: true, trainer }), []);
+  const closeTrainerDialog = useCallback(() => setTrainerDialog(CLOSED_TRAINER_DIALOG), []);
+  const openExpenseDialog = useCallback((expense = null) => setExpenseDialog({ open: true, expense }), []);
+  const closeExpenseDialog = useCallback(() => setExpenseDialog(CLOSED_EXPENSE_DIALOG), []);
+  const openDetail = useCallback((memberId) => setDetailMemberId(memberId), []);
+  const closeDetail = useCallback(() => setDetailMemberId(""), []);
+  const openDayLedger = useCallback((date) => setDayLedgerDate(date), []);
+  const closeDayLedger = useCallback(() => setDayLedgerDate(""), []);
+  const nextGymId = useCallback(() => generateGymId(membersRef.current), []);
 
   /* ---- Loading + one-time record migrations ----------------------------- */
   const persistAllMembers = useCallback(async (rows) => {
@@ -518,84 +531,154 @@ export function AppProvider({ children }) {
     );
   }, []);
 
-  const value = {
-    // auth
-    user,
-    gymId,
-    gyms,
-    authChecked,
-    applyAuthedUser,
-    selectGym,
-    loadGyms,
-    logout,
-    signOut,
-    gymsDialogOpen,
-    setGymsDialogOpen,
-    staffDialogOpen,
-    setStaffDialogOpen,
-    // data
-    members,
-    trainers,
-    expenses,
-    settings,
-    setSettings,
-    settingsRevision,
-    dataReady,
-    domain,
-    generateGymId: () => generateGymId(membersRef.current),
-    // views
-    activeView,
-    setView,
-    drawerOpen,
-    toggleDrawer,
-    closeDrawer,
-    toast,
-    showToast,
-    // shared selections
-    attendanceDate,
-    setAttendanceDate,
-    trainerAttendanceDate,
-    setTrainerAttendanceDate,
-    pendingAttendanceRemovalId,
-    setPendingAttendanceRemovalId,
-    selectedHistoryMemberId,
-    setSelectedHistoryMemberId,
-    selectedPaymentMemberId,
-    setSelectedPaymentMemberId,
-    // dialogs
-    memberDialog,
-    openMemberDialog: (member = null) => setMemberDialog({ open: true, member }),
-    closeMemberDialog: () => setMemberDialog(CLOSED_MEMBER_DIALOG),
-    trainerDialog,
-    openTrainerDialog: (trainer = null) => setTrainerDialog({ open: true, trainer }),
-    closeTrainerDialog: () => setTrainerDialog(CLOSED_TRAINER_DIALOG),
-    expenseDialog,
-    openExpenseDialog: (expense = null) => setExpenseDialog({ open: true, expense }),
-    closeExpenseDialog: () => setExpenseDialog(CLOSED_EXPENSE_DIALOG),
-    feeDialog,
-    openFeeDialog,
-    closeFeeDialog,
-    setSelectedBillingPeriods,
-    detailMemberId,
-    openDetail: (memberId) => setDetailMemberId(memberId),
-    closeDetail: () => setDetailMemberId(""),
-    dayLedgerDate,
-    openDayLedger: (date) => setDayLedgerDate(date),
-    closeDayLedger: () => setDayLedgerDate(""),
-    // actions
-    saveMember,
-    deleteMember,
-    setMemberAttendanceStatus,
-    collectFees,
-    saveExpense,
-    deleteExpense,
-    saveSettings,
-    saveTrainer,
-    deleteTrainer,
-    setTrainerAttendanceStatus,
-    refreshAttendanceStatus,
-    findLocalMemberByQr,
-  };
+  // Memoised so the tree only re-renders when something it reads has changed —
+  // a fresh object every render re-rendered every screen and dialog each time.
+  const value = useMemo(
+    () => ({
+      // auth
+      user,
+      gymId,
+      gyms,
+      authChecked,
+      applyAuthedUser,
+      selectGym,
+      loadGyms,
+      logout,
+      signOut,
+      gymsDialogOpen,
+      setGymsDialogOpen,
+      staffDialogOpen,
+      setStaffDialogOpen,
+      // data
+      members,
+      trainers,
+      expenses,
+      settings,
+      setSettings,
+      settingsRevision,
+      dataReady,
+      domain,
+      generateGymId: nextGymId,
+      // views (toast text and drawer state are in ShellContext)
+      activeView,
+      setView,
+      toggleDrawer,
+      closeDrawer,
+      showToast,
+      // shared selections
+      attendanceDate,
+      setAttendanceDate,
+      trainerAttendanceDate,
+      setTrainerAttendanceDate,
+      pendingAttendanceRemovalId,
+      setPendingAttendanceRemovalId,
+      selectedHistoryMemberId,
+      setSelectedHistoryMemberId,
+      selectedPaymentMemberId,
+      setSelectedPaymentMemberId,
+      // dialogs
+      memberDialog,
+      openMemberDialog,
+      closeMemberDialog,
+      trainerDialog,
+      openTrainerDialog,
+      closeTrainerDialog,
+      expenseDialog,
+      openExpenseDialog,
+      closeExpenseDialog,
+      feeDialog,
+      openFeeDialog,
+      closeFeeDialog,
+      setSelectedBillingPeriods,
+      detailMemberId,
+      openDetail,
+      closeDetail,
+      dayLedgerDate,
+      openDayLedger,
+      closeDayLedger,
+      // actions
+      saveMember,
+      deleteMember,
+      setMemberAttendanceStatus,
+      collectFees,
+      saveExpense,
+      deleteExpense,
+      saveSettings,
+      saveTrainer,
+      deleteTrainer,
+      setTrainerAttendanceStatus,
+      refreshAttendanceStatus,
+      findLocalMemberByQr,
+    }),
+    [
+      user,
+      gymId,
+      gyms,
+      authChecked,
+      applyAuthedUser,
+      selectGym,
+      loadGyms,
+      logout,
+      signOut,
+      gymsDialogOpen,
+      staffDialogOpen,
+      members,
+      trainers,
+      expenses,
+      settings,
+      settingsRevision,
+      dataReady,
+      domain,
+      nextGymId,
+      activeView,
+      setView,
+      toggleDrawer,
+      closeDrawer,
+      showToast,
+      attendanceDate,
+      trainerAttendanceDate,
+      pendingAttendanceRemovalId,
+      selectedHistoryMemberId,
+      selectedPaymentMemberId,
+      memberDialog,
+      openMemberDialog,
+      closeMemberDialog,
+      trainerDialog,
+      openTrainerDialog,
+      closeTrainerDialog,
+      expenseDialog,
+      openExpenseDialog,
+      closeExpenseDialog,
+      feeDialog,
+      openFeeDialog,
+      closeFeeDialog,
+      setSelectedBillingPeriods,
+      detailMemberId,
+      openDetail,
+      closeDetail,
+      dayLedgerDate,
+      openDayLedger,
+      closeDayLedger,
+      saveMember,
+      deleteMember,
+      setMemberAttendanceStatus,
+      collectFees,
+      saveExpense,
+      deleteExpense,
+      saveSettings,
+      saveTrainer,
+      deleteTrainer,
+      setTrainerAttendanceStatus,
+      refreshAttendanceStatus,
+      findLocalMemberByQr,
+    ],
+  );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  const shell = useMemo(() => ({ toast, drawerOpen }), [toast, drawerOpen]);
+
+  return (
+    <AppContext.Provider value={value}>
+      <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+    </AppContext.Provider>
+  );
 }

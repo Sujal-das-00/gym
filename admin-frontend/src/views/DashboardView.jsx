@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext.jsx";
 import Icon from "../components/Icon.jsx";
 import Photo from "../components/Photo.jsx";
 import { buildDashboard } from "../lib/dashboard.js";
-import { currency, displayDate } from "../lib/dates.js";
+import { currency, dateFormatter, displayDate } from "../lib/dates.js";
 import { getInitials } from "../lib/format.js";
 
 const ATTENTION_LIMIT = 4;
@@ -33,7 +33,7 @@ function Delta({ value, suffix }) {
 function Hero({ data, settings }) {
   const now = new Date();
   const name = settings.gymName || "Your gym";
-  const dateLabel = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short" }).format(now);
+  const dateLabel = dateFormatter({ weekday: "long", day: "numeric", month: "short" }).format(now);
   const { money, month, members } = data;
 
   return (

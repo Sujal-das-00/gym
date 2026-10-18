@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { currency, monthKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { currency, dateFormatter, monthKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { downloadCsv } from "../lib/csv.js";
 import {
-  buildLedgerEntries,
+  getLedgerEntries,
   filterEntriesByDate,
   groupEntriesByCategory,
   groupEntriesByDay,
@@ -39,8 +39,8 @@ function BreakdownRow({ row, tone }) {
   );
 }
 
-const weekdayOf = (key) => new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(parseDateKey(key));
-const monthShortOf = (key) => new Intl.DateTimeFormat("en-IN", { month: "short" }).format(parseDateKey(key));
+const weekdayOf = (key) => dateFormatter({ weekday: "long" }).format(parseDateKey(key));
+const monthShortOf = (key) => dateFormatter({ month: "short" }).format(parseDateKey(key));
 const signed = (amount) => (amount < 0 ? "−" : "+") + currency(Math.abs(amount));
 
 export default function InsightsView() {
@@ -55,7 +55,7 @@ export default function InsightsView() {
   // The full ledger is rebuilt only when the underlying records change; the
   // period picker then just slices it.
   const allEntries = useMemo(
-    () => buildLedgerEntries({ members, expenses, domain }),
+    () => getLedgerEntries({ members, expenses, domain }),
     [members, expenses, domain],
   );
 

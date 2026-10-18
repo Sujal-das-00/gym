@@ -419,11 +419,12 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 
 .view.active {
   display: block;
-  animation: viewEnter 340ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Short on purpose: a long slide on every tab change reads as the app lagging. */
+  animation: viewEnter 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 @keyframes viewEnter {
-  from { opacity: 0; transform: translateX(22px); }
+  from { opacity: 0; transform: translateX(12px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
@@ -3259,6 +3260,14 @@ button.is-busy::before {
 .contact-go { color: var(--muted); font-size: 20px; vertical-align: 0; }
 .contact-empty, .contact-more { margin: 4px; color: var(--muted); font-size: 0.86rem; text-align: center; }
 .contact-empty { padding: 32px 16px; border: 1.5px dashed var(--line); border-radius: 16px; }
+
+/* Phones: let the browser skip layout and paint for rows scrolled out of view,
+   so a long member list scrolls and filters smoothly. `auto` remembers each
+   row's real height once seen. Not on desktop, where rows are shadowed cards
+   and the paint containment this implies would clip their shadows. */
+@media (max-width: 900px) {
+  .contact-list > li { content-visibility: auto; contain-intrinsic-size: auto 71px; }
+}
 
 @media (min-width: 901px) {
   .summary-pair { grid-template-columns: repeat(2, minmax(0, 280px)); }

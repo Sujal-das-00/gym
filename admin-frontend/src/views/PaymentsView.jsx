@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { currency, displayDate, monthKey } from "../lib/dates.js";
+import { currency, displayDate, monthKey, todayKey } from "../lib/dates.js";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 
@@ -19,6 +19,46 @@ function statusOf(domain, member) {
   return "pending";
 }
 
+// Memoised: recording one payment re-renders that row only.
+const PaymentRow = memo(function PaymentRow({ row, hasRange, domain, openFeeDialog }) {
+  return (
+    <li>
+      <button type="button" className={"contact-row is-" + row.status} onClick={() => openFeeDialog(row.member.id)}>
+        <span className="contact-avatar">
+          <Photo person={row.member} />
+        </span>
+        <span className="contact-copy">
+          <strong>{row.member.name}</strong>
+          <small>
+            {hasRange
+              ? `${row.paymentCount} payment${row.paymentCount === 1 ? "" : "s"} · ${currency(row.collected)}`
+              : [row.member.phone, domain.getMembershipLabel(row.member)].filter(Boolean).join(" · ")}
+          </small>
+        </span>
+        <span className="contact-state">
+          {row.status === "overdue" ? (
+            <>
+              <strong>{currency(row.overdueAmount)}</strong>
+              <small>{row.duePeriods} due</small>
+            </>
+          ) : row.status === "paid" ? (
+            <>
+              <strong>Paid</strong>
+              <small>Next {displayDate(row.dueDate).slice(0, 6)}</small>
+            </>
+          ) : (
+            <>
+              <strong>{currency(row.member.fee)}</strong>
+              <small>Due {displayDate(row.dueDate).slice(0, 6)}</small>
+            </>
+          )}
+        </span>
+        <Icon name="chevron_right" className="contact-go" />
+      </button>
+    </li>
+  );
+});
+
 export default function PaymentsView() {
   const { members, domain, openFeeDialog } = useApp();
   const [search, setSearch] = useState("");
@@ -28,29 +68,35 @@ export default function PaymentsView() {
   const [showDates, setShowDates] = useState(false);
   const hasRange = Boolean(startDate || endDate);
 
-  const inRange = (payment) => {
-    const day = String(payment.date || "").slice(0, 10);
-    if (hasRange) {
-      if (startDate && day < startDate) return false;
-      if (endDate && day > endDate) return false;
-      return true;
-    }
-    return day.startsWith(monthKey());
-  };
-
-  const rows = members.map((member) => {
-    const status = statusOf(domain, member);
-    const payments = (member.payments || []).filter(inRange);
-    return {
-      member,
-      status,
-      collected: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-      paymentCount: payments.length,
-      overdueAmount: status === "overdue" ? domain.getOverdueAmount(member) : 0,
-      duePeriods: status === "overdue" ? domain.getDueUnpaidPeriods(member).length : 0,
-      dueDate: domain.getDueDateKey(member),
+  // Statuses and "this month" depend on the date, so rows also refresh at midnight.
+  const today = todayKey();
+  const rows = useMemo(() => {
+    const month = monthKey();
+    const inRange = (payment) => {
+      const day = String(payment.date || "").slice(0, 10);
+      if (hasRange) {
+        if (startDate && day < startDate) return false;
+        if (endDate && day > endDate) return false;
+        return true;
+      }
+      return day.startsWith(month);
     };
-  });
+    return members.map((member) => {
+      const status = statusOf(domain, member);
+      const payments = (member.payments || []).filter(inRange);
+      return {
+        member,
+        status,
+        collected: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+        paymentCount: payments.length,
+        overdueAmount: status === "overdue" ? domain.getOverdueAmount(member) : 0,
+        duePeriods: status === "overdue" ? domain.getDueUnpaidPeriods(member).length : 0,
+        dueDate: domain.getDueDateKey(member),
+      };
+    });
+    // `today` is a dependency only so the rows roll over with the date.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, domain, hasRange, startDate, endDate, today]);
 
   const counts = { all: rows.length, overdue: 0, pending: 0, paid: 0 };
   let collected = 0;
@@ -61,17 +107,22 @@ export default function PaymentsView() {
     outstanding += row.overdueAmount;
   });
 
-  const query = search.trim().toLowerCase();
-  const filtered = rows
-    .filter((row) => statusFilter === "all" || row.status === statusFilter)
-    .filter((row) =>
-      [row.member.name, row.member.phone].some((value) =>
-        String(value || "")
-          .toLowerCase()
-          .includes(query),
-      ),
-    )
-    .sort((a, b) => b.overdueAmount - a.overdueAmount || a.member.name.localeCompare(b.member.name));
+  // Typing stays instant: the list filters against the deferred query.
+  const query = useDeferredValue(search).trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      rows
+        .filter((row) => statusFilter === "all" || row.status === statusFilter)
+        .filter((row) =>
+          [row.member.name, row.member.phone].some((value) =>
+            String(value || "")
+              .toLowerCase()
+              .includes(query),
+          ),
+        )
+        .sort((a, b) => b.overdueAmount - a.overdueAmount || a.member.name.localeCompare(b.member.name)),
+    [rows, statusFilter, query],
+  );
   const visible = filtered.slice(0, VISIBLE_LIMIT);
   const groups = GROUPS.map((group) => ({ ...group, rows: visible.filter((row) => row.status === group.key) })).filter(
     (group) => group.rows.length,
@@ -174,44 +225,13 @@ export default function PaymentsView() {
             </h3>
             <ul className="contact-list">
               {group.rows.map((row) => (
-                <li key={row.member.id}>
-                  <button
-                    type="button"
-                    className={"contact-row is-" + row.status}
-                    onClick={() => openFeeDialog(row.member.id)}
-                  >
-                    <span className="contact-avatar">
-                      <Photo person={row.member} />
-                    </span>
-                    <span className="contact-copy">
-                      <strong>{row.member.name}</strong>
-                      <small>
-                        {hasRange
-                          ? `${row.paymentCount} payment${row.paymentCount === 1 ? "" : "s"} · ${currency(row.collected)}`
-                          : [row.member.phone, domain.getMembershipLabel(row.member)].filter(Boolean).join(" · ")}
-                      </small>
-                    </span>
-                    <span className="contact-state">
-                      {row.status === "overdue" ? (
-                        <>
-                          <strong>{currency(row.overdueAmount)}</strong>
-                          <small>{row.duePeriods} due</small>
-                        </>
-                      ) : row.status === "paid" ? (
-                        <>
-                          <strong>Paid</strong>
-                          <small>Next {displayDate(row.dueDate).slice(0, 6)}</small>
-                        </>
-                      ) : (
-                        <>
-                          <strong>{currency(row.member.fee)}</strong>
-                          <small>Due {displayDate(row.dueDate).slice(0, 6)}</small>
-                        </>
-                      )}
-                    </span>
-                    <Icon name="chevron_right" className="contact-go" />
-                  </button>
-                </li>
+                <PaymentRow
+                  key={row.member.id}
+                  row={row}
+                  hasRange={hasRange}
+                  domain={domain}
+                  openFeeDialog={openFeeDialog}
+                />
               ))}
             </ul>
           </section>

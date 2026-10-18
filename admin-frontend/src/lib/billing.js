@@ -9,6 +9,7 @@
  * ------------------------------------------------------------------------- */
 import {
   addMonths,
+  dateFormatter,
   displayDate,
   localDateKey,
   monthKey,
@@ -41,7 +42,7 @@ export function holidayReason(settings, dayKey) {
   if (getHolidayDates(settings).includes(key)) return "marked as a holiday in Settings";
   const date = parseDateKey(key);
   if (getWeeklyHolidays(settings).includes(date.getDay())) {
-    const weekday = new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(date);
+    const weekday = dateFormatter({ weekday: "long" }).format(date);
     return `every ${weekday} is a weekly holiday in Settings`;
   }
   return "";
@@ -309,11 +310,45 @@ export function paymentModeLabel(value) {
  * can use the original, settings-free signatures.
  */
 export function createDomain(settings) {
+  // A member's billing schedule only changes with settings (fixed for this
+  // domain), the member record (replaced, never mutated, on every edit) or the
+  // date. So each answer is worked out once per member per day and shared by
+  // every list row, filter count and dialog that asks — rather than walking the
+  // whole period history again for each of them on every render.
+  // Cached arrays and sets are shared: callers must copy before changing them.
+  let cacheDay = "";
+  let cache = new WeakMap();
+  const perMember = (compute) => {
+    const slot = Symbol();
+    return (member) => {
+      if (!member || typeof member !== "object") return compute(settings, member);
+      const today = todayKey();
+      if (today !== cacheDay) {
+        cacheDay = today;
+        cache = new WeakMap();
+      }
+      let entry = cache.get(member);
+      if (!entry) {
+        entry = {};
+        cache.set(member, entry);
+      }
+      if (!(slot in entry)) entry[slot] = compute(settings, member);
+      return entry[slot];
+    };
+  };
+
+  const holidayDates = new Set(getHolidayDates(settings));
+  const weeklyHolidays = new Set(getWeeklyHolidays(settings));
+
   return {
     settings,
     getWeeklyHolidays: () => getWeeklyHolidays(settings),
     getHolidayDates: () => getHolidayDates(settings),
-    isHoliday: (dayKey) => isHoliday(settings, dayKey),
+    // Same rule as isHoliday(), with the settings lists parsed once.
+    isHoliday: (dayKey) => {
+      const key = String(dayKey || "").slice(0, 10);
+      return holidayDates.has(key) || weeklyHolidays.has(parseDateKey(key).getDay());
+    },
     holidayReason: (dayKey) => holidayReason(settings, dayKey),
     getBillingCycleMode: () => getBillingCycleMode(settings),
     getBillingCycleDays: () => getBillingCycleDays(settings),
@@ -325,22 +360,23 @@ export function createDomain(settings) {
     getBillingAmountLabel,
     getPeriodUnitLabel,
     getBillingPeriodLabel: (periodKey, member = null) => getBillingPeriodLabel(settings, periodKey, member),
-    getBillingPeriodKeys: (member) => getBillingPeriodKeys(settings, member),
+    getBillingPeriodKeys: perMember(getBillingPeriodKeys),
     getPaymentPeriodKey,
     isAdmissionPayment,
     getPaymentLabel: (payment, member = null) => getPaymentLabel(settings, payment, member),
-    getPaidPeriodSet,
-    getBillablePeriodKeys: (member) => getBillablePeriodKeys(settings, member),
-    getUnpaidPeriods: (member) => getUnpaidPeriods(settings, member),
+    getPaidPeriodSet: perMember((unused, member) => getPaidPeriodSet(member)),
+    getBillablePeriodKeys: perMember(getBillablePeriodKeys),
+    getUnpaidPeriods: perMember(getUnpaidPeriods),
     periodStartDate,
     periodEndDate: (member, periodKey) => periodEndDate(settings, member, periodKey),
     nextPeriodStartDate: (member) => nextPeriodStartDate(settings, member),
+    // A Date is mutable, so it is rebuilt each call; the key form is cached.
     getDueDate: (member) => getDueDate(settings, member),
-    getDueDateKey: (member) => getDueDateKey(settings, member),
-    isPaidThisPeriod: (member) => isPaidThisPeriod(settings, member),
-    getDueUnpaidPeriods: (member) => getDueUnpaidPeriods(settings, member),
-    getOverdueAmount: (member) => getOverdueAmount(settings, member),
-    isOverdue: (member) => isOverdue(settings, member),
+    getDueDateKey: perMember(getDueDateKey),
+    isPaidThisPeriod: perMember(isPaidThisPeriod),
+    getDueUnpaidPeriods: perMember(getDueUnpaidPeriods),
+    getOverdueAmount: perMember(getOverdueAmount),
+    isOverdue: perMember(isOverdue),
     isPresentToday,
     getMonthlyAttendance,
     hasAttendance,
