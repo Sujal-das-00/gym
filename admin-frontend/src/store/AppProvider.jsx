@@ -137,8 +137,10 @@ export function AppProvider({ children }) {
     setActiveViewState(VIEW_COPY[view] ? view : "dashboard");
     setDayLedgerDate("");
     setDrawerOpen(false);
-    // Instant: a smooth scroll fights the view-enter animation and the drawer slide.
-    window.scrollTo(0, 0);
+    // Instant: a smooth scroll fights the view switch and the drawer slide. The
+    // explicit behavior matters — `html { scroll-behavior: smooth }` would
+    // otherwise turn a bare scrollTo(0, 0) into an animated scroll.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, []);
 
   /* ---- Dialog openers (stable, so memoised rows don't re-render) ---------- */

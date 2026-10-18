@@ -410,6 +410,10 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 
 .main-content {
   min-width: 0;
+  /* Nothing in a view may widen the page: on phones a few px of sideways
+     overflow makes the WebView rescale, which reads as the whole UI squeezing.
+     `clip` (unlike `hidden`) doesn't create a scroll box, so sticky still works. */
+  overflow-x: clip;
   padding: 24px 28px 34px;
 }
 
@@ -419,13 +423,13 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
 
 .view.active {
   display: block;
-  /* Short on purpose: a long slide on every tab change reads as the app lagging. */
-  animation: viewEnter 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Fade only — a sideways slide pushed content past the screen edge. */
+  animation: viewEnter 160ms ease-out;
 }
 
 @keyframes viewEnter {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Native-style press feedback on tappable surfaces */
@@ -1445,28 +1449,31 @@ input.has-error:focus, textarea.has-error:focus, select.has-error:focus { border
     padding: calc(64px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
     border-radius: 0 18px 18px 0;
     transform: translateX(-100%);
-    /* Hidden once closed: no sub-pixel sliver at the edge, no focus on off-screen links. */
+    /* Hidden once closed: no sub-pixel sliver at the edge, no focus on off-screen
+       links — and no shadow bleeding onto the page, since visibility hides it too. */
     visibility: hidden;
-    transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 340ms ease, visibility 0s linear 340ms;
+    /* The shadow is static: animating a 40px blur repaints the whole drawer every
+       frame, which is what made it stutter on phones. Only transform animates. */
+    box-shadow: 12px 0 40px rgba(5, 30, 21, 0.35);
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     will-change: transform;
   }
-  /* Shadow only while open — on a closed drawer it bleeds onto the page's left edge. */
   body.nav-open .sidebar {
     transform: translateX(0);
     visibility: visible;
-    box-shadow: 12px 0 40px rgba(5, 30, 21, 0.35);
-    transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 340ms ease, visibility 0s;
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s;
   }
 
   .side-nav { grid-template-columns: 1fr; }
   .side-nav a, .side-nav button { min-height: 48px; }
 
-  .sidebar-scrim { display: block; }
+  /* The scrim swallows touches so the page can't scroll behind the drawer.
+     (Locking body overflow instead re-laid-out the whole page on every open.) */
+  .sidebar-scrim { display: block; touch-action: none; transition-duration: 280ms; }
   body.nav-open .sidebar-scrim { opacity: 1; pointer-events: auto; }
-  body.nav-open { overflow: hidden; }
 
   .main-content {
     padding-top: calc(56px + var(--safe-top) + 8px);
@@ -1681,7 +1688,7 @@ html.pwa .date-pill { display: none !important; }
   /* Fixed bottom navigation — the signature "this is an app" element. */
   html.pwa .app-tabbar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
     left: 0;
     right: 0;
@@ -1712,7 +1719,7 @@ html.pwa .date-pill { display: none !important; }
     line-height: 1.1;
     border-radius: 12px;
     cursor: pointer;
-    transition: color 140ms ease, background 140ms ease, transform 120ms ease;
+    transition: color 140ms ease, background 140ms ease;
   }
 
   html.pwa .app-tabbar .tab-link .tab-ico {
@@ -1721,7 +1728,13 @@ html.pwa .date-pill { display: none !important; }
   }
   html.pwa .app-tabbar .tab-link .tab-ico .material-symbols-outlined { font-size: 24px; }
 
-  html.pwa .app-tabbar .tab-link:active { transform: scale(0.92); }
+  /* Press feedback on the icon pill only — scaling the whole tab (label too)
+     read as the bar squeezing on every tap. */
+  html.pwa .app-tabbar .tab-link:active .tab-ico { transform: scale(0.9); }
+
+  /* Bottom tabs switch instantly, like a native app — a fade on every tap
+     looked like the screen re-rendering. */
+  html.pwa .view.active { animation: none; }
 
   html.pwa .app-tabbar .tab-link.active {
     color: var(--green);
@@ -2729,10 +2742,12 @@ button.is-busy::before {
     width: 54px;
     height: 30px;
     border-radius: 999px;
-    transition: background 200ms ease, color 200ms ease;
+    transition: background 160ms ease, color 160ms ease, transform 120ms ease;
   }
   html.pwa .app-tabbar .tab-link .tab-ico .material-symbols-outlined { font-size: 22px; vertical-align: 0; }
-  html.pwa .app-tabbar .tab-link.active { background: transparent; color: #fff; font-weight: 700; }
+  /* Same font weight as inactive tabs: a bolder label is wider and nudged its
+     neighbours on every switch. Colour and the lime pill mark the active tab. */
+  html.pwa .app-tabbar .tab-link.active { background: transparent; color: #fff; }
   html.pwa .app-tabbar .tab-link.active .tab-ico { background: var(--lime); color: var(--green-deep); }
   html.pwa .app-tabbar .tab-link.active .material-symbols-outlined {
     font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 24;
