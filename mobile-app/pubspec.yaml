@@ -15,20 +15,20 @@ dependencies:
   flutter_local_notifications: ^17.2.3
   url_launcher: ^6.3.0
   permission_handler: ^11.3.1
+  image_picker: ^1.2.4
+  webview_flutter_android: ^4.14.1
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.8
 
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: assets/icon.png
-  remove_alpha_ios: true
+# Icons and splash screens are per app: flutter_launcher_icons-<flavor>.yaml and
+# flutter_native_splash-<flavor>.yaml (flavors: admin, member).
 
 flutter:
   uses-material-design: true
+  # Only what the app draws itself; icon/splash sources are build-time inputs.
   assets:
-    - assets/icon.png
+    - assets/admin/splash.png
+    - assets/member/splash.png

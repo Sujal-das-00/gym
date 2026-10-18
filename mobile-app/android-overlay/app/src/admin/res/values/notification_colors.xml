@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent of notifications Android draws itself (app closed). -->
+    <color name="notification_accent">#063A2B</color>
+</resources>

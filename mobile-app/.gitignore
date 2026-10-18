@@ -13,3 +13,6 @@ test/
 .metadata
 # Firebase client config is per-project; regenerate with `flutterfire configure`.
 lib/firebase_options.dart
+/android/key.properties
+*.jks
+*.keystore

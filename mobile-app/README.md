@@ -28,8 +28,8 @@ migration is needed and browser Web Push keeps working side by side.
 3. **App**: install Flutter, `npm i -g firebase-tools && firebase login`,
    `dart pub global activate flutterfire_cli`, then `./setup.sh` (pick your Firebase project
    and the Android/iOS apps when asked).
-4. Run: `flutter run --dart-define=APP_URL=https://your-domain.com/`
-   Release APK: `flutter build apk --release --dart-define=APP_URL=https://your-domain.com/`
+4. Run: `flutter run --dart-define=APP_URL=https://gymbot.toolszila.com/`
+   Release APK: `flutter build apk --release --dart-define=APP_URL=https://gymbot.toolszila.com/`
 5. Rebuild/redeploy the member web app (`npm run build:checkin`) — it contains the bridge code.
 
 ## Using it

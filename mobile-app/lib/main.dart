@@ -1,11 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'config.dart';
 import 'firebase_options.dart';
@@ -13,13 +16,28 @@ import 'notifications.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await GymNotifications.instance.init();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(statusBarColor: Color(0xFF073F2D), statusBarIconBrightness: Brightness.light),
-  );
+  // Push notifications are for members; admins don't register devices.
+  if (kIsMemberApp) {
+    // On Android the flavor's google-services.json entry picks the Firebase app.
+    await (Platform.isAndroid
+        ? Firebase.initializeApp()
+        : Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform));
+    await GymNotifications.instance.init();
+  }
+  // Android 15+ draws edge-to-edge and ignores statusBarColor; the splash-coloured
+  // Scaffold behind SafeArea shows through the bars instead.
+  final darkBars = kSplashColor.computeLuminance() < 0.5;
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    statusBarColor: kSplashColor,
+    statusBarIconBrightness: darkBars ? Brightness.light : Brightness.dark,
+    statusBarBrightness: darkBars ? Brightness.dark : Brightness.light,
+    systemNavigationBarColor: kSplashColor,
+    systemNavigationBarIconBrightness: darkBars ? Brightness.light : Brightness.dark,
+  ));
   runApp(const GymBooApp());
 }
+
+const Color kPageBackground = Color(0xFFF6F8F5);
 
 class GymBooApp extends StatelessWidget {
   const GymBooApp({super.key});
@@ -27,9 +45,9 @@ class GymBooApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gym Boo',
+      title: kAppName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF073F2D), useMaterial3: true),
+      theme: ThemeData(colorSchemeSeed: kBrandColor, useMaterial3: true),
       home: const WebShell(),
     );
   }
@@ -48,20 +66,24 @@ class _WebShellState extends State<WebShell> {
   late final Uri _start = _home.resolve(kStartPath);
   bool _loading = true;
   bool _failed = false;
+  // Keeps the splash look until the first page has painted.
+  bool _firstLoadDone = false;
 
   @override
   void initState() {
     super.initState();
     _controller = WebViewController(onPermissionRequest: _onWebPermission)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFFF6F8F5))
-      ..addJavaScriptChannel('GymBooNative', onMessageReceived: _onBridgeMessage)
+      ..setBackgroundColor(kPageBackground)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) => setState(() {
           _loading = true;
           _failed = false;
         }),
-        onPageFinished: (_) => setState(() => _loading = false),
+        onPageFinished: (_) => setState(() {
+          _loading = false;
+          _firstLoadDone = true;
+        }),
         onWebResourceError: (error) {
           // Only a failed main-frame load should replace the page.
           if (error.isForMainFrame ?? true) setState(() => _failed = true);
@@ -69,15 +91,48 @@ class _WebShellState extends State<WebShell> {
         onNavigationRequest: _onNavigation,
       ));
 
-    // Tapping a notification opens the page it names inside this WebView.
-    GymNotifications.instance.onOpenUrl = _openPath;
+    // <input type="file"> (member/trainer photos, gym logo) needs a native picker.
+    final platform = _controller.platform;
+    if (platform is AndroidWebViewController) platform.setOnShowFileSelector(_pickFiles);
+
+    if (kIsMemberApp) {
+      _controller.addJavaScriptChannel('GymBooNative', onMessageReceived: _onBridgeMessage);
+      // Tapping a notification opens the page it names inside this WebView.
+      GymNotifications.instance.onOpenUrl = _openPath;
+      GymNotifications.instance.launchUrl().then((url) {
+        if (url != null) _openPath(url);
+      });
+    }
     _controller.loadRequest(_start);
-    // Show the OS "Allow notifications?" popup on first launch, before sign-in.
+    // Member app: ask for notifications on every launch until they're allowed.
     // (The device is linked to a member after they sign in; see usePushNotifications.js.)
-    GymNotifications.instance.askOnFirstLaunch();
-    GymNotifications.instance.launchUrl().then((url) {
-      if (url != null) _openPath(url);
-    });
+    if (kIsMemberApp) _askForNotifications();
+  }
+
+  Future<void> _askForNotifications() async {
+    final needsSettings = await GymNotifications.instance.askUntilAllowed();
+    if (!needsSettings || !mounted) return;
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.notifications_active_outlined),
+        title: const Text('Turn on notifications'),
+        content: const Text(
+            'Get announcements, reminders and payment updates from your gym. Tap Open settings, then turn on notifications.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Open settings')),
+        ],
+      ),
+    );
+    if (open == true) await GymNotifications.instance.openSettings();
+  }
+
+  /// Photo picker for file inputs. Android 13+ uses the system photo picker,
+  /// which needs no storage permission.
+  Future<List<String>> _pickFiles(FileSelectorParams params) async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 2048, imageQuality: 85);
+    return picked == null ? const [] : [Uri.file(picked.path).toString()];
   }
 
   /// The check-in page's QR scanner asks the WebView for the camera. Android also
@@ -107,9 +162,10 @@ class _WebShellState extends State<WebShell> {
     if (uri == null) return NavigationDecision.prevent;
     if (uri.scheme == 'about' || uri.scheme == 'blob' || uri.scheme == 'data') return NavigationDecision.navigate;
     if ((uri.scheme == 'https' || uri.scheme == 'http') && uri.host == _home.host) {
-      // Member app only: /admin, the landing site etc. stay out of this app.
-      final allowed = kAllowedPathPrefixes.any((p) => uri.path == p || uri.path.startsWith('$p/'));
-      return allowed ? NavigationDecision.navigate : NavigationDecision.prevent;
+      if (kAllowedPathPrefixes.any((p) => uri.path == p || uri.path.startsWith('$p/'))) {
+        return NavigationDecision.navigate;
+      }
+      // The other app's pages, the landing site etc. open in the browser.
     }
     await launchUrl(uri, mode: LaunchMode.externalApplication);
     return NavigationDecision.prevent;
@@ -146,23 +202,30 @@ class _WebShellState extends State<WebShell> {
       canPop: false,
       onPopInvokedWithResult: _onBack,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6F8F5),
+        backgroundColor: kSplashColor,
         body: SafeArea(
           child: Stack(
             children: [
               WebViewWidget(controller: _controller),
-              if (_loading && !_failed) const LinearProgressIndicator(minHeight: 3),
+              if (_loading && !_failed && _firstLoadDone)
+                const LinearProgressIndicator(minHeight: 3, color: kBrandColor),
+              if (!_firstLoadDone && !_failed)
+                Container(
+                  color: kSplashColor,
+                  alignment: Alignment.center,
+                  child: Image.asset(kSplashImage, width: 150),
+                ),
               if (_failed)
                 Container(
-                  color: const Color(0xFFF6F8F5),
+                  color: kPageBackground,
                   alignment: Alignment.center,
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.wifi_off_rounded, size: 56, color: Color(0xFF073F2D)),
+                      const Icon(Icons.wifi_off_rounded, size: 56, color: kBrandColor),
                       const SizedBox(height: 16),
-                      const Text("Can't reach Gym Boo", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                      const Text("Can't reach $kAppName", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       const Text('Check your internet connection and try again.', textAlign: TextAlign.center),
                       const SizedBox(height: 20),

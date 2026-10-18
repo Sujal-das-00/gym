@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'config.dart';
 
@@ -9,7 +12,7 @@ import 'config.dart';
 ///
 /// Notifications that arrive while the app is closed or in the background are
 /// drawn by Android itself from the FCM `notification` block (titled with the
-/// app label, "Gym Boo") — no Dart code runs. This class only has to handle the
+/// app label, "Gym Boo Member") — no Dart code runs. This class only has to handle the
 /// foreground case, where Android shows nothing, and taps.
 class GymNotifications {
   GymNotifications._();
@@ -52,7 +55,7 @@ class GymNotifications {
       if (n == null) return;
       _local.show(
         message.messageId.hashCode,
-        n.title ?? 'Gym Boo',
+        n.title ?? kAppName,
         n.body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -105,17 +108,34 @@ class GymNotifications {
     }
   }
 
-  /// Asks for permission once, only while the user hasn't decided yet.
-  Future<void> askOnFirstLaunch() async {
+  /// Runs on every launch until notifications are allowed (Android 13+ asks
+  /// with its own dialog; older versions have them on unless turned off in
+  /// Settings). Returns true when Android could not show its dialog — denied
+  /// twice, or switched off in Settings — so the caller offers a shortcut to
+  /// the app's notification settings instead.
+  Future<bool> askUntilAllowed() async {
     try {
-      final settings = await _fcm.getNotificationSettings();
-      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
-        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      if (!Platform.isAndroid) {
+        final settings = await _fcm.getNotificationSettings();
+        if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+          await _fcm.requestPermission(alert: true, badge: true, sound: true);
+        }
+        return false;
       }
+      if (await Permission.notification.isGranted) return false;
+      // The system dialog pauses the app; no pause means Android stayed silent.
+      var systemDialogShown = false;
+      final listener = AppLifecycleListener(onInactive: () => systemDialogShown = true);
+      final status = await Permission.notification.request();
+      listener.dispose();
+      return !status.isGranted && !systemDialogShown;
     } catch (_) {
       // Best effort; the web page asks again after sign-in.
+      return false;
     }
   }
+
+  Future<void> openSettings() => openAppSettings();
 
   /// Current state without prompting.
   Future<Map<String, dynamic>> status() async {

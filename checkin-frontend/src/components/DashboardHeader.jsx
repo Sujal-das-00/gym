@@ -4,7 +4,7 @@ import Icon from "./Icon.jsx";
 /** Sticky bar over the member home screen: whose gym this is, and the way out. */
 export default function DashboardHeader({ gymName, logo, expired, onSignOut, subtitle }) {
   return (
-    <header className="sticky top-0 z-40 w-full bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <header className="sticky top-0 z-40 w-full pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
       <div className="h-16 max-w-md mx-auto px-margin flex items-center justify-between gap-space-sm">
         <div className="flex items-center gap-space-sm min-w-0">
           {logo ? (

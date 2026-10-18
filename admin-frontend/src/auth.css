@@ -262,3 +262,36 @@ button.plan-badge { font-family: inherit; cursor: pointer; }
 .maint-lock-card h2 { margin: 0 0 10px; }
 .maint-lock-card p { margin: 0 0 12px; line-height: 1.5; color: #35443b; }
 .maint-pay { padding: 10px 12px; border-radius: 10px; background: #f3f6f4; }
+
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; box-sizing: border-box; padding-right: 44px; }
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6b62;
+  cursor: pointer;
+}
+.password-toggle:hover { background: #eef3f0; color: #11784a; }
+.password-toggle svg { width: 20px; height: 20px; }
+
+.auth-card { max-height: 100%; overflow-y: auto; }
+.auth-switch { margin: 4px 0 0; text-align: center; font-size: 13px; color: #5b6b62; }
+.auth-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #11784a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.auth-link:hover { text-decoration: underline; }

@@ -144,7 +144,7 @@ export default function App() {
   // beats a flash of the "choose your gym" scanner the member is about to skip.
   if (savedGym) {
     return (
-      <main className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="flex-1 pt-safe flex flex-col items-center justify-center gap-2 px-6 text-center">
         <BrandHeader gymName="" logo="" />
         <p className="text-xs text-on-surface-variant">Loading…</p>
       </main>
@@ -196,7 +196,7 @@ export default function App() {
   }
 
   return (
-    <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 flex flex-col space-y-4">
+    <main className="flex-1 w-full max-w-md mx-auto px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] flex flex-col space-y-4">
       {/* Everything above the switcher is deliberately identical on both tabs, so
           changing tabs reads as the same screen swapping its inputs. */}
       <BrandHeader gymName={branding.gymName} logo={branding.logo} />

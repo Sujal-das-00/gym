@@ -1,0 +1,7 @@
+# dart run flutter_launcher_icons   (generates every flutter_launcher_icons-<flavor>.yaml)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/admin/icon.png
+  adaptive_icon_background: "#063a2b"
+  adaptive_icon_foreground: assets/admin/icon_foreground.png

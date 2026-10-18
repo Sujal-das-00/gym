@@ -1,4 +1,5 @@
-import { useApp } from "./store/AppContext.jsx";
+import { memo, useRef } from "react";
+import { AppContext, useApp } from "./store/AppContext.jsx";
 import Toast from "./components/Toast.jsx";
 import MobileAppbar from "./components/MobileAppbar.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -29,8 +30,8 @@ import LoginOverlay from "./auth/LoginOverlay.jsx";
 import GymsDialog from "./auth/GymsDialog.jsx";
 import StaffDialog from "./auth/StaffDialog.jsx";
 
-// Every view stays mounted and is shown/hidden by the `.view.active` class, as
-// in the original markup — that keeps each view's filters and scroll position
+// A view mounts on first visit and then stays mounted, shown/hidden by the
+// `.view.active` class — that keeps each view's filters and scroll position
 // when you navigate away and back, and preserves the view-enter animation.
 const VIEWS = [
   ["dashboard", DashboardView],
@@ -46,10 +47,40 @@ const VIEWS = [
   ["notifications", NotificationsView],
   ["settings", SettingsView],
   ["help", HelpView],
-];
+].map(([name, View]) => [name, memo(View)]);
+
+// Hidden views get a frozen copy of the app context, so a toast, the drawer, a
+// poll or an edit on another screen doesn't re-render all of them (that is what
+// made navigation and typing lag on phones). They catch up when shown again.
+function ViewPanel({ name, View }) {
+  const live = useApp();
+  const active = live.activeView === name;
+  const frozen = useRef(live);
+  const visited = useRef(false);
+  if (!live.user) visited.current = false;
+  if (active) {
+    frozen.current = live;
+    visited.current = true;
+  } else if (frozen.current.activeView === name) {
+    // Just navigated away: pass on that one change so the view's "only while
+    // open" pollers stop, then hold still.
+    frozen.current = live;
+  }
+
+  return (
+    <section className={"view" + (active ? " active" : "")} data-view-panel={name}>
+      {/* Views render only once the user is in, so no request fires before login. */}
+      {live.user && visited.current ? (
+        <AppContext.Provider value={frozen.current}>
+          <View />
+        </AppContext.Provider>
+      ) : null}
+    </section>
+  );
+}
 
 export default function App() {
-  const { activeView, drawerOpen, closeDrawer, user } = useApp();
+  const { drawerOpen, closeDrawer } = useApp();
 
   return (
     <>
@@ -68,14 +99,7 @@ export default function App() {
           <Topbar />
 
           {VIEWS.map(([name, View]) => (
-            <section
-              key={name}
-              className={"view" + (activeView === name ? " active" : "")}
-              data-view-panel={name}
-            >
-              {/* Views render only once the user is in, so no request fires before login. */}
-              {user ? <View /> : null}
-            </section>
+            <ViewPanel key={name} name={name} View={View} />
           ))}
         </main>
 

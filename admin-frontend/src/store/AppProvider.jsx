@@ -137,7 +137,8 @@ export function AppProvider({ children }) {
     setActiveViewState(VIEW_COPY[view] ? view : "dashboard");
     setDayLedgerDate("");
     setDrawerOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Instant: a smooth scroll fights the view-enter animation and the drawer slide.
+    window.scrollTo(0, 0);
   }, []);
 
   /* ---- Loading + one-time record migrations ----------------------------- */

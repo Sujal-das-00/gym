@@ -100,6 +100,18 @@ export async function login(email, password) {
   return data;
 }
 
+export async function signup(fields) {
+  const res = await fetch("/api/auth/signup", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not create the account");
+  return data;
+}
+
 export async function logout() {
   try {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });

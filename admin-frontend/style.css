@@ -395,8 +395,6 @@ body.nav-open .hamburger span:nth-child(3) { transform: translateY(0) rotate(-45
   opacity: 0;
   pointer-events: none;
   transition: opacity 320ms ease;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
 }
 
 .main-content {
@@ -1452,7 +1450,7 @@ input.has-error:focus, textarea.has-error:focus, select.has-error:focus { border
   body.nav-open { overflow: hidden; }
 
   .main-content {
-    padding-top: calc(56px + env(safe-area-inset-top) + 14px);
+    padding-top: calc(56px + env(safe-area-inset-top) + 8px);
     padding-left: max(14px, env(safe-area-inset-left));
     padding-right: max(14px, env(safe-area-inset-right));
     padding-bottom: calc(28px + env(safe-area-inset-bottom));
@@ -1672,9 +1670,9 @@ html.pwa .date-pill { display: none !important; }
     z-index: 70;
     gap: 2px;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), #ffffff);
-    -webkit-backdrop-filter: saturate(1.4) blur(12px);
-    backdrop-filter: saturate(1.4) blur(12px);
+    /* Opaque, no backdrop-filter: re-blurring the page under a fixed bar on
+       every scroll frame is what makes phone WebViews stutter. */
+    background: #ffffff;
     border-top: 1px solid var(--line);
     box-shadow: 0 -6px 22px rgba(5, 30, 21, 0.1);
   }
@@ -2188,6 +2186,10 @@ html.pwa .date-pill { display: none !important; }
    title + subtitle (VIEW_COPY text) and keep only the actions row. */
 @media (max-width: 900px) {
   .topbar > div:first-child { display: none; }
+  .topbar { gap: 8px; margin-bottom: 12px; }
+  .topbar-actions { gap: 8px; }
+  .topbar-actions:empty,
+  .topbar:not(:has(.topbar-actions > :not([hidden]):not(#openAddMember))) { display: none; }
 }
 
 /* Utility: force full width on mobile only (app-bar breakpoint). */
