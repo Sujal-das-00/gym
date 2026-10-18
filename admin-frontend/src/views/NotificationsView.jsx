@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { currency } from "../lib/dates.js";
+import { getInitials } from "../lib/format.js";
 import { fetchPendingFeeSummary, sendCustomNotification, sendFeeReminders } from "../lib/notifications.js";
+import Icon from "../components/Icon.jsx";
+import Photo from "../components/Photo.jsx";
 
 const MAX_TITLE = 80;
 const MAX_MESSAGE = 300;
 
 const AUDIENCES = [
-  { value: "all", label: "All members" },
-  { value: "pending-fees", label: "Members with pending fees" },
-  { value: "selected", label: "Selected members" },
+  { value: "all", label: "All" },
+  { value: "pending-fees", label: "Owe fees" },
+  { value: "selected", label: "Select" },
 ];
 
 // Only the gym owner may message the whole membership. `staff` can collect fees
@@ -23,24 +26,30 @@ function SendSummary({ result }) {
   if (!result) return null;
   const rows = [
     ["Eligible members", result.eligibleMembers],
-    ["Notifications attempted", result.attempted],
+    ["Attempted", result.attempted],
     ["Delivered", result.sent],
     ["Failed", result.failed],
     ["Expired devices removed", result.expired],
-    ["No notifications turned on", result.membersWithoutSubscription],
+    ["Notifications off", result.membersWithoutSubscription],
   ];
   return (
-    <div className="notify-summary">
-      <h3 className="subhead">{result.kind} sent</h3>
-      <div className="notify-summary-grid">
+    <section className="dash-card notify-result" aria-live="polite">
+      <header className="dash-card-head">
+        <div>
+          <h3>{result.kind} sent</h3>
+          <p>What happened with the last send</p>
+        </div>
+        <Icon name="check_circle" className="notify-result-icon" />
+      </header>
+      <dl className="member-stats">
         {rows.map(([label, value]) => (
-          <article key={label}>
-            <span>{label}</span>
-            <strong>{Number(value || 0)}</strong>
-          </article>
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{Number(value || 0)}</dd>
+          </div>
         ))}
-      </div>
-    </div>
+      </dl>
+    </section>
   );
 }
 
@@ -53,7 +62,8 @@ function SendSummary({ result }) {
  * server-side from the authenticated gym's members.
  */
 export default function NotificationsView() {
-  const { members, domain, user, showToast } = useApp();
+  const { members, domain, user, settings, showToast } = useApp();
+  const [tab, setTab] = useState("reminder");
 
   const [preview, setPreview] = useState(null);
   const [remindBusy, setRemindBusy] = useState(false);
@@ -88,11 +98,7 @@ export default function NotificationsView() {
   );
 
   if (!isOwner) {
-    return (
-      <section className="panel">
-        <p className="history-empty">Only the gym owner can send notifications to members.</p>
-      </section>
-    );
+    return <p className="contact-empty">Only the gym owner can send notifications to members.</p>;
   }
 
   const unavailable = preview?.available === false;
@@ -114,12 +120,14 @@ export default function NotificationsView() {
   const recipientCount =
     audience === "all" ? members.length : audience === "pending-fees" ? pendingCount : selectedIds.length;
 
-  const toggleMember = (id, checked) => {
+  const toggleMember = (id) => {
     const next = new Set(selectedIds);
-    if (checked) next.add(id);
-    else next.delete(id);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setSelectedIds([...next]);
   };
+  const memberById = (id) => members.find((member) => member.id === id);
+  const gymName = settings?.gymName || "Your gym";
 
   const onRemind = async () => {
     if (remindBusy) return;
@@ -180,7 +188,7 @@ export default function NotificationsView() {
     // without enabling anything.
     const invalidKeys = preview?.disabledReason === "invalid";
     return (
-      <section className="panel">
+      <section className="dash-card notify-off">
         <div className="panel-head">
           <div>
             <h2>Push notifications are switched off</h2>
@@ -205,218 +213,265 @@ export default function NotificationsView() {
     );
   }
 
-  return (
-    <div className="notify-view">
-      <section className="panel notify-panel">
-        <div className="panel-head">
-          <div>
-            <p className="eyebrow">Fee reminders</p>
-            <h2>🔔 Remind Members with Pending Fees</h2>
-            <p>
-              Every member who owes money gets their own reminder with their name and the exact amount.
-              Members who have not turned notifications on are skipped.
-            </p>
-          </div>
-        </div>
-
-        <div className="notify-stats">
-          <article>
-            <span>Members with pending fees</span>
-            <strong>{preview ? preview.eligibleMembers : "—"}</strong>
-          </article>
-          <article>
-            <span>Reachable by notification</span>
-            <strong>{preview ? preview.reachableMembers : "—"}</strong>
-          </article>
-          <article>
-            <span>Total outstanding</span>
-            <strong>{preview ? currency(preview.totalOutstanding) : "—"}</strong>
-          </article>
-          <article>
-            <span>Notifications on (whole gym)</span>
+  const contactRow = (entry, state) => {
+    const member = memberById(entry.id);
+    return (
+      <li key={entry.id}>
+        <div className="contact-row is-static no-dot">
+          <span className="contact-avatar">
+            {member ? <Photo person={member} /> : <span className="avatar-fallback">{getInitials(entry.name)}</span>}
+          </span>
+          <span className="contact-copy">
             <strong>
-              {preview ? `${preview.subscribedMembers} of ${preview.totalMembers}` : "—"}
+              <span className="contact-name">{entry.name}</span>
             </strong>
-          </article>
+            <small>{entry.phone}</small>
+          </span>
+          <span className="contact-state">{state}</span>
         </div>
+      </li>
+    );
+  };
 
-        {/* The confusing case: people owe money, but the reminder reaches nobody
-            because none of THEM have notifications on. A toast that vanishes in
-            two seconds is not enough to explain that, so it is stated inline and
-            the members are named. */}
-        {preview && preview.eligibleMembers > 0 && preview.reachableMembers === 0 ? (
-          <p className="notify-warning">
-            <strong>No reminders can be sent yet.</strong> {preview.eligibleMembers} member
-            {preview.eligibleMembers === 1 ? "" : "s"} owe money, but none of them have turned on
-            notifications in the member app.{" "}
-            {preview.subscribedMembers > 0 ? (
-              <>
-                The {preview.subscribedMembers} device owner
-                {preview.subscribedMembers === 1 ? "" : "s"} listed below have notifications on and
-                are paid up — that is why an announcement to "All members" still reaches a phone
-                while this reminder reaches nobody.
-              </>
-            ) : (
-              <>No member in this gym has turned notifications on yet.</>
-            )}{" "}
-            Ask the members who owe to sign in at the check-in page and tap "Turn on notifications"
-            on their dashboard.
-          </p>
-        ) : null}
+  return (
+    <section className="list-view notify-view" aria-label="Send notification">
+      <div className="segmented" role="radiogroup" aria-label="Notification type">
+        <label>
+          <input type="radio" name="notifyTab" checked={tab === "reminder"} onChange={() => setTab("reminder")} />
+          <span>Fee reminder</span>
+        </label>
+        <label>
+          <input type="radio" name="notifyTab" checked={tab === "announce"} onChange={() => setTab("announce")} />
+          <span>Announcement</span>
+        </label>
+      </div>
 
-        {unreachable.length ? (
-          <div className="notify-unreachable">
-            <h3 className="subhead">
-              Owe money, cannot be reached ({unreachable.length}
-              {preview.eligibleMembers > preview.pending.length ? "+" : ""})
-            </h3>
-            <div className="notify-unreachable-list">
-              {unreachable.map((entry) => (
-                <div key={entry.id}>
-                  <span>{entry.name}</span>
-                  <em>{entry.phone}</em>
-                  <strong>{currency(entry.outstanding)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {subscribed.length ? (
-          <div className="notify-unreachable">
-            <h3 className="subhead">
-              Notifications turned on ({subscribed.length}
-              {preview.subscribedMembers > subscribed.length ? "+" : ""})
-            </h3>
-            <div className="notify-unreachable-list notify-subscribed-list">
-              {subscribed.map((entry) => (
-                <div key={entry.id}>
-                  <span>{entry.name}</span>
-                  <em>{entry.phone}</em>
-                  <strong>
-                    {entry.overdue ? "Owes" : "Paid up"} · {entry.devices} device
-                    {entry.devices === 1 ? "" : "s"}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <button
-          className="notify-button"
-          disabled={remindBusy || !preview || !reachable}
-          onClick={onRemind}
-          type="button"
-        >
-          {remindBusy
-            ? "Sending…"
-            : reachable
-              ? `🔔 Remind ${reachable} member${reachable === 1 ? "" : "s"} with pending fees`
-              : "🔔 No one to remind yet"}
-        </button>
-      </section>
-
-      <section className="panel notify-panel">
-        <form className="notify-form" onSubmit={onSubmitCustom}>
-          <div className="panel-head">
+      {tab === "reminder" ? (
+        <>
+          <div className="summary-pair">
             <div>
-              <p className="eyebrow">Announcement</p>
-              <h2>✉ Send Custom Notification</h2>
-              <p>Write your own message and choose who receives it.</p>
+              <span>Owe fees</span>
+              <strong>{preview ? preview.eligibleMembers : "—"}</strong>
+              <small>{preview ? `${currency(preview.totalOutstanding)} outstanding` : "Loading…"}</small>
+            </div>
+            <div>
+              <span>Reachable</span>
+              <strong>{preview ? preview.reachableMembers : "—"}</strong>
+              <small>have notifications on</small>
             </div>
           </div>
 
-          <div className="form-grid">
-            <label>
-              Title
-              <input
-                maxLength={MAX_TITLE}
-                name="title"
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Holiday notice"
-                required
-                type="text"
-                value={title}
-              />
-            </label>
-            <label>
-              Recipients
-              <select name="audience" onChange={(event) => setAudience(event.target.value)} value={audience}>
-                {AUDIENCES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="wide">
-              Message
-              <textarea
-                maxLength={MAX_MESSAGE}
-                name="message"
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="The gym stays closed this Sunday for maintenance."
-                required
-                rows={3}
-                value={message}
-              />
-              <span className="field-hint">
-                {message.length}/{MAX_MESSAGE} characters
+          <p className="list-note is-info">
+            <Icon name="notifications_active" />
+            <span>
+              Each member who owes gets their own reminder with their name and exact amount.
+              {preview ? ` Notifications are on for ${preview.subscribedMembers} of ${preview.totalMembers} members.` : ""}
+            </span>
+          </p>
+
+          {/* The confusing case: people owe money, but the reminder reaches nobody
+              because none of THEM have notifications on. Stated inline, with the
+              members named below, rather than in a toast that vanishes. */}
+          {preview && preview.eligibleMembers > 0 && preview.reachableMembers === 0 ? (
+            <p className="list-note">
+              <Icon name="warning" />
+              <span>
+                <strong>No reminders can be sent yet.</strong> None of the {preview.eligibleMembers} member
+                {preview.eligibleMembers === 1 ? "" : "s"} who owe have turned on notifications.
+                {preview.subscribedMembers > 0
+                  ? " The members with notifications on are paid up, which is why an announcement still reaches a phone."
+                  : ""}{" "}
+                Ask them to sign in on the check-in page and tap &quot;Turn on notifications&quot;.
               </span>
-            </label>
-          </div>
-
-          {audience === "selected" ? (
-            <div className="notify-picker">
-              <input
-                className="notify-search"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name or mobile number..."
-                type="search"
-                value={search}
-              />
-              <div className="fee-month-list">
-                {matches.length ? (
-                  matches.map((member) => (
-                    <label className="fee-month-option" key={member.id}>
-                      <input
-                        checked={selected.has(member.id)}
-                        onChange={(event) => toggleMember(member.id, event.target.checked)}
-                        type="checkbox"
-                        value={member.id}
-                      />
-                      <span>{member.name}</span>
-                      <strong>{member.phone}</strong>
-                    </label>
-                  ))
-                ) : (
-                  <p className="history-empty">No members match that search.</p>
-                )}
-              </div>
-            </div>
+            </p>
           ) : null}
 
-          <p className="field-hint notify-recipient-count">
-            {recipientCount} member{recipientCount === 1 ? "" : "s"} selected. Members who have not turned on
-            notifications are skipped.
-          </p>
+          {unreachable.length ? (
+            <section className="contact-group" aria-label="Owe fees but cannot be reached">
+              <h3 className="contact-group-title">
+                Owe fees · notifications off
+                <span>
+                  {unreachable.length}
+                  {preview.eligibleMembers > preview.pending.length ? "+" : ""}
+                </span>
+              </h3>
+              <ul className="contact-list">
+                {unreachable.map((entry) =>
+                  contactRow(entry, <strong className="notify-owed">{currency(entry.outstanding)}</strong>),
+                )}
+              </ul>
+            </section>
+          ) : null}
 
-          <button
-            className="notify-button"
-            disabled={sendBusy || !title.trim() || !message.trim()}
-            type="submit"
-          >
-            {sendBusy ? "Sending…" : "✉ Send notification"}
+          {subscribed.length ? (
+            <section className="contact-group" aria-label="Notifications turned on">
+              <h3 className="contact-group-title">
+                Notifications on
+                <span>
+                  {subscribed.length}
+                  {preview.subscribedMembers > subscribed.length ? "+" : ""}
+                </span>
+              </h3>
+              <ul className="contact-list">
+                {subscribed.map((entry) =>
+                  contactRow(
+                    entry,
+                    <>
+                      <span className={"status-pill " + (entry.overdue ? "overdue" : "paid")}>
+                        {entry.overdue ? "Owes" : "Paid up"}
+                      </span>
+                      <small>
+                        {entry.devices} device{entry.devices === 1 ? "" : "s"}
+                      </small>
+                    </>,
+                  ),
+                )}
+              </ul>
+            </section>
+          ) : null}
+
+          <button className="sheet-confirm notify-send" disabled={remindBusy || !preview || !reachable} onClick={onRemind} type="button">
+            <Icon name="notifications_active" />
+            {remindBusy
+              ? "Sending…"
+              : reachable
+                ? `Remind ${reachable} member${reachable === 1 ? "" : "s"}`
+                : "No one to remind yet"}
           </button>
-        </form>
-      </section>
+        </>
+      ) : (
+        <form className="notify-form" onSubmit={onSubmitCustom}>
+          <section className="dash-card">
+            <div className="mf-grid">
+              <label className="mf-field wide">
+                <span className="mf-label-row">
+                  Title
+                  <em>
+                    {title.length}/{MAX_TITLE}
+                  </em>
+                </span>
+                <input
+                  maxLength={MAX_TITLE}
+                  name="title"
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Holiday notice"
+                  required
+                  type="text"
+                  value={title}
+                />
+              </label>
+              <label className="mf-field wide">
+                <span className="mf-label-row">
+                  Message
+                  <em>
+                    {message.length}/{MAX_MESSAGE}
+                  </em>
+                </span>
+                <textarea
+                  maxLength={MAX_MESSAGE}
+                  name="message"
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="The gym stays closed this Sunday for maintenance."
+                  required
+                  rows={3}
+                  value={message}
+                />
+              </label>
+              <div className="mf-field wide">
+                <span className="mf-label" id="notifyAudienceLabel">
+                  Send to
+                </span>
+                <div className="segmented" role="radiogroup" aria-labelledby="notifyAudienceLabel">
+                  {AUDIENCES.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="radio"
+                        name="audience"
+                        value={option.value}
+                        checked={audience === option.value}
+                        onChange={() => setAudience(option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
 
-      {result ? (
-        <section className="panel notify-panel">
-          <SendSummary result={result} />
-        </section>
-      ) : null}
-    </div>
+          {audience === "selected" ? (
+            <section className="contact-group notify-picker" aria-label="Select members">
+              <div className="list-toolbar">
+                <label className="list-search">
+                  <Icon name="search" />
+                  <input
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search name or mobile"
+                    aria-label="Search members"
+                    type="search"
+                    value={search}
+                  />
+                </label>
+              </div>
+              {matches.length ? (
+                <ul className="contact-list">
+                  {matches.map((member) => {
+                    const checked = selected.has(member.id);
+                    return (
+                      <li key={member.id}>
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
+                          className={"contact-row no-dot notify-pick" + (checked ? " is-checked" : "")}
+                          onClick={() => toggleMember(member.id)}
+                        >
+                          <span className="contact-avatar">
+                            <Photo person={member} />
+                          </span>
+                          <span className="contact-copy">
+                            <strong>
+                              <span className="contact-name">{member.name}</span>
+                            </strong>
+                            <small>{member.phone}</small>
+                          </span>
+                          <span className="pay-check" aria-hidden="true">
+                            <Icon name="check" />
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="contact-empty">No members match that search.</p>
+              )}
+            </section>
+          ) : null}
+
+          <section className="notify-preview" aria-label="Preview">
+            <span className="mf-label">Preview</span>
+            <div className="notify-bubble">
+              <span className="notify-bubble-icon" aria-hidden="true">
+                {getInitials(gymName) || "G"}
+              </span>
+              <div>
+                <small>{gymName} · now</small>
+                <strong>{title.trim() || "Your title"}</strong>
+                <p>{message.trim() || "Your message appears here."}</p>
+              </div>
+            </div>
+          </section>
+
+          <button className="sheet-confirm notify-send" disabled={sendBusy || !title.trim() || !message.trim()} type="submit">
+            <Icon name="send" />
+            {sendBusy ? "Sending…" : `Send to ${recipientCount} member${recipientCount === 1 ? "" : "s"}`}
+          </button>
+          <p className="notify-foot">Members who have not turned on notifications are skipped.</p>
+        </form>
+      )}
+
+      <SendSummary result={result} />
+    </section>
   );
 }

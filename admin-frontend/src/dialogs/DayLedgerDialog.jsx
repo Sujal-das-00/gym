@@ -2,14 +2,15 @@ import { useMemo } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import { currency } from "../lib/dates.js";
+import { CATEGORY_ICONS } from "../lib/constants.js";
 import { buildLedgerEntries, filterEntriesByDate, summarizeEntries } from "../lib/ledger.js";
 import { dayLabel } from "../lib/period.js";
 import Icon from "../components/Icon.jsx";
 
 /**
- * The "Read more" window behind a day row on the Insights screen: every single
- * earning and expense recorded on that one date, named and signed, so the
- * admin can see exactly what made up the day's total.
+ * The window behind a day row on the Insights screen: every single earning and
+ * expense recorded on that one date, named and signed, so the admin can see
+ * exactly what made up the day's total.
  */
 export default function DayLedgerDialog() {
   const { dayLedgerDate, closeDayLedger, members, expenses, domain, openDetail, openExpenseDialog } = useApp();
@@ -35,72 +36,80 @@ export default function DayLedgerDialog() {
   };
 
   return (
-    <Dialog className="day-ledger-dialog" open={open} onClose={closeDayLedger}>
-      <div className="day-ledger-panel">
-        <div className="dialog-head">
-          <div>
-            <p className="eyebrow">Day breakdown</p>
-            <h2>{dayLedgerDate ? dayLabel(dayLedgerDate) : ""}</h2>
-            <p>
-              {`${totals.count} ${totals.count === 1 ? "entry" : "entries"} · net `}
-              <strong className={totals.net < 0 ? "is-out" : "is-in"}>
-                {(totals.net < 0 ? "−" : "+") + currency(Math.abs(totals.net))}
-              </strong>
-            </p>
+    <Dialog className="sheet" open={open} onClose={closeDayLedger}>
+      {open ? (
+        <div className="sheet-panel">
+          <header className="sheet-head">
+            <span className="sheet-grabber" aria-hidden="true" />
+            <h2>{dayLabel(dayLedgerDate)}</h2>
+            <button className="sheet-close" aria-label="Close" type="button" onClick={closeDayLedger}>
+              <Icon name="close" />
+            </button>
+          </header>
+
+          <div className="sheet-body">
+            <div className="money-card-split">
+              <div className="is-in">
+                <span className="money-card-ico" aria-hidden="true">
+                  <Icon name="south_west" />
+                </span>
+                <div>
+                  <small>Came in</small>
+                  <b>{currency(totals.earned)}</b>
+                </div>
+              </div>
+              <div className="is-out">
+                <span className="money-card-ico" aria-hidden="true">
+                  <Icon name="north_east" />
+                </span>
+                <div>
+                  <small>Went out</small>
+                  <b>{currency(totals.spent)}</b>
+                </div>
+              </div>
+            </div>
+
+            <section className="contact-group">
+              <h3 className="contact-group-title ledger-day-title">
+                {totals.count} {totals.count === 1 ? "entry" : "entries"}
+                <em className={totals.net < 0 ? "is-out" : "is-in"}>
+                  Net {(totals.net < 0 ? "−" : "+") + currency(Math.abs(totals.net))}
+                </em>
+              </h3>
+              {entries.length ? (
+                <ul className="contact-list">
+                  {entries.map((entry) => (
+                    <li key={entry.type + ":" + entry.id}>
+                      <button
+                        type="button"
+                        className={"contact-row no-dot ledger-entry " + (entry.type === "expense" ? "is-out" : "is-in")}
+                        onClick={() => openEntry(entry)}
+                      >
+                        <span className="ledger-tile" aria-hidden="true">
+                          <Icon name={CATEGORY_ICONS[entry.category] || "receipt_long"} />
+                        </span>
+                        <span className="contact-copy">
+                          <strong>
+                            <span className="contact-name">{entry.title}</span>
+                          </strong>
+                          <small>{[entry.detail, domain.paymentModeLabel(entry.mode)].filter(Boolean).join(" · ")}</small>
+                        </span>
+                        <span className="contact-state">
+                          <strong className="ledger-amount">
+                            {(entry.type === "expense" ? "−" : "+") + currency(entry.amount)}
+                          </strong>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="member-empty">Nothing was recorded on this day.</p>
+              )}
+            </section>
           </div>
-          <button className="icon-button" aria-label="Close" type="button" onClick={closeDayLedger}>
-            ×
-          </button>
         </div>
-
-        <div className="day-ledger-summary">
-          <article className="is-in">
-            <span>Came in</span>
-            <strong>{currency(totals.earned)}</strong>
-          </article>
-          <article className="is-out">
-            <span>Went out</span>
-            <strong>{currency(totals.spent)}</strong>
-          </article>
-        </div>
-
-        <div className="day-ledger-list">
-          {entries.length ? (
-            entries.map((entry) => (
-              <button
-                key={entry.type + ":" + entry.id}
-                className={"day-ledger-row " + (entry.type === "expense" ? "is-expense" : "is-earning")}
-                type="button"
-                onClick={() => openEntry(entry)}
-              >
-                <span className="day-ledger-ico" aria-hidden="true">
-                  <Icon name={entry.type === "expense" ? "arrow_outward" : "south_west"} />
-                </span>
-                <span className="day-ledger-copy">
-                  <strong>{entry.title}</strong>
-                  <span>{entry.detail}</span>
-                </span>
-                <span className="day-ledger-amount-col">
-                  <strong className="day-ledger-amount">
-                    {(entry.type === "expense" ? "−" : "+") + currency(entry.amount)}
-                  </strong>
-                  {entry.mode ? (
-                    <small className="day-ledger-mode">{domain.paymentModeLabel(entry.mode)}</small>
-                  ) : null}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="history-empty">Nothing was recorded on this day.</p>
-          )}
-        </div>
-
-        <div className="form-actions">
-          <button className="secondary-action" type="button" onClick={closeDayLedger}>
-            Close
-          </button>
-        </div>
-      </div>
+      ) : null}
     </Dialog>
   );
 }

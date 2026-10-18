@@ -1,184 +1,232 @@
 import { useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { currency, displayDate } from "../lib/dates.js";
+import { currency, displayDate, monthKey } from "../lib/dates.js";
 import Photo from "../components/Photo.jsx";
+import Icon from "../components/Icon.jsx";
+
+const VISIBLE_LIMIT = 120;
+
+const GROUPS = [
+  { key: "overdue", label: "Overdue" },
+  { key: "pending", label: "Pending" },
+  { key: "paid", label: "Paid" },
+];
+
+// One status per member so every contact lands in exactly one group.
+function statusOf(domain, member) {
+  if (domain.isOverdue(member)) return "overdue";
+  if (domain.isPaidThisPeriod(member)) return "paid";
+  return "pending";
+}
 
 export default function PaymentsView() {
-  const { members, domain, selectedPaymentMemberId, setSelectedPaymentMemberId, openFeeDialog } = useApp();
+  const { members, domain, openFeeDialog } = useApp();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showDates, setShowDates] = useState(false);
+  const hasRange = Boolean(startDate || endDate);
 
-  const memberPaymentsInRange = (member) =>
-    (member.payments || []).filter((payment) => {
-      if (startDate && payment.date < startDate) return false;
-      if (endDate && payment.date > endDate) return false;
+  const inRange = (payment) => {
+    const day = String(payment.date || "").slice(0, 10);
+    if (hasRange) {
+      if (startDate && day < startDate) return false;
+      if (endDate && day > endDate) return false;
       return true;
-    });
+    }
+    return day.startsWith(monthKey());
+  };
+
+  const rows = members.map((member) => {
+    const status = statusOf(domain, member);
+    const payments = (member.payments || []).filter(inRange);
+    return {
+      member,
+      status,
+      collected: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+      paymentCount: payments.length,
+      overdueAmount: status === "overdue" ? domain.getOverdueAmount(member) : 0,
+      duePeriods: status === "overdue" ? domain.getDueUnpaidPeriods(member).length : 0,
+      dueDate: domain.getDueDateKey(member),
+    };
+  });
+
+  const counts = { all: rows.length, overdue: 0, pending: 0, paid: 0 };
+  let collected = 0;
+  let outstanding = 0;
+  rows.forEach((row) => {
+    counts[row.status] += 1;
+    collected += row.collected;
+    outstanding += row.overdueAmount;
+  });
 
   const query = search.trim().toLowerCase();
-  const filtered = members
-    .filter((member) => {
-      const textMatch = [member.name, member.phone].some((value) =>
-        String(value || "").toLowerCase().includes(query),
-      );
-      if (!textMatch) return false;
-      if (statusFilter === "paid") return domain.isPaidThisPeriod(member);
-      if (statusFilter === "pending") return !domain.isPaidThisPeriod(member);
-      if (statusFilter === "overdue") return domain.isOverdue(member);
-      return true;
-    })
-    .sort((a, b) => Number(domain.isOverdue(b)) - Number(domain.isOverdue(a)) || a.name.localeCompare(b.name));
+  const filtered = rows
+    .filter((row) => statusFilter === "all" || row.status === statusFilter)
+    .filter((row) =>
+      [row.member.name, row.member.phone].some((value) =>
+        String(value || "")
+          .toLowerCase()
+          .includes(query),
+      ),
+    )
+    .sort((a, b) => b.overdueAmount - a.overdueAmount || a.member.name.localeCompare(b.member.name));
+  const visible = filtered.slice(0, VISIBLE_LIMIT);
+  const groups = GROUPS.map((group) => ({ ...group, rows: visible.filter((row) => row.status === group.key) })).filter(
+    (group) => group.rows.length,
+  );
 
-  const visibleMembers = filtered.slice(0, 120);
-  const selectedMember =
-    visibleMembers.find((item) => item.id === selectedPaymentMemberId) || visibleMembers[0] || null;
-  const detailPayments = selectedMember ? [...memberPaymentsInRange(selectedMember)].reverse() : [];
-  const selectedPaid = selectedMember ? domain.isPaidThisPeriod(selectedMember) : false;
-  const selectedHasDues = selectedMember ? domain.getUnpaidPeriods(selectedMember).length > 0 : false;
+  const clearDates = () => {
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
-    <section className="panel billing-panel">
-      <div className="panel-head"></div>
-      <div className="history-filters payment-filters">
-        <label>
-          <span>Search customer</span>
+    <section className="list-view">
+      <div className="summary-pair">
+        <div>
+          <span>{hasRange ? "Collected in range" : "Collected this month"}</span>
+          <strong>{currency(collected)}</strong>
+        </div>
+        <div>
+          <span>Outstanding</span>
+          <strong className={outstanding ? "is-due" : ""}>{currency(outstanding)}</strong>
+        </div>
+      </div>
+
+      <div className="list-toolbar">
+        <label className="list-search">
+          <Icon name="search" />
           <input
             id="paymentSearch"
             type="search"
-            placeholder="Name or mobile number..."
+            placeholder="Search name or mobile"
+            aria-label="Search members"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <label>
-          <span>From</span>
-          <input
-            id="paymentStartDate"
-            type="date"
-            min="2000-01-01"
-            max="2099-12-31"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>To</span>
-          <input
-            id="paymentEndDate"
-            type="date"
-            min="2000-01-01"
-            max="2099-12-31"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Status</span>
-          <select
-            id="paymentStatusFilter"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+        <button
+          type="button"
+          className={"list-filter-toggle" + (showDates || hasRange ? " is-on" : "")}
+          aria-expanded={showDates}
+          aria-label="Filter by date range"
+          onClick={() => setShowDates((open) => !open)}
+        >
+          <Icon name="calendar_month" />
+          {hasRange ? <i aria-hidden="true" /> : null}
+        </button>
+      </div>
+
+      {showDates ? (
+        <div className="list-dates">
+          <label>
+            <span>From</span>
+            <input
+              id="paymentStartDate"
+              type="date"
+              min="2000-01-01"
+              max="2099-12-31"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>To</span>
+            <input
+              id="paymentEndDate"
+              type="date"
+              min="2000-01-01"
+              max="2099-12-31"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+          <button type="button" className="list-dates-clear" disabled={!hasRange} onClick={clearDates}>
+            Clear
+          </button>
+        </div>
+      ) : null}
+
+      <div className="chip-row" role="tablist" aria-label="Payment status">
+        {[{ key: "all", label: "All" }, ...GROUPS].map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === chip.key}
+            className={"filter-chip " + chip.key + (statusFilter === chip.key ? " active" : "")}
+            onClick={() => setStatusFilter(chip.key)}
           >
-            <option value="all">All customers</option>
-            <option value="paid">Paid this month</option>
-            <option value="pending">Pending this month</option>
-            <option value="overdue">Overdue</option>
-          </select>
-        </label>
+            {chip.label}
+            <span>{counts[chip.key]}</span>
+          </button>
+        ))}
       </div>
-      <div className="history-workspace payment-workspace">
-        <div className="payment-list-head">
-          <h3 className="subhead" id="paymentCustomerCount">
-            Customers ({filtered.length}
-            {filtered.length > visibleMembers.length ? ", showing first 120" : ""})
-          </h3>
-          <span className="payment-filter-pill">Active filters applied</span>
-        </div>
-        <div id="paymentCustomerGrid" className="payment-customer-grid">
-          {visibleMembers.length ? (
-            visibleMembers.map((member) => {
-              const payments = memberPaymentsInRange(member);
-              const paid = domain.isPaidThisPeriod(member);
-              const total = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-              return (
-                <button
-                  key={member.id}
-                  className={
-                    "payment-customer-card " +
-                    (member.id === selectedMember?.id ? "active " : "") +
-                    (paid ? "is-paid" : "is-pending")
-                  }
-                  type="button"
-                  onClick={() => setSelectedPaymentMemberId(member.id)}
-                >
-                  <Photo person={member} />
-                  <div>
-                    <h3>{member.name}</h3>
-                    <p className="customer-phone">{member.phone}</p>
-                    <span>
-                      {domain.getMembershipLabel(member)} ·{" "}
-                      <em className="customer-filtered">
-                        {payments.length} filtered {payments.length === 1 ? "payment" : "payments"}
-                      </em>
+
+      {groups.length ? (
+        groups.map((group) => (
+          <section className="contact-group" key={group.key} aria-label={group.label}>
+            <h3 className="contact-group-title">
+              {group.label}
+              <span>{group.rows.length}</span>
+            </h3>
+            <ul className="contact-list">
+              {group.rows.map((row) => (
+                <li key={row.member.id}>
+                  <button
+                    type="button"
+                    className={"contact-row is-" + row.status}
+                    onClick={() => openFeeDialog(row.member.id)}
+                  >
+                    <span className="contact-avatar">
+                      <Photo person={row.member} />
                     </span>
-                  </div>
-                  <strong className="customer-amount">{currency(total)}</strong>
-                </button>
-              );
-            })
-          ) : (
-            <p className="history-empty">No customers match these filters.</p>
-          )}
-        </div>
-        <div id="paymentCustomerDetail" className="payment-customer-detail">
-          {selectedMember ? (
-            <>
-              <div className={"payment-detail-head " + (selectedPaid ? "is-paid" : "is-pending")}>
-                <Photo person={selectedMember} />
-                <div>
-                  <h3>{selectedMember.name}</h3>
-                  <p>
-                    {domain.getMembershipLabel(selectedMember)} ·{" "}
-                    <span className={"payment-status " + (selectedPaid ? "paid" : "pending")}>
-                      {selectedPaid ? "✓ Paid" : "⏳ Pending"}
+                    <span className="contact-copy">
+                      <strong>{row.member.name}</strong>
+                      <small>
+                        {hasRange
+                          ? `${row.paymentCount} payment${row.paymentCount === 1 ? "" : "s"} · ${currency(row.collected)}`
+                          : [row.member.phone, domain.getMembershipLabel(row.member)].filter(Boolean).join(" · ")}
+                      </small>
                     </span>
-                  </p>
-                </div>
-                <strong className="payment-detail-amount">{currency(selectedMember.fee)}</strong>
-              </div>
-              <button
-                className="collect-fee-button"
-                type="button"
-                disabled={!selectedHasDues}
-                onClick={() => openFeeDialog(selectedMember.id)}
-              >
-                {selectedHasDues ? "Add payment" : "No pending dues"}
-              </button>
-              <div className="payment-history-list">
-                {detailPayments.length ? (
-                  detailPayments.map((payment) => (
-                    <div className="payment-history-row" key={payment.id}>
-                      <div>
-                        <strong>{currency(payment.amount)}</strong>
-                        <span>
-                          {domain.getPaymentLabel(payment, selectedMember)}
-                        </span>
-                      </div>
-                      <span>{displayDate(payment.date)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="history-empty">No payments collected for this customer yet.</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="history-empty">Add a member to view payment history.</p>
-          )}
-        </div>
-      </div>
+                    <span className="contact-state">
+                      {row.status === "overdue" ? (
+                        <>
+                          <strong>{currency(row.overdueAmount)}</strong>
+                          <small>{row.duePeriods} due</small>
+                        </>
+                      ) : row.status === "paid" ? (
+                        <>
+                          <strong>Paid</strong>
+                          <small>Next {displayDate(row.dueDate).slice(0, 6)}</small>
+                        </>
+                      ) : (
+                        <>
+                          <strong>{currency(row.member.fee)}</strong>
+                          <small>Due {displayDate(row.dueDate).slice(0, 6)}</small>
+                        </>
+                      )}
+                    </span>
+                    <Icon name="chevron_right" className="contact-go" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      ) : (
+        <p className="contact-empty">
+          {members.length ? "No members match these filters." : "Add a member to start collecting fees."}
+        </p>
+      )}
+
+      {filtered.length > visible.length ? (
+        <p className="contact-more">
+          Showing the first {VISIBLE_LIMIT} of {filtered.length}. Search to narrow the list.
+        </p>
+      ) : null}
     </section>
   );
 }

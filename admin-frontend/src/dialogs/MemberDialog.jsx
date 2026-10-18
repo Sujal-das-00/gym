@@ -3,14 +3,18 @@ import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
+import Icon from "../components/Icon.jsx";
 import { todayKey } from "../lib/dates.js";
 import { readPhoto } from "../lib/photo.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
 import { firstErrorField, toPhoneDigits, validateMember } from "../lib/validation.js";
 
+// Quick picks for a package length; any 1-60 months can still be typed.
+const PACKAGE_PRESETS = [3, 6, 12];
+
 // Order the fields appear in the form, so the first invalid one is the one we
 // focus after a failed submit.
-const FIELD_ORDER = ["gymId", "name", "phone", "address", "fee", "admissionFee", "packageMonths", "startDate"];
+const FIELD_ORDER = ["name", "phone", "gymId", "address", "packageMonths", "fee", "startDate", "admissionFee"];
 
 const FIELD_IDS = {
   gymId: "gymIdInput",
@@ -173,259 +177,344 @@ export default function MemberDialog() {
     }
   };
 
+  const feeError = errorFor("fee");
+  const admissionError = errorFor("admissionFee");
+
   return (
-    <Dialog className="member-dialog" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
-      <form className="member-form" id="memberForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
-        <div className="dialog-head">
-          <div>
-            <p className="eyebrow">Easy onboarding</p>
-            <h2 id="dialogTitle">{member ? "Edit member" : "Add new member"}</h2>
-          </div>
-          <button className="icon-button" id="closeDialog" aria-label="Close" type="button" onClick={closeMemberDialog}>
-            ×
+    <Dialog className="sheet member-form-sheet" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
+      <form className="sheet-panel" id="memberForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
+        <header className="sheet-head">
+          <span className="sheet-grabber" aria-hidden="true" />
+          <h2 id="dialogTitle">{member ? "Edit member" : "Add member"}</h2>
+          <button className="sheet-close" id="closeDialog" aria-label="Close" type="button" onClick={closeMemberDialog}>
+            <Icon name="close" />
           </button>
+        </header>
+
+        <div className="sheet-body">
+          <section className="sheet-section">
+            <div className="mf-photo">
+              <label className="mf-avatar">
+                {photo ? (
+                  <img id="photoPreview" src={photo} alt="Member photo preview" />
+                ) : (
+                  <Icon name="person" className="mf-avatar-empty" />
+                )}
+                <span className="mf-avatar-badge" aria-hidden="true">
+                  <Icon name="photo_camera" />
+                </span>
+                <input
+                  id="photoInput"
+                  name="photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-label={photo ? "Change photo" : "Add photo"}
+                  onChange={onPhotoChange}
+                />
+              </label>
+              <div>
+                <strong>{photo ? "Change photo" : "Add a photo"}</strong>
+                <small>Take one with the camera or pick from the gallery. It helps the desk recognise members.</small>
+              </div>
+            </div>
+          </section>
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Member details</h3>
+            </div>
+            <div className="mf-grid">
+              <label className="mf-field wide">
+                Full name
+                <input
+                  id="nameInput"
+                  name="name"
+                  autoComplete="name"
+                  maxLength={80}
+                  placeholder="e.g. Rahul Verma"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  {...fieldProps("name")}
+                />
+                <FieldError id="nameInput-error" message={errorFor("name")} />
+              </label>
+              <PhoneField
+                id="phoneInput"
+                className="mf-field"
+                value={phone}
+                onChange={setPhone}
+                onBlur={() => markTouched("phone")}
+                error={errorFor("phone")}
+              />
+              <label className="mf-field">
+                Membership ID
+                <input
+                  id="gymIdInput"
+                  name="gymId"
+                  placeholder="Auto generated"
+                  maxLength={40}
+                  value={gymId}
+                  onChange={(event) => setGymId(event.target.value)}
+                  {...fieldProps("gymId")}
+                />
+                <FieldError id="gymIdInput-error" message={errorFor("gymId")} />
+              </label>
+              <label className="mf-field wide">
+                Address
+                <textarea
+                  id="addressInput"
+                  name="address"
+                  rows="2"
+                  maxLength={200}
+                  placeholder="House, street, area"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  {...fieldProps("address")}
+                />
+                <FieldError id="addressInput-error" message={errorFor("address")} />
+              </label>
+            </div>
+          </section>
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Plan</h3>
+            </div>
+            <div className="mf-grid">
+              <div className="mf-field wide">
+                <span className="mf-label" id="membershipTypeLabel">
+                  Membership type
+                </span>
+                <div className="segmented" role="radiogroup" aria-labelledby="membershipTypeLabel">
+                  <label>
+                    <input
+                      type="radio"
+                      name="membershipType"
+                      value="monthly"
+                      checked={membershipType === "monthly"}
+                      onChange={() => setMembershipType("monthly")}
+                    />
+                    <span>Monthly</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="membershipType"
+                      value="package"
+                      checked={membershipType === "package"}
+                      onChange={() => setMembershipType("package")}
+                    />
+                    <span>Package</span>
+                  </label>
+                </div>
+                <small className="field-hint">
+                  {isPackage
+                    ? "Bills again after the package period you choose below."
+                    : "Bills every month using the gym's billing cycle."}
+                </small>
+              </div>
+
+              {isPackage ? (
+                <div className="mf-field wide" id="packageMonthsField">
+                  <span className="mf-label">Package length</span>
+                  <div className="mf-months">
+                    {PACKAGE_PRESETS.map((months) => (
+                      <button
+                        key={months}
+                        type="button"
+                        className={"pay-mode" + (String(months) === String(packageMonths) ? " active" : "")}
+                        onClick={() => setPackageMonths(String(months))}
+                      >
+                        {months} mo
+                      </button>
+                    ))}
+                    <span className={"affix-input mf-months-custom" + (errorFor("packageMonths") ? " has-error" : "")}>
+                      <input
+                        id="packageMonthsInput"
+                        name="packageMonths"
+                        type="number"
+                        min="1"
+                        max="60"
+                        step="1"
+                        inputMode="numeric"
+                        aria-label="Package months"
+                        value={packageMonths}
+                        onChange={(event) => setPackageMonths(event.target.value)}
+                        onBlur={() => markTouched("packageMonths")}
+                        aria-invalid={errorFor("packageMonths") ? "true" : undefined}
+                      />
+                      <span className="affix">months</span>
+                    </span>
+                  </div>
+                  <FieldError id="packageMonthsInput-error" message={errorFor("packageMonths")} />
+                </div>
+              ) : null}
+
+              <label className="mf-field">
+                {isPackage ? "Package fee" : "Monthly fee"}
+                <span className={"affix-input" + (feeError ? " has-error" : "")}>
+                  <span className="affix">₹</span>
+                  <input
+                    id="feeInput"
+                    name="fee"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={fee}
+                    onChange={(event) => setFee(event.target.value)}
+                    onBlur={() => markTouched("fee")}
+                    aria-invalid={feeError ? "true" : undefined}
+                    aria-describedby={feeError ? "feeInput-error" : undefined}
+                  />
+                </span>
+                <FieldError id="feeInput-error" message={feeError} />
+              </label>
+              <label className="mf-field">
+                Start date
+                <input
+                  id="startDateInput"
+                  name="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                  {...fieldProps("startDate")}
+                />
+                <FieldError id="startDateInput-error" message={errorFor("startDate")} />
+              </label>
+              <label className="mf-field wide">
+                Trainer
+                <select
+                  id="assignedTrainerInput"
+                  name="trainerId"
+                  value={trainerId}
+                  onChange={(event) => setTrainerId(event.target.value)}
+                >
+                  <option value="">No trainer</option>
+                  {trainerOptions.map((trainer) => (
+                    <option key={trainer.id} value={trainer.id}>
+                      {trainer.name} - {trainer.specialty || "Trainer"}
+                      {trainer.status === "inactive" ? " (inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Payment</h3>
+            </div>
+            <div className="mf-grid">
+              <div className="mf-field wide">
+                <span className="mf-label" id="collectionTimingLabel">
+                  When is the fee collected?
+                </span>
+                <div className="segmented" role="radiogroup" aria-labelledby="collectionTimingLabel">
+                  <label>
+                    <input
+                      type="radio"
+                      name="collectionTiming"
+                      value="at-join"
+                      checked={collectionTiming === "at-join"}
+                      onChange={() => setCollectionTiming("at-join")}
+                    />
+                    <span>Upfront</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="collectionTiming"
+                      value="fixed-day"
+                      checked={collectionTiming === "fixed-day"}
+                      onChange={() => setCollectionTiming("fixed-day")}
+                    />
+                    <span>After the period</span>
+                  </label>
+                </div>
+                <small className="field-hint">
+                  {collectionTiming === "fixed-day"
+                    ? "No payment at join. The fee is due at the end of each period."
+                    : "Mark the first term paid now. The next payment is due one cycle later."}
+                </small>
+              </div>
+
+              <label className="mf-field wide">
+                <span className="mf-label-row">
+                  Admission fee
+                  <em>Optional</em>
+                </span>
+                <span className={"affix-input" + (admissionError ? " has-error" : "")}>
+                  <span className="affix">₹</span>
+                  <input
+                    id="admissionFeeInput"
+                    name="admissionFee"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    inputMode="numeric"
+                    value={admissionFee}
+                    onChange={(event) => setAdmissionFee(event.target.value)}
+                    onBlur={() => markTouched("admissionFee")}
+                    aria-invalid={admissionError ? "true" : undefined}
+                    aria-describedby={admissionError ? "admissionFeeInput-error" : undefined}
+                  />
+                </span>
+                <FieldError id="admissionFeeInput-error" message={admissionError} />
+                <small className="field-hint">One-time joining charge. Leave blank if the gym doesn&apos;t collect one.</small>
+              </label>
+
+              {Number(admissionFee) > 0 ? (
+                <div className="mf-field wide" id="admissionModeField">
+                  <span className="mf-label" id="admissionModeLabel">
+                    Admission fee paid by
+                  </span>
+                  <div className="pay-modes" role="radiogroup" aria-labelledby="admissionModeLabel">
+                    {PAYMENT_MODES.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={admissionMode === option.value}
+                        className={"pay-mode" + (admissionMode === option.value ? " active" : "")}
+                        onClick={() => setAdmissionMode(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          {formError ? (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          ) : null}
         </div>
 
-        <div className="photo-field">
-          <div className="photo-preview-box">
-            <span className="photo-placeholder" aria-hidden="true">
-              👤
-            </span>
-            <img
-              id="photoPreview"
-              src={photo || ""}
-              alt={photo ? "Member photo preview" : ""}
-              style={{ visibility: photo ? "visible" : "hidden" }}
-            />
-          </div>
-          <label>
-            <span>Take or upload photo</span>
-            <input id="photoInput" name="photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhotoChange} />
-          </label>
-        </div>
-
-        <div className="form-grid">
-          <label>
-            Gym ID
-            <input
-              id="gymIdInput"
-              name="gymId"
-              placeholder="Auto generated"
-              maxLength={40}
-              value={gymId}
-              onChange={(event) => setGymId(event.target.value)}
-              {...fieldProps("gymId")}
-            />
-            <FieldError id="gymIdInput-error" message={errorFor("gymId")} />
-          </label>
-          <label>
-            Name
-            <input
-              id="nameInput"
-              name="name"
-              autoComplete="name"
-              maxLength={80}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              {...fieldProps("name")}
-            />
-            <FieldError id="nameInput-error" message={errorFor("name")} />
-          </label>
-          <PhoneField
-            id="phoneInput"
-            value={phone}
-            onChange={setPhone}
-            onBlur={() => markTouched("phone")}
-            error={errorFor("phone")}
-          />
-          <label className="wide">
-            Address
-            <textarea
-              id="addressInput"
-              name="address"
-              rows="3"
-              maxLength={200}
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-              {...fieldProps("address")}
-            />
-            <FieldError id="addressInput-error" message={errorFor("address")} />
-          </label>
-          <fieldset className="membership-options wide">
-            <legend>Membership type</legend>
-            <label className="membership-option">
-              <input
-                type="radio"
-                name="membershipType"
-                value="monthly"
-                checked={membershipType === "monthly"}
-                onChange={() => setMembershipType("monthly")}
-              />
-              <span>
-                <strong>Monthly membership</strong>
-                <small>Bills every month using the gym billing cycle.</small>
-              </span>
-            </label>
-            <label className="membership-option">
-              <input
-                type="radio"
-                name="membershipType"
-                value="package"
-                checked={membershipType === "package"}
-                onChange={() => setMembershipType("package")}
-              />
-              <span>
-                <strong>Package membership</strong>
-                <small>Bills again after the selected package period.</small>
-              </span>
-            </label>
-          </fieldset>
-          <label>
-            Fee amount
-            <input
-              id="feeInput"
-              name="fee"
-              type="number"
-              min="0"
-              step="1"
-              inputMode="numeric"
-              value={fee}
-              onChange={(event) => setFee(event.target.value)}
-              {...fieldProps("fee")}
-            />
-            <FieldError id="feeInput-error" message={errorFor("fee")} />
-          </label>
-          <label>
-            Admission fee
-            <input
-              id="admissionFeeInput"
-              name="admissionFee"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="0"
-              inputMode="numeric"
-              value={admissionFee}
-              onChange={(event) => setAdmissionFee(event.target.value)}
-              {...fieldProps("admissionFee")}
-            />
-            <FieldError id="admissionFeeInput-error" message={errorFor("admissionFee")} />
-            <small className="field-hint">One-time joining charge. Leave blank if the gym doesn't collect one.</small>
-          </label>
-          <label id="admissionModeField" hidden={!(Number(admissionFee) > 0)}>
-            Admission fee payment mode
-            <select
-              id="admissionModeInput"
-              name="admissionMode"
-              disabled={!(Number(admissionFee) > 0)}
-              value={admissionMode}
-              onChange={(event) => setAdmissionMode(event.target.value)}
+        <footer className="sheet-foot mf-foot">
+          {member ? (
+            <button
+              className={"mf-delete" + (busy ? " is-busy" : "")}
+              id="deleteMember"
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              aria-label={`Delete ${member.name || "member"}`}
             >
-              {PAYMENT_MODES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label id="packageMonthsField" className="package-months-field" hidden={!isPackage}>
-            Package months
-            <input
-              id="packageMonthsInput"
-              name="packageMonths"
-              type="number"
-              min="1"
-              max="60"
-              step="1"
-              inputMode="numeric"
-              disabled={!isPackage}
-              value={packageMonths}
-              onChange={(event) => setPackageMonths(event.target.value)}
-              {...fieldProps("packageMonths")}
-            />
-            <FieldError id="packageMonthsInput-error" message={errorFor("packageMonths")} />
-          </label>
-          <label>
-            Start date
-            <input
-              id="startDateInput"
-              name="startDate"
-              type="date"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
-              {...fieldProps("startDate")}
-            />
-            <FieldError id="startDateInput-error" message={errorFor("startDate")} />
-          </label>
-          <fieldset className="membership-options wide">
-            <legend>Payment collection</legend>
-            <label className="membership-option">
-              <input
-                type="radio"
-                name="collectionTiming"
-                value="at-join"
-                checked={collectionTiming === "at-join"}
-                onChange={() => setCollectionTiming("at-join")}
-              />
-              <span>
-                <strong>Collect at join (upfront)</strong>
-                <small>Mark the first term paid now. Next payment is due one cycle later.</small>
-              </span>
-            </label>
-            <label className="membership-option">
-              <input
-                type="radio"
-                name="collectionTiming"
-                value="fixed-day"
-                checked={collectionTiming === "fixed-day"}
-                onChange={() => setCollectionTiming("fixed-day")}
-              />
-              <span>
-                <strong>Collect after the period</strong>
-                <small>No payment at join. Due at the end of the period.</small>
-              </span>
-            </label>
-          </fieldset>
-          <label className="wide">
-            Assigned trainer
-            <select
-              id="assignedTrainerInput"
-              name="trainerId"
-              value={trainerId}
-              onChange={(event) => setTrainerId(event.target.value)}
-            >
-              <option value="">No trainer assigned</option>
-              {trainerOptions.map((trainer) => (
-                <option key={trainer.id} value={trainer.id}>
-                  {trainer.name} - {trainer.specialty || "Trainer"}
-                  {trainer.status === "inactive" ? " (inactive)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {formError ? (
-          <p className="form-error" role="alert">
-            {formError}
-          </p>
-        ) : null}
-
-        <div className="form-actions">
-          <button
-            className={"secondary-action" + (busy ? " is-busy" : "")}
-            id="deleteMember"
-            type="button"
-            style={{ display: member ? "inline-block" : "none" }}
-            disabled={busy}
-            onClick={onDelete}
-          >
-            Delete
+              <Icon name="delete" />
+            </button>
+          ) : null}
+          <button className={"sheet-confirm" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
+            {busy ? "Saving..." : member ? "Save changes" : "Add member"}
           </button>
-          <button className={"primary-action" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
-            {busy ? "Saving..." : "Save member"}
-          </button>
-        </div>
+        </footer>
       </form>
     </Dialog>
   );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { currency, monthKey, todayKey } from "../lib/dates.js";
+import { currency, monthKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { downloadCsv } from "../lib/csv.js";
 import {
   buildLedgerEntries,
@@ -10,33 +10,38 @@ import {
   summarizeEntries,
   topPayingMembers,
 } from "../lib/ledger.js";
-import {
-  MONTH_OPTIONS,
-  PERIOD_MODES,
-  availableYears,
-  dayLabel,
-  describePeriod,
-  resolvePeriod,
-} from "../lib/period.js";
+import { PERIOD_MODES, availableYears, describePeriod, resolvePeriod } from "../lib/period.js";
+import { CATEGORY_ICONS } from "../lib/constants.js";
 import Icon from "../components/Icon.jsx";
+import Photo from "../components/Photo.jsx";
 
 /** A category row with a bar showing its share of that side's total. */
 function BreakdownRow({ row, tone }) {
+  const share = Math.round(row.share * 100);
   return (
-    <li className={"insight-breakdown-row is-" + tone}>
-      <div className="insight-breakdown-head">
-        <span className="insight-breakdown-label">{row.label}</span>
-        <strong>{currency(row.amount)}</strong>
+    <li className={"split-row is-" + tone}>
+      <span className="split-ico" aria-hidden="true">
+        <Icon name={CATEGORY_ICONS[row.category] || "receipt_long"} />
+      </span>
+      <div className="split-body">
+        <div className="split-head">
+          <span>{row.label}</span>
+          <strong>{currency(row.amount)}</strong>
+        </div>
+        <div className="split-bar" aria-hidden="true">
+          <span style={{ width: Math.max(2, share) + "%" }} />
+        </div>
+        <small>
+          {share}% · {row.count} {row.count === 1 ? "entry" : "entries"}
+        </small>
       </div>
-      <div className="insight-breakdown-bar" aria-hidden="true">
-        <span style={{ width: Math.max(2, Math.round(row.share * 100)) + "%" }} />
-      </div>
-      <small>
-        {`${Math.round(row.share * 100)}% · ${row.count} ${row.count === 1 ? "entry" : "entries"}`}
-      </small>
     </li>
   );
 }
+
+const weekdayOf = (key) => new Intl.DateTimeFormat("en-IN", { weekday: "long" }).format(parseDateKey(key));
+const monthShortOf = (key) => new Intl.DateTimeFormat("en-IN", { month: "short" }).format(parseDateKey(key));
+const signed = (amount) => (amount < 0 ? "−" : "+") + currency(Math.abs(amount));
 
 export default function InsightsView() {
   const { members, expenses, domain, openDayLedger, openDetail, showToast } = useApp();
@@ -68,6 +73,23 @@ export default function InsightsView() {
   const topMembers = topPayingMembers(earnings);
   const days = groupEntriesByDay(entries);
 
+  // ‹ October 2026 › / ‹ 2026 › stepping for the month and year modes.
+  const step = (delta) => {
+    if (mode === "year") {
+      setYear(String(Number(year) + delta));
+      return;
+    }
+    const next = new Date(Number(year), Number(month) - 1 + delta, 1);
+    setYear(String(next.getFullYear()));
+    setMonth(String(next.getMonth() + 1).padStart(2, "0"));
+  };
+  const onMonthPick = (value) => {
+    if (!/^\d{4}-\d{2}$/.test(value)) return;
+    setYear(value.slice(0, 4));
+    setMonth(value.slice(5, 7));
+  };
+  const memberById = (id) => members.find((member) => member.id === id);
+
   const exportCsv = () => {
     if (!entries.length) {
       showToast("Nothing to export for this period");
@@ -91,221 +113,219 @@ export default function InsightsView() {
   };
 
   return (
-    <>
-      <section className="panel insight-period-panel">
-        <div className="panel-head">
-          <div>
-            <h2>Period</h2>
-            <p>Choose a month, year or custom range.</p>
-          </div>
-          <button className="secondary-action" type="button" onClick={exportCsv}>
-            Export CSV
-          </button>
-        </div>
-
-        <div className="insight-mode-switch" role="group" aria-label="Period type">
+    <section className="list-view insights-view" aria-label="Detailed insights">
+      <div className="list-toolbar">
+        <div className="segmented insight-modes" role="radiogroup" aria-label="Period type">
           {PERIOD_MODES.map((option) => (
-            <button
-              key={option.value}
-              className={"insight-mode-button" + (mode === option.value ? " active" : "")}
-              type="button"
-              aria-pressed={mode === option.value}
-              onClick={() => setMode(option.value)}
-            >
-              {option.label}
-            </button>
+            <label key={option.value}>
+              <input type="radio" name="insightMode" checked={mode === option.value} onChange={() => setMode(option.value)} />
+              <span>{option.value === "custom" ? "Custom" : option.value === "year" ? "Year" : "Month"}</span>
+            </label>
           ))}
         </div>
+        <button type="button" className="list-filter-toggle" aria-label="Export CSV" onClick={exportCsv}>
+          <Icon name="download" />
+        </button>
+      </div>
 
-        <div className="history-filters insight-filters">
-          {mode === "custom" ? (
-            <>
-              <label>
-                <span>From</span>
-                <input
-                  type="date"
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>To</span>
-                <input
-                  type="date"
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              <label>
-                <span>Year</span>
-                <select value={year} onChange={(event) => setYear(event.target.value)}>
-                  {years.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {mode === "month" ? (
-                <label>
-                  <span>Month</span>
-                  <select value={month} onChange={(event) => setMonth(event.target.value)}>
-                    {MONTH_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-            </>
-          )}
+      {mode === "custom" ? (
+        <div className="list-dates">
+          <label>
+            <span>From</span>
+            <input type="date" min="2000-01-01" max="2099-12-31" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" min="2000-01-01" max="2099-12-31" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="list-dates-clear"
+            disabled={!startDate && !endDate}
+            onClick={() => {
+              setStartDate("");
+              setEndDate("");
+            }}
+          >
+            Clear
+          </button>
         </div>
-      </section>
+      ) : (
+        <div className="day-bar">
+          <button type="button" className="day-step" aria-label={mode === "year" ? "Previous year" : "Previous month"} onClick={() => step(-1)}>
+            <Icon name="chevron_left" />
+          </button>
+          <label className="day-pick">
+            <strong>{periodLabel}</strong>
+            <small>
+              {totals.count} {totals.count === 1 ? "entry" : "entries"}
+            </small>
+            {/* Invisible picker over the label, like the attendance day bar. */}
+            {mode === "month" ? (
+              <input
+                type="month"
+                aria-label="Pick a month"
+                value={`${year}-${month}`}
+                onChange={(event) => onMonthPick(event.target.value)}
+                onClick={(event) => event.currentTarget.showPicker?.()}
+              />
+            ) : (
+              <select aria-label="Pick a year" value={year} onChange={(event) => setYear(event.target.value)}>
+                {years.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+          <button type="button" className="day-step" aria-label={mode === "year" ? "Next year" : "Next month"} onClick={() => step(1)}>
+            <Icon name="chevron_right" />
+          </button>
+        </div>
+      )}
 
-      <section className="stats-grid finance-stats" aria-label={`Summary for ${periodLabel}`}>
-        <article className="stat-card paid">
-          <div className="stat-icon">
-            <Icon name="savings" style={{ fontSize: "1.4rem" }} />
-          </div>
-          <span>Earned in {periodLabel}</span>
-          <strong>{currency(totals.earned)}</strong>
-          <small>{`${totals.earningCount} payment${totals.earningCount === 1 ? "" : "s"} collected`}</small>
-        </article>
-        <article className="stat-card due">
-          <div className="stat-icon">
-            <Icon name="shopping_cart" style={{ fontSize: "1.4rem" }} />
-          </div>
-          <span>Spent in {periodLabel}</span>
-          <strong>{currency(totals.spent)}</strong>
-          <small>{`${totals.expenseCount} expense${totals.expenseCount === 1 ? "" : "s"} recorded`}</small>
-        </article>
-        <article className="stat-card total">
-          <div className="stat-icon">
-            <Icon name="account_balance" style={{ fontSize: "1.4rem" }} />
-          </div>
-          <span>Net</span>
-          <strong className={totals.net < 0 ? "is-negative" : ""}>
-            {(totals.net < 0 ? "−" : "") + currency(Math.abs(totals.net))}
-          </strong>
-          <small>{totals.net < 0 ? "Spent more than collected" : "Kept after expenses"}</small>
-        </article>
-        <article className="stat-card attend">
-          <div className="stat-icon">
-            <Icon name="calendar_month" style={{ fontSize: "1.4rem" }} />
-          </div>
-          <span>Active days</span>
-          <strong>{days.length}</strong>
-          <small>Days money moved</small>
-        </article>
-      </section>
-
-      <div className="insight-breakdown-grid">
-        <section className="panel">
-          <div className="panel-head compact">
+      <section className="money-card" aria-label={`Summary for ${periodLabel}`}>
+        <span className="money-card-label">Net · {periodLabel}</span>
+        <strong className={totals.net < 0 ? "is-negative" : ""}>
+          {(totals.net < 0 ? "−" : "") + currency(Math.abs(totals.net))}
+        </strong>
+        <div className="money-card-split">
+          <div className="is-in">
+            <span className="money-card-ico" aria-hidden="true">
+              <Icon name="south_west" />
+            </span>
             <div>
-              <h3>Where the money came from</h3>
-              <p>{`${currency(totals.earned)} collected in ${periodLabel}`}</p>
+              <small>Earned</small>
+              <b>{currency(totals.earned)}</b>
+              <small>
+                {totals.earningCount} payment{totals.earningCount === 1 ? "" : "s"}
+              </small>
             </div>
           </div>
+          <div className="is-out">
+            <span className="money-card-ico" aria-hidden="true">
+              <Icon name="north_east" />
+            </span>
+            <div>
+              <small>Spent</small>
+              <b>{currency(totals.spent)}</b>
+              <small>
+                {totals.expenseCount} expense{totals.expenseCount === 1 ? "" : "s"}
+              </small>
+            </div>
+          </div>
+        </div>
+        <small className="money-card-foot">
+          Money moved on {days.length} day{days.length === 1 ? "" : "s"}
+        </small>
+      </section>
+
+      <div className="insight-grid">
+        <section className="dash-card">
+          <header className="dash-card-head">
+            <div>
+              <h3>Money in</h3>
+              <p>Where it came from</p>
+            </div>
+            <strong className="insight-card-total is-in">{currency(totals.earned)}</strong>
+          </header>
           {incomeRows.length ? (
-            <ul className="insight-breakdown-list">
+            <ul className="split-list">
               {incomeRows.map((row) => (
                 <BreakdownRow key={row.category} row={row} tone="in" />
               ))}
             </ul>
           ) : (
-            <p className="history-empty">Nothing was collected in this period.</p>
+            <p className="member-empty">Nothing was collected in this period.</p>
           )}
 
           {topMembers.length ? (
             <>
-              <h4 className="insight-subhead">Top paying members</h4>
-              <ul className="insight-member-list">
-                {topMembers.map((row) => (
-                  <li key={row.memberId}>
-                    <button type="button" onClick={() => openDetail(row.memberId)}>
-                      <span>{row.name}</span>
-                      <strong>{currency(row.amount)}</strong>
-                    </button>
-                  </li>
-                ))}
+              <h4 className="contact-group-title insight-subhead">Top paying members</h4>
+              <ul className="insight-top">
+                {topMembers.map((row, index) => {
+                  const member = memberById(row.memberId);
+                  return (
+                    <li key={row.memberId}>
+                      <button type="button" onClick={() => openDetail(row.memberId)}>
+                        <span className="insight-rank">{index + 1}</span>
+                        <span className="contact-avatar">{member ? <Photo person={member} /> : null}</span>
+                        <span className="contact-copy">
+                          <strong>
+                            <span className="contact-name">{row.name}</span>
+                          </strong>
+                          <small>
+                            {row.count} payment{row.count === 1 ? "" : "s"}
+                          </small>
+                        </span>
+                        <strong className="insight-top-amount">{currency(row.amount)}</strong>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           ) : null}
         </section>
 
-        <section className="panel">
-          <div className="panel-head compact">
+        <section className="dash-card">
+          <header className="dash-card-head">
             <div>
-              <h3>Where the money went</h3>
-              <p>{`${currency(totals.spent)} spent in ${periodLabel}`}</p>
+              <h3>Money out</h3>
+              <p>Where it went</p>
             </div>
-          </div>
+            <strong className="insight-card-total is-out">{currency(totals.spent)}</strong>
+          </header>
           {spendRows.length ? (
-            <ul className="insight-breakdown-list">
+            <ul className="split-list">
               {spendRows.map((row) => (
                 <BreakdownRow key={row.category} row={row} tone="out" />
               ))}
             </ul>
           ) : (
-            <p className="history-empty">No expenses recorded in this period.</p>
+            <p className="member-empty">No expenses recorded in this period.</p>
           )}
         </section>
       </div>
 
-      <section className="panel insight-days-panel">
-        <div className="panel-head">
-          <div>
-            <h2>Day by day</h2>
-            <p>{`${days.length} active day${days.length === 1 ? "" : "s"} in ${periodLabel}`}</p>
-          </div>
-        </div>
-        {days.length ? (
-          <ul className="insight-day-list">
+      {days.length ? (
+        <section className="contact-group insight-days" aria-label="Day by day">
+          <h3 className="contact-group-title">
+            Day by day
+            <span>{days.length}</span>
+          </h3>
+          <ul className="contact-list">
             {days.map((day) => (
-              <li key={day.date} className="insight-day-row">
-                <div className="insight-day-main">
-                  <strong className="insight-day-date">{day.date.slice(8, 10)}</strong>
-                  <div className="insight-day-copy">
-                    <strong>{dayLabel(day.date)}</strong>
-                    <span>
-                      {/* The in/out split only earns its place on a mixed day —
-                          on a one-sided day it would just repeat the net. */}
-                      {day.earned > 0 && day.spent > 0 ? (
-                        <>
-                          <em className="is-in">{"+" + currency(day.earned)}</em>
-                          {" in · "}
-                          <em className="is-out">{"−" + currency(day.spent)}</em>
-                          {" out · "}
-                        </>
-                      ) : null}
-                      {`${day.count} ${day.count === 1 ? "entry" : "entries"}`}
-                    </span>
-                  </div>
-                </div>
-                <strong className={"insight-day-net " + (day.net < 0 ? "is-out" : "is-in")}>
-                  {(day.net < 0 ? "−" : "+") + currency(Math.abs(day.net))}
-                </strong>
-                <button className="insight-read-more" type="button" onClick={() => openDayLedger(day.date)}>
-                  Read more <Icon name="arrow_forward" />
+              <li key={day.date}>
+                <button type="button" className="contact-row no-dot insight-day" onClick={() => openDayLedger(day.date)}>
+                  <span className="date-tile" aria-hidden="true">
+                    <b>{day.date.slice(8, 10)}</b>
+                    <small>{monthShortOf(day.date)}</small>
+                  </span>
+                  <span className="contact-copy">
+                    <strong>{weekdayOf(day.date)}</strong>
+                    <small>
+                      {/* The in/out split only earns its place on a mixed day. */}
+                      {day.earned > 0 && day.spent > 0
+                        ? `+${currency(day.earned)} in · −${currency(day.spent)} out`
+                        : `${day.count} ${day.count === 1 ? "entry" : "entries"}`}
+                    </small>
+                  </span>
+                  <span className="contact-state">
+                    <strong className={day.net < 0 ? "is-out" : "is-in"}>{signed(day.net)}</strong>
+                  </span>
+                  <Icon name="chevron_right" className="contact-go" />
                 </button>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="history-empty">
-            No earnings or expenses in {periodLabel}. Collect a fee or record an expense, then pick that period here.
-          </p>
-        )}
-      </section>
-    </>
+        </section>
+      ) : (
+        <p className="contact-empty">
+          No earnings or expenses in {periodLabel}. Collect a fee or record an expense, then pick that period here.
+        </p>
+      )}
+    </section>
   );
 }

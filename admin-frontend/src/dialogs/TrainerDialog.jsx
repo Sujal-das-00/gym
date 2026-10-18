@@ -3,11 +3,15 @@ import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
+import Icon from "../components/Icon.jsx";
 import { normalizeTrainer } from "../lib/trainers.js";
 import { readPhoto } from "../lib/photo.js";
 import { firstErrorField, toPhoneDigits, validateTrainer } from "../lib/validation.js";
 
 const FIELD_ORDER = ["name", "phone", "specialty", "shift", "bio"];
+
+// One-tap shifts; anything else can still be typed.
+const SHIFT_PRESETS = ["Morning", "Evening", "Full day"];
 
 const FIELD_IDS = {
   name: "trainerNameInput",
@@ -134,132 +138,195 @@ export default function TrainerDialog() {
   };
 
   return (
-    <Dialog className="member-dialog" id="trainerDialog" open={trainerDialog.open} onClose={closeTrainerDialog}>
-      <form className="member-form" id="trainerForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
-        <div className="dialog-head">
-          <div>
-            <p className="eyebrow">Trainer profile</p>
-            <h2 id="trainerDialogTitle">{trainer ? "Edit trainer" : "Add trainer"}</h2>
-          </div>
-          <button className="icon-button" id="closeTrainerDialog" aria-label="Close" type="button" onClick={closeTrainerDialog}>
-            ×
+    <Dialog className="sheet member-form-sheet" id="trainerDialog" open={trainerDialog.open} onClose={closeTrainerDialog}>
+      <form className="sheet-panel" id="trainerForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
+        <header className="sheet-head">
+          <span className="sheet-grabber" aria-hidden="true" />
+          <h2 id="trainerDialogTitle">{trainer ? "Edit trainer" : "Add trainer"}</h2>
+          <button className="sheet-close" id="closeTrainerDialog" aria-label="Close" type="button" onClick={closeTrainerDialog}>
+            <Icon name="close" />
           </button>
+        </header>
+
+        <div className="sheet-body">
+          <section className="sheet-section">
+            <div className="mf-photo">
+              <label className="mf-avatar">
+                {photo ? (
+                  <img id="trainerPhotoPreview" src={photo} alt="Trainer photo preview" />
+                ) : (
+                  <Icon name="person" className="mf-avatar-empty" />
+                )}
+                <span className="mf-avatar-badge" aria-hidden="true">
+                  <Icon name="photo_camera" />
+                </span>
+                <input
+                  id="trainerPhotoInput"
+                  name="photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-label={photo ? "Change photo" : "Add photo"}
+                  onChange={onPhotoChange}
+                />
+              </label>
+              <div>
+                <strong>{photo ? "Change photo" : "Add a photo"}</strong>
+                <small>Shown in the trainer list so members and staff know who is on shift.</small>
+              </div>
+            </div>
+          </section>
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Trainer details</h3>
+            </div>
+            <div className="mf-grid">
+              <label className="mf-field wide">
+                Full name
+                <input
+                  id="trainerNameInput"
+                  name="name"
+                  autoComplete="name"
+                  maxLength={80}
+                  placeholder="e.g. Arjun Mehta"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  {...fieldProps("name")}
+                />
+                <FieldError id="trainerNameInput-error" message={errorFor("name")} />
+              </label>
+              <PhoneField
+                id="trainerPhoneInput"
+                className="mf-field"
+                value={phone}
+                onChange={setPhone}
+                onBlur={() => markTouched("phone")}
+                error={errorFor("phone")}
+              />
+              <label className="mf-field">
+                Specialty
+                <input
+                  id="trainerSpecialtyInput"
+                  name="specialty"
+                  placeholder="Strength, yoga, cardio"
+                  maxLength={60}
+                  value={specialty}
+                  onChange={(event) => setSpecialty(event.target.value)}
+                  {...fieldProps("specialty")}
+                />
+                <FieldError id="trainerSpecialtyInput-error" message={errorFor("specialty")} />
+              </label>
+            </div>
+          </section>
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Schedule</h3>
+            </div>
+            <div className="mf-grid">
+              <div className="mf-field wide">
+                <span className="mf-label">Shift</span>
+                <div className="mf-months">
+                  {SHIFT_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={"pay-mode" + (shift.trim().toLowerCase() === preset.toLowerCase() ? " active" : "")}
+                      onClick={() => setShift(preset)}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  id="trainerShiftInput"
+                  name="shift"
+                  placeholder="Or type one, e.g. 6–10 am"
+                  maxLength={60}
+                  aria-label="Shift"
+                  value={shift}
+                  onChange={(event) => setShift(event.target.value)}
+                  {...fieldProps("shift")}
+                />
+                <FieldError id="trainerShiftInput-error" message={errorFor("shift")} />
+              </div>
+              <div className="mf-field wide">
+                <span className="mf-label" id="trainerStatusLabel">
+                  Status
+                </span>
+                <div className="segmented" role="radiogroup" aria-labelledby="trainerStatusLabel">
+                  <label>
+                    <input
+                      id="trainerStatusInput"
+                      type="radio"
+                      name="status"
+                      value="active"
+                      checked={status === "active"}
+                      onChange={() => setStatus("active")}
+                    />
+                    <span>Active</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="status"
+                      value="inactive"
+                      checked={status === "inactive"}
+                      onChange={() => setStatus("inactive")}
+                    />
+                    <span>Inactive</span>
+                  </label>
+                </div>
+                <small className="field-hint">
+                  {status === "inactive"
+                    ? "Kept on file but moved to the bottom of the trainer list."
+                    : "Shown in the trainer list and in member trainer lists."}
+                </small>
+              </div>
+              <label className="mf-field wide">
+                <span className="mf-label-row">
+                  Notes
+                  <em>Optional</em>
+                </span>
+                <textarea
+                  id="trainerBioInput"
+                  name="bio"
+                  rows="3"
+                  maxLength={500}
+                  placeholder="Experience, certifications or assigned batches"
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value)}
+                  {...fieldProps("bio")}
+                />
+                <FieldError id="trainerBioInput-error" message={errorFor("bio")} />
+              </label>
+            </div>
+          </section>
+
+          {formError ? (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          ) : null}
         </div>
 
-        <div className="photo-field">
-          <div className="photo-preview-box">
-            <span className="photo-placeholder" aria-hidden="true">
-              👤
-            </span>
-            <img
-              id="trainerPhotoPreview"
-              src={photo || ""}
-              alt={photo ? "Trainer photo preview" : ""}
-              style={{ visibility: photo ? "visible" : "hidden" }}
-            />
-          </div>
-          <label>
-            <span>Take or upload photo</span>
-            <input id="trainerPhotoInput" name="photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhotoChange} />
-          </label>
-        </div>
-
-        <div className="form-grid">
-          <label>
-            Name
-            <input
-              id="trainerNameInput"
-              name="name"
-              autoComplete="name"
-              maxLength={80}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              {...fieldProps("name")}
-            />
-            <FieldError id="trainerNameInput-error" message={errorFor("name")} />
-          </label>
-          <PhoneField
-            id="trainerPhoneInput"
-            value={phone}
-            onChange={setPhone}
-            onBlur={() => markTouched("phone")}
-            error={errorFor("phone")}
-          />
-          <label>
-            Specialty
-            <input
-              id="trainerSpecialtyInput"
-              name="specialty"
-              placeholder="Strength, yoga, cardio"
-              maxLength={60}
-              value={specialty}
-              onChange={(event) => setSpecialty(event.target.value)}
-              {...fieldProps("specialty")}
-            />
-            <FieldError id="trainerSpecialtyInput-error" message={errorFor("specialty")} />
-          </label>
-          <label>
-            Shift
-            <input
-              id="trainerShiftInput"
-              name="shift"
-              placeholder="Morning, evening, full day"
-              maxLength={60}
-              value={shift}
-              onChange={(event) => setShift(event.target.value)}
-              {...fieldProps("shift")}
-            />
-            <FieldError id="trainerShiftInput-error" message={errorFor("shift")} />
-          </label>
-          <label>
-            Status
-            <select
-              id="trainerStatusInput"
-              name="status"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
+        <footer className="sheet-foot mf-foot">
+          {trainer ? (
+            <button
+              className={"mf-delete" + (busy ? " is-busy" : "")}
+              id="deleteTrainer"
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              aria-label={`Delete ${trainer.name || "trainer"}`}
             >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </label>
-          <label className="wide">
-            Notes
-            <textarea
-              id="trainerBioInput"
-              name="bio"
-              rows="3"
-              maxLength={500}
-              placeholder="Experience, certifications, or assigned batches"
-              value={bio}
-              onChange={(event) => setBio(event.target.value)}
-              {...fieldProps("bio")}
-            />
-            <FieldError id="trainerBioInput-error" message={errorFor("bio")} />
-          </label>
-        </div>
-
-        {formError ? (
-          <p className="form-error" role="alert">
-            {formError}
-          </p>
-        ) : null}
-
-        <div className="form-actions">
-          <button
-            className={"secondary-action" + (busy ? " is-busy" : "")}
-            id="deleteTrainer"
-            type="button"
-            style={{ display: trainer ? "inline-block" : "none" }}
-            disabled={busy}
-            onClick={onDelete}
-          >
-            Delete
+              <Icon name="delete" />
+            </button>
+          ) : null}
+          <button className={"sheet-confirm" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
+            {busy ? "Saving..." : trainer ? "Save changes" : "Add trainer"}
           </button>
-          <button className={"primary-action" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
-            {busy ? "Saving..." : "Save trainer"}
-          </button>
-        </div>
+        </footer>
       </form>
     </Dialog>
   );

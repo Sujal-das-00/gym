@@ -1,7 +1,12 @@
 import { useApp } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
+import Photo from "../components/Photo.jsx";
+import Icon from "../components/Icon.jsx";
+import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
 import { currency, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { sendFeeReminder, sendLoginDetails } from "../lib/whatsapp.js";
 
+/** Member profile sheet: status, quick actions, key numbers, attendance and payments. */
 export default function DetailDialog() {
   const {
     members,
@@ -10,160 +15,190 @@ export default function DetailDialog() {
     detailMemberId,
     closeDetail,
     openMemberDialog,
+    openFeeDialog,
     attendanceDate,
     setMemberAttendanceStatus,
+    user,
+    gyms,
+    gymId,
+    settings,
   } = useApp();
 
   const member = members.find((item) => item.id === detailMemberId);
   const open = Boolean(member);
 
-  const getTrainerName = (id) => trainers.find((trainer) => trainer.id === id)?.name || "No trainer assigned";
-
-  const getLastPaymentText = () => {
-    const payments = member.payments || [];
-    if (!payments.length) return "No payment";
-    return displayDate(payments[payments.length - 1].date);
-  };
-
-  // The calendar follows the month picked on the Mark Attendance sheet.
-  const renderCalendar = () => {
-    const current = parseDateKey(attendanceDate || todayKey());
-    const year = current.getFullYear();
-    const month = current.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const attendance = new Set(member.attendance || []);
-    const today = todayKey();
-    const monthName = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(current);
-
-    const cells = Array.from({ length: daysInMonth }, (unused, index) => {
-      const day = index + 1;
-      const key = localDateKey(new Date(year, month, day));
-      const classes = ["day-cell"];
-      if (attendance.has(key)) classes.push("present");
-      // Holiday shading follows the Settings panel (weekly days + specific dates);
-      // a check-in on a holiday still renders as present.
-      else if (domain.isHoliday(key)) classes.push("holiday");
-      if (key === today) classes.push("today");
-      return { day, key, className: classes.join(" ") };
-    });
-
-    return { cells, monthName };
-  };
-
   if (!open) {
-    return <Dialog className="detail-dialog" id="detailDialog" open={false} onClose={closeDetail} />;
+    return <Dialog className="sheet member-sheet" id="detailDialog" open={false} onClose={closeDetail} />;
   }
 
-  const { cells, monthName } = renderCalendar();
+  // The calendar follows the month picked on the Mark Attendance sheet.
+  const current = parseDateKey(attendanceDate || todayKey());
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const monthName = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(current);
+  const attendance = new Set(member.attendance || []);
+  const today = todayKey();
+  const cells = Array.from({ length: new Date(year, month + 1, 0).getDate() }, (unused, index) => {
+    const key = localDateKey(new Date(year, month, index + 1));
+    const classes = ["day-cell"];
+    if (attendance.has(key)) classes.push("present");
+    // Holiday shading follows the Settings panel (weekly days + specific dates);
+    // a check-in on a holiday still renders as present.
+    else if (domain.isHoliday(key)) classes.push("holiday");
+    if (key === today) classes.push("today");
+    return { day: index + 1, key, className: classes.join(" ") };
+  });
+
+  const overdue = domain.isOverdue(member);
+  const paid = domain.isPaidThisPeriod(member);
+  const status = overdue ? "overdue" : paid ? "paid" : "pending";
+  const hasDues = domain.getUnpaidPeriods(member).length > 0;
+  const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
   const payments = [...(member.payments || [])].reverse();
+  const lastPayment = payments[0];
+  const gymSlug = user?.gym?.slug || gyms.find((gym) => gym.id === gymId)?.slug || "";
+
+  const actions = [
+    hasDues && { key: "collect", icon: "currency_rupee", label: "Collect", primary: true, run: () => openFeeDialog(member.id) },
+    { key: "edit", icon: "edit", label: "Edit", run: () => openMemberDialog(member) },
+    {
+      key: "login",
+      icon: "key",
+      label: "Send login",
+      run: () => sendLoginDetails(member, { gymName: settings?.gymName, gymSlug }),
+    },
+    hasDues && { key: "remind", whatsapp: true, label: "Remind", run: () => sendFeeReminder(member, domain) },
+  ].filter(Boolean);
 
   return (
-    <Dialog className="detail-dialog" id="detailDialog" open={open} onClose={closeDetail}>
-      <div className="detail-panel">
-        <div className="dialog-head">
-          <div className="member-title">
-            <img
-              id="detailPhoto"
-              alt=""
-              src={member.photo || ""}
-              style={{ display: member.photo ? "block" : "none" }}
-            />
-            <div>
-              <p className="eyebrow" id="detailStatus">
-                {domain.isOverdue(member)
-                  ? "Payment overdue"
-                  : domain.isPaidThisPeriod(member)
-                    ? "Paid this period"
-                    : "Active member"}
-              </p>
-              <h2 id="detailName">{member.name}</h2>
-              <p id="detailMeta">
-                {`${member.phone} · ${member.address} · Trainer: ${getTrainerName(member.trainerId)}`}
-              </p>
-            </div>
-          </div>
-          <button className="icon-button" id="closeDetail" aria-label="Close" type="button" onClick={closeDetail}>
-            ×
+    <Dialog className="sheet member-sheet" id="detailDialog" open={open} onClose={closeDetail}>
+      <div className="sheet-panel">
+        <header className="sheet-head">
+          <span className="sheet-grabber" aria-hidden="true" />
+          <h2>Member</h2>
+          <button className="sheet-close" id="closeDetail" aria-label="Close" type="button" onClick={closeDetail}>
+            <Icon name="close" />
           </button>
-        </div>
+        </header>
 
-        <div className="detail-actions">
-          <button
-            className="secondary-action"
-            id="editMember"
-            type="button"
-            // The original stacked the edit dialog on top of this one rather
-            // than closing it, so returning from the edit lands back here.
-            onClick={() => openMemberDialog(member)}
-          >
-            Edit details
-          </button>
-        </div>
-
-        <section className="detail-grid">
-          <article>
-            <span>Fee</span>
-            <strong id="detailFee">{currency(member.fee)}</strong>
-          </article>
-          <article>
-            <span>{domain.isOverdue(member) ? "Overdue since" : "Next due date"}</span>
-            <strong id="detailDueDate">{displayDate(domain.getDueDateKey(member))}</strong>
-          </article>
-          <article>
-            <span>This month attendance</span>
-            <strong id="detailAttendance">{domain.getMonthlyAttendance(member)} days</strong>
-          </article>
-          <article>
-            <span>Last payment</span>
-            <strong id="detailLastPayment">{getLastPaymentText()}</strong>
-          </article>
-          {/* Only shown when the gym actually charged a joining fee. */}
-          {Number(member.admissionFee || 0) > 0 ? (
-            <article>
-              <span>Admission fee</span>
-              <strong id="detailAdmissionFee">{currency(member.admissionFee)}</strong>
-            </article>
-          ) : null}
-        </section>
-
-        <section className="calendar-section">
-          <div className="panel-head compact">
+        <div className="sheet-body">
+          <div className="sheet-member">
+            <span className="contact-avatar">
+              <Photo person={member} />
+            </span>
             <div>
-              <h3>Attendance calendar</h3>
-              <p id="calendarHint">
-                {monthName} attendance for {member.name}
-              </p>
+              <strong id="detailName">{member.name}</strong>
+              <small>{[member.phone, domain.getMembershipLabel(member)].filter(Boolean).join(" · ")}</small>
             </div>
+            <span className={"status-pill " + status} id="detailStatus">
+              {overdue ? "Overdue" : paid ? "Paid" : "Pending"}
+            </span>
           </div>
-          <div className="calendar-grid" id="attendanceCalendar">
-            {cells.map((cell) => (
+
+          {/* Fee and edit dialogs stack on top of this one, so closing them lands back here. */}
+          <div className="sheet-actions">
+            {actions.map((action) => (
               <button
-                key={cell.key}
-                className={cell.className}
+                key={action.key}
                 type="button"
-                onClick={() => setMemberAttendanceStatus(member.id, cell.key, !domain.hasAttendance(member, cell.key))}
+                id={action.key === "edit" ? "editMember" : undefined}
+                className={action.primary ? "is-primary" : action.whatsapp ? "is-whatsapp" : ""}
+                onClick={action.run}
               >
-                {cell.day}
+                <span>{action.whatsapp ? <WhatsAppIcon size={22} /> : <Icon name={action.icon} />}</span>
+                {action.label}
               </button>
             ))}
           </div>
-        </section>
 
-        <section className="payment-history">
-          <h3>Payment history</h3>
-          <div id="paymentHistory">
+          <dl className="member-stats">
+            <div>
+              <dt>Fee</dt>
+              <dd id="detailFee">{currency(member.fee)}</dd>
+            </div>
+            <div className={overdue ? "is-due" : ""}>
+              <dt>{overdue ? "Overdue since" : "Next due"}</dt>
+              <dd id="detailDueDate">{displayDate(domain.getDueDateKey(member))}</dd>
+            </div>
+            <div>
+              <dt>Visits this month</dt>
+              <dd id="detailAttendance">{domain.getMonthlyAttendance(member)}</dd>
+            </div>
+            <div>
+              <dt>Last payment</dt>
+              <dd id="detailLastPayment">{lastPayment ? displayDate(String(lastPayment.date).slice(0, 10)) : "None yet"}</dd>
+            </div>
+            {/* Only shown when the gym actually charged a joining fee. */}
+            {Number(member.admissionFee || 0) > 0 ? (
+              <div>
+                <dt>Admission fee</dt>
+                <dd id="detailAdmissionFee">{currency(member.admissionFee)}</dd>
+              </div>
+            ) : null}
+          </dl>
+
+          {member.address || trainer ? (
+            <ul className="member-facts">
+              {trainer ? (
+                <li>
+                  <Icon name="exercise" />
+                  {trainer}
+                </li>
+              ) : null}
+              {member.address ? (
+                <li>
+                  <Icon name="location_on" />
+                  {member.address}
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
+
+          <section className="sheet-section">
+            <div className="sheet-section-head">
+              <h3>Attendance · {monthName}</h3>
+              <small className="member-calendar-hint">Tap a day to mark</small>
+            </div>
+            <div className="calendar-grid" id="attendanceCalendar">
+              {cells.map((cell) => (
+                <button
+                  key={cell.key}
+                  className={cell.className}
+                  type="button"
+                  onClick={() => setMemberAttendanceStatus(member.id, cell.key, !domain.hasAttendance(member, cell.key))}
+                >
+                  {cell.day}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <details className="sheet-history" open>
+            <summary>
+              Payment history
+              <Icon name="expand_more" />
+            </summary>
             {payments.length ? (
-              payments.map((payment) => (
-                <div className="payment-row" key={payment.id}>
-                  <strong>{currency(payment.amount)}</strong>
-                  <span>{`${domain.getPaymentLabel(payment, member)} · ${displayDate(payment.date)}`}</span>
-                </div>
-              ))
+              <ul id="paymentHistory">
+                {payments.map((payment) => (
+                  <li key={payment.id}>
+                    <span>
+                      <strong>{domain.getPaymentLabel(payment, member)}</strong>
+                      <small>
+                        {[displayDate(String(payment.date || "").slice(0, 10)), domain.paymentModeLabel(payment.mode)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </small>
+                    </span>
+                    <strong>{currency(payment.amount)}</strong>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <p className="muted">No payments recorded yet.</p>
+              <p className="member-empty">No payments recorded yet.</p>
             )}
-          </div>
-        </section>
+          </details>
+        </div>
       </div>
     </Dialog>
   );

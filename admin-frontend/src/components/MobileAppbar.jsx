@@ -1,10 +1,19 @@
 import { useApp } from "../store/AppContext.jsx";
 import { VIEW_SHORT_TITLE } from "../lib/constants.js";
+import useLicence from "../hooks/useLicence.js";
+import { planNotice } from "../lib/plan.js";
+import Icon from "./Icon.jsx";
+
+const OWNER_ROLES = ["gym_admin", "super_admin"];
 
 export default function MobileAppbar() {
-  const { activeView, drawerOpen, toggleDrawer, openMemberDialog } = useApp();
+  const { activeView, drawerOpen, toggleDrawer, openMemberDialog, setView, user } = useApp();
+  const notice = planNotice(useLicence());
+  const canOpenPlan = OWNER_ROLES.includes(user?.role);
+
   return (
-    <header className="mobile-appbar">
+    // On the dashboard the bar is flat so it flows into the hero band below it.
+    <header className={"mobile-appbar" + (activeView === "dashboard" ? " is-flush" : "")}>
       <button
         className="hamburger"
         id="menuToggle"
@@ -21,6 +30,19 @@ export default function MobileAppbar() {
       <span className="mobile-appbar-title" id="mobileTitle">
         {VIEW_SHORT_TITLE[activeView] || "Dashboard"}
       </span>
+      {notice ? (
+        <button
+          className={"appbar-plan-chip " + notice.tone}
+          type="button"
+          title={notice.text}
+          aria-label={notice.text}
+          disabled={!canOpenPlan}
+          onClick={() => setView("plan")}
+        >
+          <span className="appbar-plan-dot" aria-hidden="true"></span>
+          <span className="appbar-plan-text">{notice.short}</span>
+        </button>
+      ) : null}
       <button
         className="mobile-appbar-add"
         id="mobileAddMember"
@@ -28,7 +50,7 @@ export default function MobileAppbar() {
         aria-label="Add member"
         onClick={() => openMemberDialog()}
       >
-        +
+        <Icon name="person_add" />
       </button>
     </header>
   );

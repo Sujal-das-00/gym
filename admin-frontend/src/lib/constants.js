@@ -13,6 +13,19 @@ export const EXPENSE_CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+// Material Symbols glyph per ledger category (expense categories + the two earning kinds).
+export const CATEGORY_ICONS = {
+  "trainer-payment": "exercise",
+  rent: "home",
+  equipment: "fitness_center",
+  utilities: "bolt",
+  maintenance: "build",
+  miscellaneous: "category",
+  other: "more_horiz",
+  "membership-fee": "card_membership",
+  "admission-fee": "how_to_reg",
+};
+
 // Keep in sync with PAYMENT_MODES in backend/src/config/constants.js.
 export const PAYMENT_MODES = [
   { value: "cash", label: "Cash" },
@@ -49,7 +62,7 @@ export const VIEW_COPY = {
   checkin: ["QR Check-in", "Members scan the desk QR to check in."],
   history: ["Attendance History", "Attendance records by date."],
   members: ["Members", "Search and manage members."],
-  payments: ["Payment History", "Payment records by member."],
+  payments: ["Payments", "Collect fees and track who has paid."],
   expenses: ["Expense Tracker", "Expenses and earnings in one ledger."],
   insights: ["Detailed Insights", "Income and spending for any period."],
   trainers: ["Trainers", "Trainer profiles and shifts."],
@@ -62,16 +75,16 @@ export const VIEW_COPY = {
 // Short labels used by the mobile app bar — the sidebar link text for each view.
 export const VIEW_SHORT_TITLE = {
   dashboard: "Dashboard",
-  attendance: "Mark Attendance",
+  attendance: "Attendance",
   checkin: "QR Check-in",
-  history: "Attendance History",
+  history: "History",
   members: "Members",
   trainers: "Trainers",
   payments: "Payments",
   plan: "Plan & Billing",
   expenses: "Expense Tracker",
   insights: "Detailed Insights",
-  notifications: "Send Notification",
+  notifications: "Notifications",
   settings: "Settings",
   help: "Help",
 };

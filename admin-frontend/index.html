@@ -13,9 +13,17 @@
   <link rel="manifest" href="/manifest.json" />
   <script>
     // Flag standalone/installed launches early so app-only UI applies before first paint.
-    if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true) {
-      document.documentElement.classList.add("pwa");
-    }
+    (function () {
+      var root = document.documentElement;
+      var ua = navigator.userAgent;
+      var standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+      // The Gym Boo phone app is a WebView (Android "; wv)", iOS without "Safari/")
+      // inside Flutter's SafeArea, which already keeps the page clear of the system
+      // bars — env(safe-area-inset-*) would pad them a second time.
+      var shell = /; wv\)/.test(ua) || (/iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua) && !standalone);
+      if (standalone || shell) root.classList.add("pwa");
+      if (shell) root.classList.add("app-shell");
+    })();
   </script>
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
