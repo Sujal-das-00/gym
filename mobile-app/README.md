@@ -41,5 +41,5 @@ Admin: Dashboard → Notifications → Send custom notification → audience *Al
 
 - File/photo upload inputs inside the WebView need a file-chooser handler
   (`AndroidWebViewController.setOnShowFileSelector`); not included yet.
-- iOS needs an Apple Developer account and an APNs key uploaded in Firebase to receive pushes.
+- iOS: both apps build as Xcode schemes `admin` / `member`; see IOS_RELEASE_GUIDE.md (Apple Developer account, member Firebase iOS app, APNs key).
 - Pushes go to *members*; admins don't register devices (the existing notification model).

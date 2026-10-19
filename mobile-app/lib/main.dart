@@ -142,10 +142,14 @@ class _WebShellState extends State<WebShell> {
 
   /// The check-in page's QR scanner asks the WebView for the camera. Android also
   /// needs the app itself to hold the camera permission, so ask the OS first.
+  /// iOS shows its own camera prompt (NSCameraUsageDescription) once the WebView is
+  /// allowed; permission_handler would just answer "denied" there without Podfile macros.
   Future<void> _onWebPermission(WebViewPermissionRequest request) async {
     final wantsCamera = request.types.contains(WebViewPermissionResourceType.camera);
     final onlyCamera = request.types.every((t) => t == WebViewPermissionResourceType.camera);
-    if (wantsCamera && onlyCamera && (await Permission.camera.request()).isGranted) {
+    if (wantsCamera &&
+        onlyCamera &&
+        (!Platform.isAndroid || (await Permission.camera.request()).isGranted)) {
       await request.grant();
     } else {
       await request.deny();

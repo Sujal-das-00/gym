@@ -2,9 +2,10 @@ import 'package:flutter/services.dart' show appFlavor;
 import 'package:flutter/widgets.dart' show Color;
 
 /// One codebase, two apps, picked at build time with `--flavor`:
-///   admin  → "Gym Boo"        (app.gymboo.gym_boo) opens /admin
+///   admin  → "Gym Boo"        (app.gymboo.gym_boo; iOS app.gymboo.gymBoo) opens /admin
 ///   member → "Gym Boo Member" (app.gymboo.member)  opens /checkin, gets push notifications
-/// Builds without a flavor (e.g. iOS, which has no flavors set up yet) are the admin app.
+/// Android flavors: android-overlay/app/build.gradle.kts; iOS schemes: IOS_RELEASE_GUIDE.md.
+/// Builds without a flavor are the admin app.
 const bool kIsMemberApp = appFlavor == 'member';
 
 /// Where the Gym Boo web app lives. Defaults to production; override at build
