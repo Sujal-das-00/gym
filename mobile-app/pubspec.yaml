@@ -19,6 +19,7 @@ dependencies:
   webview_flutter_android: ^4.14.1
   share_plus: ^13.3.1
   printing: ^5.15.1
+  pdf: ^3.11.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0
@@ -34,3 +35,6 @@ flutter:
   assets:
     - assets/admin/splash.png
     - assets/member/splash.png
+    # Receipt PDFs (lib/receipt_pdf.dart): the built-in PDF font has no ₹.
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf

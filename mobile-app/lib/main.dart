@@ -15,6 +15,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'config.dart';
 import 'firebase_options.dart';
 import 'notifications.dart';
+import 'receipt_pdf.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -178,7 +179,7 @@ class _WebShellState extends State<WebShell> {
   /// Requests from the web page: {"id": 1, "type": ...}
   ///   "status" | "enable"   member app: push notification permission (FCM)
   ///   "saveFile"            {name, mime, text}: share/save a generated file (CSV)
-  ///   "savePdf"             {name, html}: render to PDF and save it to Downloads (receipts)
+  ///   "savePdf"             {name, receipt, html}: build the PDF and save it to Downloads (receipts)
   ///   "printHtml"           {name, html}: print dialog, where "Save as PDF" makes the file
   Future<void> _onBridgeMessage(JavaScriptMessage message) async {
     int? id;
@@ -229,10 +230,15 @@ class _WebShellState extends State<WebShell> {
   Future<Map<String, Object?>> _savePdf(Map<String, dynamic> request) async {
     final base = _safeFileName(request['name'] as String? ?? 'document');
     final name = base.toLowerCase().endsWith('.pdf') ? base : '$base.pdf';
-    final html = request['html'] as String? ?? '';
-    // Same HTML-to-PDF conversion the print dialog used, minus the dialog.
-    // ignore: deprecated_member_use
-    final pdf = await Printing.convertHtml(html: html);
+    final receipt = request['receipt'];
+    final Uint8List pdf;
+    if (receipt is Map<String, dynamic>) {
+      pdf = await buildReceiptPdf(receipt);
+    } else {
+      // Web pages from before `receipt` was sent: convert their HTML instead.
+      // ignore: deprecated_member_use
+      pdf = await Printing.convertHtml(html: request['html'] as String? ?? '');
+    }
 
     final uri = Platform.isAndroid
         ? await _downloads.invokeMethod<String>('save', {'name': name, 'mime': 'application/pdf', 'bytes': pdf})
