@@ -48,6 +48,8 @@ function normalizeMember(member) {
       : "",
     startDate: toDateKey(member.startDate || member.start_date || todayKey()),
     photo: String(member.photo || ""),
+    // trainers.id of the assigned trainer; "" when none.
+    trainerId: String(member.trainerId ?? member.trainer_id ?? "").trim().slice(0, 64),
     attendance: Array.isArray(member.attendance) ? [...new Set(member.attendance.map(toDateKey))].sort() : [],
     // Dates the member checked in while their membership was expired (flagged red in the admin panel).
     expiredCheckins: Array.isArray(member.expiredCheckins) ? [...new Set(member.expiredCheckins.map(toDateKey))].sort() : [],

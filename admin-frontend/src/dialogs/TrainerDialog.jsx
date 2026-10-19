@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
@@ -22,7 +22,8 @@ const FIELD_IDS = {
 };
 
 export default function TrainerDialog() {
-  const { trainerDialog, closeTrainerDialog, trainers, saveTrainer, deleteTrainer, showToast } = useApp();
+  const { closeTrainerDialog, trainers, saveTrainer, deleteTrainer, showToast } = useApp();
+  const { trainerDialog } = useDialogs();
   const trainer = trainerDialog.trainer;
 
   const [name, setName] = useState("");
@@ -111,8 +112,7 @@ export default function TrainerDialog() {
       await saveTrainer(payload, Boolean(trainer?.id));
       closeTrainerDialog();
     } catch (error) {
-      // Trainers are stored in localStorage, so a failure here is usually a full
-      // or blocked storage quota — worth naming instead of silently closing.
+      // Offline, expired session or a rejected photo — keep the form and say why.
       const message = error?.message || "Could not save this trainer. Try again.";
       setFormError(message);
       showToast(message);

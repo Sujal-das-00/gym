@@ -29,8 +29,9 @@ if (typeof window !== "undefined") {
 }
 
 // Resolves with the wrapper's answer. The timeout is generous because the
-// first "enable" waits on the OS permission dialog.
-export function nativeCall(type, timeoutMs = 60000) {
+// first "enable" waits on the OS permission dialog. `data` rides along with the
+// request (e.g. the receipt HTML for "printHtml").
+export function nativeCall(type, timeoutMs = 60000, data = {}) {
   return new Promise((resolve, reject) => {
     if (!isNativeApp()) {
       reject(new Error("Not running inside the Gym Boo app"));
@@ -42,6 +43,6 @@ export function nativeCall(type, timeoutMs = 60000) {
       reject(new Error("The app did not respond"));
     }, timeoutMs);
     pending.set(id, { resolve, reject, timer });
-    window.GymBooNative.postMessage(JSON.stringify({ id, type }));
+    window.GymBooNative.postMessage(JSON.stringify({ ...data, id, type }));
   });
 }

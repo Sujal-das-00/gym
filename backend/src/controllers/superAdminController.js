@@ -38,7 +38,7 @@ function getMe(req, res) {
 async function listGyms(req, res) {
   const rows = await query(
     `SELECT ${gymModel.GYM_COLUMNS},
-            (SELECT COUNT(*) FROM members m WHERE m.tenant_id = g.id) AS member_count,
+            (SELECT COUNT(*) FROM members m WHERE m.tenant_id = g.id AND m.archived_at IS NULL) AS member_count,
             (SELECT rp.name FROM gym_referrals r JOIN referral_partners rp ON rp.id = r.partner_id WHERE r.tenant_id = g.id LIMIT 1) AS referred_by,
             (SELECT r.code FROM gym_referrals r WHERE r.tenant_id = g.id LIMIT 1) AS referral_code,
             (SELECT r.status FROM gym_referrals r WHERE r.tenant_id = g.id LIMIT 1) AS referral_status,
@@ -189,7 +189,7 @@ async function putSettings(req, res) {
 async function getOverview(req, res) {
   const [[gyms], [members], [purchases], [partners], [payouts], [reviews], [trials]] = await Promise.all([
     query("SELECT COUNT(*) AS total, COALESCE(SUM(status = 'active'), 0) AS active FROM gyms"),
-    query("SELECT COUNT(*) AS total FROM members"),
+    query("SELECT COUNT(*) AS total FROM members WHERE archived_at IS NULL"),
     query(`SELECT COALESCE(SUM(status = 'pending'), 0) AS pending,
                   COALESCE(SUM(CASE WHEN status = 'approved' THEN amount ELSE 0 END), 0) AS revenue,
                   COALESCE(SUM(status = 'approved' AND plan = 'lifetime'), 0) AS lifetime

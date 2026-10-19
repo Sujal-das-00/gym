@@ -28,7 +28,17 @@ const MemberRow = memo(function MemberRow({ member, status, present, hasDues, tr
             <span className="contact-name">{member.name}</span>
             {present ? <em className="contact-tag">Present</em> : null}
           </strong>
-          <small>{[member.phone, trainer || domain.getMembershipLabel(member)].filter(Boolean).join(" · ")}</small>
+          <small>{[member.phone, domain.getMembershipLabel(member)].filter(Boolean).join(" · ")}</small>
+          <small className="contact-meta">
+            {member.startDate ? `Joined ${displayDate(member.startDate)}` : ""}
+            {trainer ? (
+              <>
+                {member.startDate ? " · " : ""}
+                <Icon name="exercise" />
+                {trainer}
+              </>
+            ) : null}
+          </small>
         </span>
         <span className="contact-state">
           <span className={"status-pill " + status}>

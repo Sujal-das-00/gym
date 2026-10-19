@@ -10,6 +10,7 @@ const pushController = require("../controllers/pushController");
 const settingsController = require("../controllers/settingsController");
 const reviewController = require("../controllers/reviewController");
 const statsController = require("../controllers/statsController");
+const trainerController = require("../controllers/trainerController");
 const partnerController = require("../controllers/partnerController");
 const superRoutes = require("./superRoutes");
 const { authenticatePartner } = require("../middleware/partnerAuth");
@@ -103,6 +104,10 @@ router.post("/members", asyncHandler(memberController.postMember));
 router.put("/members/:id", asyncHandler(memberController.putMember));
 router.delete("/members/:id", asyncHandler(memberController.deleteMember));
 router.post("/members/:id/payments", asyncHandler(memberController.addPayments));
+
+router.get("/trainers", asyncHandler(trainerController.listTrainers));
+router.put("/trainers/:id", asyncHandler(trainerController.putTrainer));
+router.delete("/trainers/:id", asyncHandler(trainerController.deleteTrainer));
 
 router.get("/expenses", asyncHandler(expenseController.listExpenses));
 router.post("/expenses", asyncHandler(expenseController.postExpense));

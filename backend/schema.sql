@@ -96,14 +96,40 @@ CREATE TABLE IF NOT EXISTS members (
   collection_timing VARCHAR(16) NOT NULL DEFAULT '',
   start_date DATE NOT NULL,
   photo VARCHAR(512) NOT NULL DEFAULT '',
+  -- trainers.id of the assigned trainer; '' when none.
+  trainer_id VARCHAR(64) NOT NULL DEFAULT '',
   created_at VARCHAR(32) NOT NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_members_tenant_code (tenant_id, gym_id),
-  UNIQUE KEY uniq_members_tenant_phone (tenant_id, phone),
+  -- "Deleting" a member archives them: the row and its payment/attendance history
+  -- stay, but every read filters on archived_at IS NULL.
+  archived_at DATETIME NULL DEFAULT NULL,
+  -- 1 while active, NULL once archived. NULLs never collide in a unique key, so an
+  -- archived member's phone and gym code are free to be registered again.
+  active_flag TINYINT(1) AS (IF(archived_at IS NULL, 1, NULL)) STORED,
+  UNIQUE KEY uniq_members_tenant_code_active (tenant_id, gym_id, active_flag),
+  UNIQUE KEY uniq_members_tenant_phone_active (tenant_id, phone, active_flag),
   INDEX idx_members_tenant (tenant_id),
   INDEX idx_members_name (name),
   INDEX idx_members_phone (phone),
   CONSTRAINT fk_members_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
+-- Gym trainers. attendance is a JSON array of YYYY-MM-DD days marked present.
+CREATE TABLE IF NOT EXISTS trainers (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  phone VARCHAR(30) NOT NULL DEFAULT '',
+  specialty VARCHAR(160) NOT NULL DEFAULT '',
+  shift VARCHAR(160) NOT NULL DEFAULT '',
+  status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+  bio TEXT NULL,
+  photo VARCHAR(512) NOT NULL DEFAULT '',
+  attendance JSON NULL,
+  created_at VARCHAR(32) NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_trainers_tenant (tenant_id),
+  CONSTRAINT fk_trainers_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS attendance (

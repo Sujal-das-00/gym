@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Icon from "../components/Icon.jsx";
 import { currency, todayKey } from "../lib/dates.js";
 import { CATEGORY_ICONS, EXPENSE_CATEGORIES, PAYMENT_MODES } from "../lib/constants.js";
 
 export default function ExpenseDialog() {
-  const { expenseDialog, closeExpenseDialog, saveExpense, deleteExpense, showToast } = useApp();
+  const { closeExpenseDialog, saveExpense, deleteExpense, showToast } = useApp();
+  const { expenseDialog } = useDialogs();
   const expense = expenseDialog.expense;
   const [category, setCategory] = useState("trainer-payment");
   const [amount, setAmount] = useState("");

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -95,8 +97,10 @@ class _WebShellState extends State<WebShell> {
     final platform = _controller.platform;
     if (platform is AndroidWebViewController) platform.setOnShowFileSelector(_pickFiles);
 
+    // Both apps: the WebView can't download (no <a download>, no blob: files)
+    // or print, so CSV exports and receipts are handed to the app over this bridge.
+    _controller.addJavaScriptChannel('GymBooNative', onMessageReceived: _onBridgeMessage);
     if (kIsMemberApp) {
-      _controller.addJavaScriptChannel('GymBooNative', onMessageReceived: _onBridgeMessage);
       // Tapping a notification opens the page it names inside this WebView.
       GymNotifications.instance.onOpenUrl = _openPath;
       GymNotifications.instance.launchUrl().then((url) {
@@ -171,20 +175,65 @@ class _WebShellState extends State<WebShell> {
     return NavigationDecision.prevent;
   }
 
-  /// Requests from the web page: {"id": 1, "type": "status" | "enable"}.
+  /// Requests from the web page: {"id": 1, "type": ...}
+  ///   "status" | "enable"   member app: push notification permission (FCM)
+  ///   "saveFile"            {name, mime, text}: share/save a generated file (CSV)
+  ///   "printHtml"           {name, html}: print dialog, where "Save as PDF" makes the file
   Future<void> _onBridgeMessage(JavaScriptMessage message) async {
     int? id;
     String result;
     try {
       final request = jsonDecode(message.message) as Map<String, dynamic>;
       id = request['id'] as int?;
-      result = await GymNotifications.instance.handleBridge(request['type'] as String? ?? 'status');
-    } catch (_) {
-      result = jsonEncode({'permission': 'default', 'token': null});
+      final type = request['type'] as String? ?? 'status';
+      if (type == 'saveFile') {
+        result = jsonEncode(await _saveFile(request));
+      } else if (type == 'printHtml') {
+        result = jsonEncode(await _printHtml(request));
+      } else if (kIsMemberApp) {
+        result = await GymNotifications.instance.handleBridge(type);
+      } else {
+        result = jsonEncode({'ok': false, 'error': 'unsupported'});
+      }
+    } catch (error) {
+      result = jsonEncode({'ok': false, 'error': '$error', 'permission': 'default', 'token': null});
     }
     if (id == null) return;
     // jsonEncode(result) is a quoted, escaped JS string literal; the web side parses it.
     await _controller.runJavaScript('window.__gymbooNativeResult($id, ${jsonEncode(result)});');
+  }
+
+  /// Opens the system share sheet with the file, where it can be saved to Files or
+  /// Drive, or sent on WhatsApp / email. Nothing is written outside the app's cache.
+  Future<Map<String, Object?>> _saveFile(Map<String, dynamic> request) async {
+    final name = _safeFileName(request['name'] as String? ?? 'export.csv');
+    final mime = request['mime'] as String? ?? 'text/plain';
+    final bytes = utf8.encode(request['text'] as String? ?? '');
+    final share = await SharePlus.instance.share(ShareParams(
+      files: [XFile.fromData(Uint8List.fromList(bytes), mimeType: mime, name: name)],
+      fileNameOverrides: [name],
+      title: name,
+    ));
+    return {'ok': true, 'status': share.status.name};
+  }
+
+  Future<Map<String, Object?>> _printHtml(Map<String, dynamic> request) async {
+    final name = _safeFileName(request['name'] as String? ?? 'document');
+    final html = request['html'] as String? ?? '';
+    final done = await Printing.layoutPdf(
+      name: name,
+      // The receipt's layout lives in the web app (checkin-frontend/src/lib/receipt.js);
+      // converting that same HTML keeps one design instead of a second one in Dart.
+      // Soft-deprecated, but still supported and maintained on Android and iOS.
+      // ignore: deprecated_member_use
+      onLayout: (format) => Printing.convertHtml(html: html, format: format),
+    );
+    return {'ok': true, 'printed': done};
+  }
+
+  static String _safeFileName(String name) {
+    final cleaned = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-');
+    return cleaned.isEmpty ? 'file' : cleaned;
   }
 
   Future<void> _onBack(bool didPop, Object? _) async {

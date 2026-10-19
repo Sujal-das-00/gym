@@ -1,4 +1,4 @@
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
@@ -12,7 +12,6 @@ export default function DetailDialog() {
     members,
     trainers,
     domain,
-    detailMemberId,
     closeDetail,
     openMemberDialog,
     openFeeDialog,
@@ -23,6 +22,7 @@ export default function DetailDialog() {
     gymId,
     settings,
   } = useApp();
+  const { detailMemberId } = useDialogs();
 
   const member = members.find((item) => item.id === detailMemberId);
   const open = Boolean(member);
@@ -125,6 +125,14 @@ export default function DetailDialog() {
               <dd id="detailAttendance">{domain.getMonthlyAttendance(member)}</dd>
             </div>
             <div>
+              <dt>Joined</dt>
+              <dd id="detailJoined">{displayDate(member.startDate)}</dd>
+            </div>
+            <div>
+              <dt>Trainer</dt>
+              <dd id="detailTrainer">{trainer || "Not assigned"}</dd>
+            </div>
+            <div>
               <dt>Last payment</dt>
               <dd id="detailLastPayment">{lastPayment ? displayDate(String(lastPayment.date).slice(0, 10)) : "None yet"}</dd>
             </div>
@@ -137,14 +145,8 @@ export default function DetailDialog() {
             ) : null}
           </dl>
 
-          {member.address || trainer ? (
+          {member.address ? (
             <ul className="member-facts">
-              {trainer ? (
-                <li>
-                  <Icon name="exercise" />
-                  {trainer}
-                </li>
-              ) : null}
               {member.address ? (
                 <li>
                   <Icon name="location_on" />

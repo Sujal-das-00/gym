@@ -45,6 +45,7 @@ async function hydrateMembers(rows) {
           collectionTiming: row.collection_timing,
           startDate: row.start_date,
           photo: row.photo,
+          trainerId: row.trainer_id || "",
           createdAt: row.created_at,
           attendance: attendance.get(row.id) || [],
           expiredCheckins: expired.get(row.id) || [],
@@ -61,12 +62,12 @@ async function hydrateMember(row) {
 }
 
 async function getAllMembers(gymId) {
-  const rows = await query("SELECT * FROM members WHERE tenant_id = ? ORDER BY name", [gymId]);
+  const rows = await query("SELECT * FROM members WHERE tenant_id = ? AND archived_at IS NULL ORDER BY name", [gymId]);
   return hydrateMembers(rows);
 }
 
 async function getMemberById(gymId, id) {
-  const rows = await query("SELECT * FROM members WHERE tenant_id = ? AND id = ?", [gymId, id]);
+  const rows = await query("SELECT * FROM members WHERE tenant_id = ? AND id = ? AND archived_at IS NULL", [gymId, id]);
   return hydrateMember(rows[0]);
 }
 
@@ -74,7 +75,7 @@ async function findMember(gymId, identifier) {
   const value = String(identifier || "").trim();
   const phone = normalizePhone(value) || value;
   const rows = await query(
-    "SELECT * FROM members WHERE tenant_id = ? AND (LOWER(id) = LOWER(?) OR LOWER(gym_id) = LOWER(?) OR phone = ?) LIMIT 1",
+    "SELECT * FROM members WHERE tenant_id = ? AND archived_at IS NULL AND (LOWER(id) = LOWER(?) OR LOWER(gym_id) = LOWER(?) OR phone = ?) LIMIT 1",
     [gymId, value, value, phone],
   );
   return hydrateMember(rows[0]);
@@ -87,7 +88,7 @@ async function findMemberByCredentials(gymId, gymCode, phone) {
   const normalizedPhone = normalizePhone(phone);
   if (!code || !normalizedPhone) return null;
   const rows = await query(
-    "SELECT * FROM members WHERE tenant_id = ? AND LOWER(gym_id) = LOWER(?) AND phone = ? LIMIT 1",
+    "SELECT * FROM members WHERE tenant_id = ? AND archived_at IS NULL AND LOWER(gym_id) = LOWER(?) AND phone = ? LIMIT 1",
     [gymId, code, normalizedPhone],
   );
   return hydrateMember(rows[0]);
@@ -95,24 +96,31 @@ async function findMemberByCredentials(gymId, gymCode, phone) {
 
 async function saveMember(gymId, member) {
   await exec(
-    `INSERT INTO members (id, tenant_id, gym_id, name, phone, address, fee, admission_fee, membership_type, package_months, collection_timing, start_date, photo, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO members (id, tenant_id, gym_id, name, phone, address, fee, admission_fee, membership_type, package_months, collection_timing, start_date, photo, trainer_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        gym_id = VALUES(gym_id), name = VALUES(name), phone = VALUES(phone), address = VALUES(address),
        fee = VALUES(fee), admission_fee = VALUES(admission_fee), membership_type = VALUES(membership_type),
        package_months = VALUES(package_months), collection_timing = VALUES(collection_timing),
-       start_date = VALUES(start_date), photo = VALUES(photo)`,
-    [member.id, gymId, member.gymId, member.name, member.phone, member.address, member.fee, member.admissionFee, member.membershipType, member.packageMonths, member.collectionTiming || "", member.startDate, member.photo, member.createdAt],
+       start_date = VALUES(start_date), photo = VALUES(photo), trainer_id = VALUES(trainer_id)`,
+    [member.id, gymId, member.gymId, member.name, member.phone, member.address, member.fee, member.admissionFee, member.membershipType, member.packageMonths, member.collectionTiming || "", member.startDate, member.photo, member.trainerId || "", member.createdAt],
   );
   return getMemberById(gymId, member.id);
 }
 
+// Archives rather than deletes: the member disappears from the panel, check-in and
+// login, but the row and their payment/attendance history stay in the database.
 async function deleteMember(gymId, id) {
-  return exec("DELETE FROM members WHERE tenant_id = ? AND id = ?", [gymId, id]);
+  return exec("UPDATE members SET archived_at = NOW() WHERE tenant_id = ? AND id = ? AND archived_at IS NULL", [gymId, id]);
+}
+
+// Unassign a removed trainer from every member who had them (archived ones too).
+async function clearTrainerFromMembers(gymId, trainerId) {
+  return exec("UPDATE members SET trainer_id = '' WHERE tenant_id = ? AND trainer_id = ?", [gymId, trainerId]);
 }
 
 async function countMembers(gymId) {
-  const rows = await query("SELECT COUNT(*) AS count FROM members WHERE tenant_id = ?", [gymId]);
+  const rows = await query("SELECT COUNT(*) AS count FROM members WHERE tenant_id = ? AND archived_at IS NULL", [gymId]);
   return Number(rows[0]?.count || 0);
 }
 
@@ -121,6 +129,7 @@ function duplicateMemberError(error) {
 }
 
 module.exports = {
+  clearTrainerFromMembers,
   countMembers,
   deleteMember,
   duplicateMemberError,

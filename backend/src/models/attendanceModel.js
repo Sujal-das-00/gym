@@ -22,7 +22,7 @@ async function attendanceStatusRows(gymId, date) {
     `SELECT m.id, m.gym_id, CASE WHEN a.member_id IS NULL THEN 0 ELSE 1 END AS present
      FROM members m
      LEFT JOIN attendance a ON a.member_id = m.id AND a.attendance_date = ?
-     WHERE m.tenant_id = ?
+     WHERE m.tenant_id = ? AND m.archived_at IS NULL
      ORDER BY m.name`,
     [date, gymId],
   );

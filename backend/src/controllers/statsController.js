@@ -8,7 +8,7 @@ let cache = null;
 
 async function readStats() {
   const [gyms] = await query("SELECT COUNT(*) AS n FROM gyms WHERE status = 'active'");
-  const [members] = await query("SELECT COUNT(*) AS n FROM members");
+  const [members] = await query("SELECT COUNT(*) AS n FROM members WHERE archived_at IS NULL");
   const [active] = await query("SELECT COUNT(*) AS n FROM attendance WHERE attendance_date = CURDATE()");
   return { gyms: Number(gyms.n), members: Number(members.n), dailyActiveUsers: Number(active.n) };
 }

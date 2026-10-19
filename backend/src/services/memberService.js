@@ -25,6 +25,7 @@ async function mergeMemberPayload(existing, payload) {
       ? payload.collectionTiming
       : existing?.collectionTiming || "",
     startDate: String(payload.startDate || existing?.startDate || todayKey()),
+    trainerId: String(payload.trainerId ?? existing?.trainerId ?? ""),
     photo:
       payload.photo && payload.photo !== existing?.photo
         ? await saveImageData(payload.photo, "member")

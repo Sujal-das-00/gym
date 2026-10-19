@@ -17,7 +17,8 @@ export function normalizeTrainer(trainer = {}) {
   };
 }
 
-// Trainers live in localStorage only — they were never given a backend table.
+// Trainers are stored on the server now. These read and clear the copy older
+// versions kept in localStorage, which AppProvider uploads once.
 export function loadTrainers() {
   try {
     const rows = JSON.parse(localStorage.getItem(TRAINERS_STORAGE_KEY) || "[]");
@@ -27,6 +28,10 @@ export function loadTrainers() {
   }
 }
 
-export function persistTrainers(trainers) {
-  localStorage.setItem(TRAINERS_STORAGE_KEY, JSON.stringify(trainers));
+export function clearLocalTrainers() {
+  try {
+    localStorage.removeItem(TRAINERS_STORAGE_KEY);
+  } catch {
+    // Storage blocked: nothing was readable either.
+  }
 }

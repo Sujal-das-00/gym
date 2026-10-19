@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useApp } from "../store/AppContext.jsx";
+import { useMemo, useRef, useState } from "react";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
@@ -28,8 +28,19 @@ const FIELD_IDS = {
 };
 
 export default function MemberDialog() {
+  const { closeMemberDialog } = useApp();
+  const { memberDialog } = useDialogs();
+  // Keyed per member, so the form starts from that member's values on its very
+  // first render — no empty frame followed by a second render to fill it in.
+  return (
+    <Dialog className="sheet member-form-sheet" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
+      <MemberForm key={memberDialog.member?.id || "new"} member={memberDialog.member} />
+    </Dialog>
+  );
+}
+
+function MemberForm({ member }) {
   const {
-    memberDialog,
     closeMemberDialog,
     members,
     trainers,
@@ -39,21 +50,22 @@ export default function MemberDialog() {
     deleteMember,
     showToast,
   } = useApp();
-  const member = memberDialog.member;
 
-  const [gymId, setGymId] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [fee, setFee] = useState("");
-  const [admissionFee, setAdmissionFee] = useState("");
-  const [admissionMode, setAdmissionMode] = useState("cash");
-  const [membershipType, setMembershipType] = useState("monthly");
-  const [packageMonths, setPackageMonths] = useState("3");
-  const [collectionTiming, setCollectionTiming] = useState("at-join");
-  const [startDate, setStartDate] = useState(() => todayKey());
-  const [trainerId, setTrainerId] = useState("");
-  const [photo, setPhoto] = useState("");
+  const [gymId, setGymId] = useState(() => member?.gymId || member?.id || generateGymId());
+  const [name, setName] = useState(member?.name || "");
+  const [phone, setPhone] = useState(() => toPhoneDigits(member?.phone));
+  const [address, setAddress] = useState(member?.address || "");
+  const [fee, setFee] = useState(member?.fee || "");
+  const [admissionFee, setAdmissionFee] = useState(Number(member?.admissionFee || 0) > 0 ? member.admissionFee : "");
+  const [admissionMode, setAdmissionMode] = useState(
+    () => member?.payments?.find((payment) => payment.kind === "admission")?.mode || "cash",
+  );
+  const [membershipType, setMembershipType] = useState(() => domain.getMembershipType(member));
+  const [packageMonths, setPackageMonths] = useState(() => String(domain.getPackageMonths(member)));
+  const [collectionTiming, setCollectionTiming] = useState(() => domain.getCollectionTiming(member));
+  const [startDate, setStartDate] = useState(member?.startDate || todayKey());
+  const [trainerId, setTrainerId] = useState(member?.trainerId || "");
+  const [photo, setPhoto] = useState(member?.photo || "");
   const [busy, setBusy] = useState(false);
   // A field only shows its error once it has been left or the form submitted —
   // errors while still typing the first character read as nagging.
@@ -61,26 +73,6 @@ export default function MemberDialog() {
   const [formError, setFormError] = useState("");
   const formRef = useRef(null);
 
-  useEffect(() => {
-    if (!memberDialog.open) return;
-    setGymId(member?.gymId || member?.id || generateGymId());
-    setName(member?.name || "");
-    setPhone(toPhoneDigits(member?.phone));
-    setAddress(member?.address || "");
-    setFee(member?.fee || "");
-    setAdmissionFee(Number(member?.admissionFee || 0) > 0 ? member.admissionFee : "");
-    setAdmissionMode(member?.payments?.find((payment) => payment.kind === "admission")?.mode || "cash");
-    setMembershipType(domain.getMembershipType(member));
-    setPackageMonths(String(domain.getPackageMonths(member)));
-    setCollectionTiming(domain.getCollectionTiming(member));
-    setStartDate(member?.startDate || todayKey());
-    setTrainerId(member?.trainerId || "");
-    setPhoto(member?.photo || "");
-    setBusy(false);
-    setTouched({});
-    setFormError("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberDialog.open, member]);
 
   const isPackage = membershipType === "package";
 
@@ -163,7 +155,15 @@ export default function MemberDialog() {
 
   const onDelete = async () => {
     if (!member?.id || busy) return;
-    if (!confirm("Delete " + (member.name || "this member") + "?")) return;
+    const who = member.name || "this member";
+    if (
+      !confirm(
+        `Do you want to delete ${who} from the gym?\n\n` +
+          "They will be removed from your member list and can no longer check in or log in. " +
+          "Their payment and attendance records are kept.",
+      )
+    )
+      return;
     setBusy(true);
     try {
       await deleteMember(member.id);
@@ -181,7 +181,6 @@ export default function MemberDialog() {
   const admissionError = errorFor("admissionFee");
 
   return (
-    <Dialog className="sheet member-form-sheet" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
       <form className="sheet-panel" id="memberForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
         <header className="sheet-head">
           <span className="sheet-grabber" aria-hidden="true" />
@@ -516,6 +515,5 @@ export default function MemberDialog() {
           </button>
         </footer>
       </form>
-    </Dialog>
   );
 }

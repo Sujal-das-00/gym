@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
@@ -13,7 +13,8 @@ const HISTORY_LIMIT = 6;
  * summary, confirm. A bottom sheet on phones, a centred card on desktop.
  */
 export default function FeeDialog() {
-  const { feeDialog, closeFeeDialog, setSelectedBillingPeriods, members, domain, collectFees, showToast } = useApp();
+  const { closeFeeDialog, setSelectedBillingPeriods, members, domain, collectFees, showToast } = useApp();
+  const { feeDialog } = useDialogs();
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState("cash");
 

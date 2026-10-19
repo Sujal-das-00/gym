@@ -16,3 +16,13 @@ export const ShellContext = createContext({ toast: "", drawerOpen: false });
 export function useShell() {
   return useContext(ShellContext);
 }
+
+// Which dialog is open (and with what) is read only by the dialogs themselves.
+// Kept out of AppContext so opening one doesn't re-render the screen behind it
+// — that full-screen re-render was the lag on "Edit member" on phones. The
+// open/close functions stay in AppContext; they never change.
+export const DialogContext = createContext(null);
+
+export function useDialogs() {
+  return useContext(DialogContext);
+}

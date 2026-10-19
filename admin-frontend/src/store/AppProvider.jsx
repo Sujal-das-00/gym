@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppContext, ShellContext } from "./AppContext.jsx";
+import { AppContext, DialogContext, ShellContext } from "./AppContext.jsx";
 import { api, clearToken, fetchMe, jsonRequest, logout as apiLogout, setApiContext } from "../lib/api.js";
 import { ACTIVE_GYM_KEY, DEFAULT_SETTINGS, VIEW_COPY } from "../lib/constants.js";
 import { localDateKey, monthKey, todayKey } from "../lib/dates.js";
 import { createDomain, getBillingPeriodKeys } from "../lib/billing.js";
 import { applyTheme, normalizeTheme } from "../lib/theme.js";
-import { loadTrainers as readTrainers, persistTrainers } from "../lib/trainers.js";
+import { loadTrainers as readLocalTrainers, clearLocalTrainers } from "../lib/trainers.js";
 import { normalizePhone } from "../lib/format.js";
 
 const CLOSED_MEMBER_DIALOG = { open: false, member: null };
@@ -24,6 +24,24 @@ function generateGymId(members) {
   return id;
 }
 
+// Trainers used to live only in this browser's localStorage. The first load after
+// the move uploads any the server doesn't have yet (same ids, so assignments
+// still match), then forgets the local copy. Super-admins switch between gyms,
+// so for them it's unclear which gym the local trainers belong to: skipped.
+async function loadTrainerRows(role) {
+  const rows = await api("/api/trainers");
+  const local = role === "super_admin" ? [] : readLocalTrainers();
+  if (!local.length) return rows;
+  const known = new Set(rows.map((trainer) => trainer.id));
+  const uploaded = await Promise.all(
+    local
+      .filter((trainer) => !known.has(trainer.id))
+      .map((trainer) => api("/api/trainers/" + encodeURIComponent(trainer.id), jsonRequest("PUT", trainer))),
+  );
+  clearLocalTrainers();
+  return [...rows, ...uploaded].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function AppProvider({ children }) {
   /* ---- Auth + multi-gym context (multi-tenant separation) ---------------- */
   const [user, setUser] = useState(null);
@@ -38,7 +56,7 @@ export function AppProvider({ children }) {
   // Bumped only when settings arrive from the server, so the Settings form knows
   // to re-seed its draft without doing so on every in-place tweak.
   const [settingsRevision, setSettingsRevision] = useState(0);
-  const [trainers, setTrainers] = useState(() => readTrainers());
+  const [trainers, setTrainers] = useState([]);
   const [dataReady, setDataReady] = useState(false);
 
   /* ---- Shared UI state -------------------------------------------------- */
@@ -214,6 +232,11 @@ export function AppProvider({ children }) {
       setExpenses(await api("/api/expenses"));
     } catch {
       setExpenses([]);
+    }
+    try {
+      setTrainers(await loadTrainerRows(userRef.current?.role));
+    } catch {
+      setTrainers([]);
     }
     setDataReady(true);
   }, [persistAllMembers]);
@@ -436,52 +459,60 @@ export function AppProvider({ children }) {
     return saved;
   }, []);
 
-  /* ---- Trainers (localStorage only) ------------------------------------- */
-  const commitTrainers = useCallback((rows) => {
-    setTrainers(rows);
-    persistTrainers(rows);
-  }, []);
+  /* ---- Trainers (server; see loadTrainerRows for the localStorage carry-over) */
+  const trainersRef = useRef(trainers);
+  trainersRef.current = trainers;
+
+  const putTrainer = useCallback(
+    (trainer) => api("/api/trainers/" + encodeURIComponent(trainer.id), jsonRequest("PUT", trainer)),
+    [],
+  );
 
   const setTrainerAttendanceStatus = useCallback(
-    (trainerId, day, present) => {
+    async (trainerId, day, present) => {
       if (!day) return;
-      let found = false;
-      const rows = trainers.map((trainer) => {
-        if (trainer.id !== trainerId) return trainer;
-        found = true;
-        const attendance = new Set(trainer.attendance || []);
-        if (present) attendance.add(day);
-        else attendance.delete(day);
-        return { ...trainer, attendance: [...attendance].sort() };
-      });
-      if (!found) return;
-      commitTrainers(rows);
-      showToast(present ? "Trainer marked present" : "Trainer marked absent");
+      const trainer = trainersRef.current.find((item) => item.id === trainerId);
+      if (!trainer) return;
+      const attendance = new Set(trainer.attendance || []);
+      if (present) attendance.add(day);
+      else attendance.delete(day);
+      const next = { ...trainer, attendance: [...attendance].sort() };
+      // Optimistic, so the toggle answers at once; rolled back if the save fails.
+      setTrainers((rows) => rows.map((item) => (item.id === trainerId ? next : item)));
+      try {
+        const saved = await putTrainer(next);
+        setTrainers((rows) => rows.map((item) => (item.id === trainerId ? saved : item)));
+        showToast(present ? "Trainer marked present" : "Trainer marked absent");
+      } catch (error) {
+        setTrainers((rows) => rows.map((item) => (item.id === trainerId ? trainer : item)));
+        showToast(error?.message || "Could not update trainer attendance");
+      }
     },
-    [commitTrainers, showToast, trainers],
+    [putTrainer, showToast],
   );
 
   const saveTrainer = useCallback(
-    (trainer, wasEditing) => {
-      commitTrainers(
-        wasEditing ? trainers.map((item) => (item.id === trainer.id ? trainer : item)) : [...trainers, trainer],
+    async (trainer, wasEditing) => {
+      const saved = await putTrainer(trainer);
+      setTrainers((rows) =>
+        rows.some((item) => item.id === saved.id) ? rows.map((item) => (item.id === saved.id ? saved : item)) : [...rows, saved],
       );
       showToast(wasEditing ? "Trainer updated" : "Trainer added");
     },
-    [commitTrainers, showToast, trainers],
+    [putTrainer, showToast],
   );
 
   const deleteTrainer = useCallback(
-    (trainerId) => {
-      commitTrainers(trainers.filter((item) => item.id !== trainerId));
-      const cleared = membersRef.current.map((member) =>
-        member.trainerId === trainerId ? { ...member, trainerId: "" } : member,
+    async (trainerId) => {
+      // The server also unassigns the trainer from their members.
+      await api("/api/trainers/" + encodeURIComponent(trainerId), { method: "DELETE" });
+      setTrainers((rows) => rows.filter((item) => item.id !== trainerId));
+      setMembers((rows) =>
+        rows.map((member) => (member.trainerId === trainerId ? { ...member, trainerId: "" } : member)),
       );
-      setMembers(cleared);
-      persistAllMembers(cleared.filter((member) => member.trainerId === "")).catch(() => {});
       showToast("Trainer deleted");
     },
-    [commitTrainers, persistAllMembers, showToast, trainers],
+    [showToast],
   );
 
   /* ---- Attendance sync (polling) ---------------------------------------- */
@@ -579,23 +610,17 @@ export function AppProvider({ children }) {
       selectedPaymentMemberId,
       setSelectedPaymentMemberId,
       // dialogs
-      memberDialog,
       openMemberDialog,
       closeMemberDialog,
-      trainerDialog,
       openTrainerDialog,
       closeTrainerDialog,
-      expenseDialog,
       openExpenseDialog,
       closeExpenseDialog,
-      feeDialog,
       openFeeDialog,
       closeFeeDialog,
       setSelectedBillingPeriods,
-      detailMemberId,
       openDetail,
       closeDetail,
-      dayLedgerDate,
       openDayLedger,
       closeDayLedger,
       // actions
@@ -642,23 +667,17 @@ export function AppProvider({ children }) {
       pendingAttendanceRemovalId,
       selectedHistoryMemberId,
       selectedPaymentMemberId,
-      memberDialog,
       openMemberDialog,
       closeMemberDialog,
-      trainerDialog,
       openTrainerDialog,
       closeTrainerDialog,
-      expenseDialog,
       openExpenseDialog,
       closeExpenseDialog,
-      feeDialog,
       openFeeDialog,
       closeFeeDialog,
       setSelectedBillingPeriods,
-      detailMemberId,
       openDetail,
       closeDetail,
-      dayLedgerDate,
       openDayLedger,
       closeDayLedger,
       saveMember,
@@ -677,10 +696,16 @@ export function AppProvider({ children }) {
   );
 
   const shell = useMemo(() => ({ toast, drawerOpen }), [toast, drawerOpen]);
+  const dialogs = useMemo(
+    () => ({ memberDialog, trainerDialog, expenseDialog, feeDialog, detailMemberId, dayLedgerDate }),
+    [memberDialog, trainerDialog, expenseDialog, feeDialog, detailMemberId, dayLedgerDate],
+  );
 
   return (
     <AppContext.Provider value={value}>
-      <ShellContext.Provider value={shell}>{children}</ShellContext.Provider>
+      <ShellContext.Provider value={shell}>
+        <DialogContext.Provider value={dialogs}>{children}</DialogContext.Provider>
+      </ShellContext.Provider>
     </AppContext.Provider>
   );
 }

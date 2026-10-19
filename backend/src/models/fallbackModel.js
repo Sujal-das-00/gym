@@ -52,14 +52,54 @@ function saveMember(gymId, member) {
   return publicMember(normalized);
 }
 
+// Archives like memberModel.deleteMember: the member (with their payments and
+// attendance) moves to archivedMembers instead of being thrown away.
 function deleteMember(gymId, id) {
-  const rows = store.getState().members;
-  const before = rows.length;
-  store.getState().members = rows.filter((member) => member.id !== id);
-  store.getState().checkins = store.getState().checkins.filter((checkin) => checkin.memberId !== id);
-  if (store.getState().members.length !== before) bumpAttendanceRevision();
+  const state = store.getState();
+  const member = state.members.find((item) => item.id === id);
+  if (!member) return { affectedRows: 0 };
+  state.members = state.members.filter((item) => item.id !== id);
+  state.archivedMembers ||= [];
+  state.archivedMembers.push({ ...member, archivedAt: nowIso() });
+  bumpAttendanceRevision();
   store.persist();
-  return { affectedRows: before === store.getState().members.length ? 0 : 1 };
+  return { affectedRows: 1 };
+}
+
+function clearTrainerFromMembers(gymId, trainerId) {
+  const state = store.getState();
+  for (const member of [...state.members, ...(state.archivedMembers || [])]) {
+    if (member.trainerId === trainerId) member.trainerId = "";
+  }
+  store.persist();
+  return { affectedRows: 1 };
+}
+
+// Trainer functions mirror trainerModel's (gymId, ...) signatures.
+function getAllTrainers() {
+  return [...(store.getState().trainers || [])].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function getTrainerById(gymId, id) {
+  return (store.getState().trainers || []).find((trainer) => trainer.id === id) || null;
+}
+
+function saveTrainer(gymId, trainer) {
+  store.getState().trainers ||= [];
+  const rows = store.getState().trainers;
+  const index = rows.findIndex((item) => item.id === trainer.id);
+  if (index >= 0) rows[index] = trainer;
+  else rows.push(trainer);
+  store.persist();
+  return trainer;
+}
+
+function deleteTrainer(gymId, id) {
+  const rows = store.getState().trainers || [];
+  const before = rows.length;
+  store.getState().trainers = rows.filter((trainer) => trainer.id !== id);
+  store.persist();
+  return { affectedRows: before === store.getState().trainers.length ? 0 : 1 };
 }
 
 function getSettings() {
@@ -236,7 +276,12 @@ module.exports = {
   attendanceStatusRows,
   createCheckin,
   deleteExpense,
+  clearTrainerFromMembers,
   deleteMember,
+  deleteTrainer,
+  getAllTrainers,
+  getTrainerById,
+  saveTrainer,
   findCheckinForDate,
   findMember,
   findMemberByCredentials,

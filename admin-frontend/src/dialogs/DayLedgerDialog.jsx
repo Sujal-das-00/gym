@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useApp } from "../store/AppContext.jsx";
+import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import { currency } from "../lib/dates.js";
 import { CATEGORY_ICONS } from "../lib/constants.js";
@@ -13,7 +13,8 @@ import Icon from "../components/Icon.jsx";
  * exactly what made up the day's total.
  */
 export default function DayLedgerDialog() {
-  const { dayLedgerDate, closeDayLedger, members, expenses, domain, openDetail, openExpenseDialog } = useApp();
+  const { closeDayLedger, members, expenses, domain, openDetail, openExpenseDialog } = useApp();
+  const { dayLedgerDate } = useDialogs();
   const open = Boolean(dayLedgerDate);
 
   const entries = useMemo(() => {

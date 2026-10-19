@@ -121,10 +121,12 @@ async function tightenConstraints() {
   // Replace the old global-unique keys with per-tenant unique keys.
   if (await indexExists("members", "gym_id")) await tryRaw("ALTER TABLE members DROP INDEX gym_id", "drop members.gym_id unique");
   if (await indexExists("members", "phone")) await tryRaw("ALTER TABLE members DROP INDEX phone", "drop members.phone unique");
-  if (!(await indexExists("members", "uniq_members_tenant_code"))) {
+  // Once ensureMemberArchive has swapped in the archive-aware keys, the plain
+  // per-tenant keys must not come back (they'd block re-adding an archived member).
+  if (!(await indexExists("members", "uniq_members_tenant_code")) && !(await indexExists("members", "uniq_members_tenant_code_active"))) {
     await tryRaw("ALTER TABLE members ADD UNIQUE KEY uniq_members_tenant_code (tenant_id, gym_id)", "add members (tenant, code) unique");
   }
-  if (!(await indexExists("members", "uniq_members_tenant_phone"))) {
+  if (!(await indexExists("members", "uniq_members_tenant_phone")) && !(await indexExists("members", "uniq_members_tenant_phone_active"))) {
     await tryRaw("ALTER TABLE members ADD UNIQUE KEY uniq_members_tenant_phone (tenant_id, phone)", "add members (tenant, phone) unique");
   }
   if (!(await indexExists("members", "idx_members_tenant"))) {
@@ -215,6 +217,10 @@ async function ensureFeatureColumns() {
       "payments.payment_mode",
     );
   }
+  // Assigned trainer. Existing members have none ('').
+  if (!(await columnExists("members", "trainer_id"))) {
+    await tryRaw("ALTER TABLE members ADD COLUMN trainer_id VARCHAR(64) NOT NULL DEFAULT '' AFTER photo", "members.trainer_id");
+  }
   if (!(await indexExists("payments", "idx_payments_member_kind"))) {
     await tryRaw(
       "ALTER TABLE payments ADD INDEX idx_payments_member_kind (member_id, kind)",
@@ -248,6 +254,42 @@ async function normalizeStoredPhones() {
   }
 }
 
+// "Delete member" archives instead of deleting (see schema.sql). archived_at is
+// what every read filters on, so it is added first and on its own. The generated
+// active_flag + key swap is best-effort: without it archiving still works, only
+// re-registering an archived member's phone/gym code is refused as a duplicate.
+async function ensureMemberArchive() {
+  if (!(await columnExists("members", "archived_at"))) {
+    await raw("ALTER TABLE members ADD COLUMN archived_at DATETIME NULL DEFAULT NULL");
+  }
+  if (!(await columnExists("members", "active_flag"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD COLUMN active_flag TINYINT(1) AS (IF(archived_at IS NULL, 1, NULL)) STORED",
+      "members.active_flag",
+    );
+  }
+  if (!(await columnExists("members", "active_flag"))) return;
+  if (!(await indexExists("members", "uniq_members_tenant_code_active"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD UNIQUE KEY uniq_members_tenant_code_active (tenant_id, gym_id, active_flag)",
+      "add members (tenant, code, active) unique",
+    );
+  }
+  if (!(await indexExists("members", "uniq_members_tenant_phone_active"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD UNIQUE KEY uniq_members_tenant_phone_active (tenant_id, phone, active_flag)",
+      "add members (tenant, phone, active) unique",
+    );
+  }
+  // Drop the old keys only once their replacements exist.
+  if ((await indexExists("members", "uniq_members_tenant_code_active")) && (await indexExists("members", "uniq_members_tenant_code"))) {
+    await tryRaw("ALTER TABLE members DROP INDEX uniq_members_tenant_code", "drop members (tenant, code) unique");
+  }
+  if ((await indexExists("members", "uniq_members_tenant_phone_active")) && (await indexExists("members", "uniq_members_tenant_phone"))) {
+    await tryRaw("ALTER TABLE members DROP INDEX uniq_members_tenant_phone", "drop members (tenant, phone) unique");
+  }
+}
+
 async function runMigrations() {
   await ensureTenantColumns();
   await ensureFeatureColumns();
@@ -263,6 +305,7 @@ async function runMigrations() {
   }
 
   await tightenConstraints();
+  await ensureMemberArchive();
   // Super-admins are authenticated straight from env (SUPER_ADMIN_EMAIL /
   // SUPER_ADMIN_PASSWORD) via the /superadmin panel — nothing to seed here.
 }

@@ -3267,6 +3267,9 @@ button.is-busy::before {
 .contact-copy { display: grid; gap: 2px; min-width: 0; }
 .contact-copy strong { overflow: hidden; font-size: 0.96rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .contact-copy small { overflow: hidden; color: var(--muted); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+.contact-copy .contact-meta { font-size: 0.74rem; }
+.contact-copy .contact-meta:empty { display: none; }
+.contact-meta .material-symbols-outlined { margin-right: 2px; font-size: 14px; vertical-align: -2px; }
 .contact-state { display: grid; justify-items: end; gap: 2px; text-align: right; }
 .contact-state strong { font-size: 0.92rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .contact-state small { color: var(--muted); font-size: 0.72rem; white-space: nowrap; }
@@ -3527,7 +3530,7 @@ dialog.sheet[open] { animation: sheetPop 220ms ease; }
 .member-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
 .member-stats > div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
 .member-stats dt { color: var(--muted); font-size: 0.74rem; font-weight: 700; }
-.member-stats dd { margin: 4px 0 0; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.member-stats dd { margin: 4px 0 0; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .member-stats .is-due dd { color: var(--red); }
 
 .member-facts { display: grid; gap: 8px; margin: 0; padding: 0; color: var(--muted); font-size: 0.86rem; list-style: none; }

@@ -6,6 +6,7 @@ const memberModel = require("./memberModel");
 const paymentModel = require("./paymentModel");
 const pushSubscriptionModel = require("./pushSubscriptionModel");
 const settingsModel = require("./settingsModel");
+const trainerModel = require("./trainerModel");
 
 let mode = "mysql";
 
@@ -29,6 +30,7 @@ function repo() {
     // in pushService.js, which turn the notification endpoints off in that mode.
     ...pushSubscriptionModel,
     ...settingsModel,
+    ...trainerModel,
   };
 }
 

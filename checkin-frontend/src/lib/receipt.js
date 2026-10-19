@@ -1,5 +1,6 @@
 import { displayDate, displayPeriod } from "./format.js";
 import { rupees } from "./memberStats.js";
+import { isNativeApp, nativeCall } from "./native.js";
 
 const escapeHtml = (value) =>
   String(value ?? "").replace(
@@ -125,6 +126,18 @@ export function invoiceHtml({ gymName, member, payment, title }) {
  */
 export function downloadInvoice({ gymName, member, payment }) {
   const title = `invoice-${member.gymId}-${payment.date}`;
+
+  // The phone app's WebView has no print(), so the app opens the print dialog
+  // itself. Builds from before this bridge answer without `ok`: ask for an update.
+  if (isNativeApp()) {
+    nativeCall("printHtml", 120000, { name: title, html: invoiceHtml({ gymName, member, payment, title }) })
+      .then((result) => {
+        if (!result?.ok) throw new Error("unsupported");
+      })
+      .catch(() => alert("Could not download the receipt. Update the Gym Boo Member app and try again."));
+    return;
+  }
+
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
