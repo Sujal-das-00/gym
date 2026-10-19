@@ -20,6 +20,18 @@ const FILTERS = [
  */
 export default function MemberReceipts({ gymName, member }) {
   const [filter, setFilter] = useState("all");
+  // The payment whose receipt is being made; its button shows a spinner meanwhile.
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const download = async (payment) => {
+    if (downloadingId) return;
+    setDownloadingId(payment.id);
+    try {
+      await downloadInvoice({ gymName, member, payment });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const rows = useMemo(() => {
     // Several periods are often recorded on the same day, so the paid-on date
@@ -113,13 +125,19 @@ export default function MemberReceipts({ gymName, member }) {
                     <span className="font-label-sm text-label-sm text-primary font-semibold">Paid</span>
                   </div>
                   <button
+                    aria-busy={downloadingId === payment.id}
                     aria-label={`Download invoice for ${paymentTitle(payment)}`}
-                    className="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40 transition-colors flex items-center justify-center"
-                    onClick={() => downloadInvoice({ gymName, member, payment })}
-                    title="Download invoice as PDF"
+                    className="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40 transition-colors flex items-center justify-center disabled:opacity-60"
+                    disabled={Boolean(downloadingId)}
+                    onClick={() => download(payment)}
+                    title={downloadingId === payment.id ? "Preparing invoice…" : "Download invoice as PDF"}
                     type="button"
                   >
-                    <Icon className="text-[18px]" name="download" />
+                    {downloadingId === payment.id ? (
+                      <Icon className="text-[18px] text-primary animate-spin" name="progress_activity" />
+                    ) : (
+                      <Icon className="text-[18px]" name="download" />
+                    )}
                   </button>
                 </div>
               </div>

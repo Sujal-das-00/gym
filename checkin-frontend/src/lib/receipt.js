@@ -125,21 +125,46 @@ export function invoiceHtml({ gymName, member, payment, title }) {
  * intermediate file on disk. The document title becomes the suggested PDF
  * filename, which is why it is set to the invoice's name.
  */
-export function downloadInvoice({ gymName, member, payment }) {
+/**
+ * The invoice's fields, already formatted, for the phone app to lay out as a PDF
+ * itself (mobile-app/lib/receipt_pdf.dart mirrors invoiceHtml above).
+ */
+export const receiptData = ({ gymName, member, payment, title }) => ({
+  title,
+  gymName: String(gymName ?? ""),
+  memberName: String(member.name ?? ""),
+  gymId: String(member.gymId ?? ""),
+  paidOn: displayDate(payment.date),
+  paidFor: paymentTitle(payment),
+  mode: paymentMode(payment),
+  amount: rupees(payment.amount),
+});
+
+/**
+ * Resolves once the receipt is saved (app) or the print dialog has closed
+ * (browser), so the button can show it is busy until then.
+ */
+export async function downloadInvoice({ gymName, member, payment }) {
   const title = `invoice-${member.gymId}-${payment.date}`;
 
-  // The phone app's WebView can't print or download, so the app turns this HTML
-  // into a PDF and saves it to Downloads itself. App builds from before "savePdf"
-  // answer with their notification status (no `ok`); those get the print dialog,
-  // and builds older than that answer neither: ask for an update.
+  // The phone app's WebView can't print or download, so the app builds the PDF
+  // and saves it to Downloads itself. `html` is for app builds that predate
+  // `receipt`. Builds from before "savePdf" answer with their notification
+  // status (no `ok`); those get the print dialog, and builds older than that
+  // answer neither: ask for an update.
   if (isNativeApp()) {
-    const request = { name: title, html: invoiceHtml({ gymName, member, payment, title }) };
-    nativeCall("savePdf", 120000, request)
-      .then((result) => (result && "ok" in result ? result : nativeCall("printHtml", 120000, request)))
-      .then((result) => {
-        if (!result?.ok) throw new Error(result?.error || "unsupported");
-      })
-      .catch(() => alert("Could not download the receipt. Update the Gym Boo Member app and try again."));
+    const request = {
+      name: title,
+      receipt: receiptData({ gymName, member, payment, title }),
+      html: invoiceHtml({ gymName, member, payment, title }),
+    };
+    try {
+      let result = await nativeCall("savePdf", 120000, request);
+      if (!(result && "ok" in result)) result = await nativeCall("printHtml", 120000, request);
+      if (!result?.ok) throw new Error(result?.error || "unsupported");
+    } catch (error) {
+      alert(`Could not download the receipt. Update the Gym Boo Member app and try again.\n\n(${error?.message || error})`);
+    }
     return;
   }
   // Older app builds have no bridge, and a WebView ignores print(): the hidden
