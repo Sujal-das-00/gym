@@ -11,6 +11,14 @@ export function isNativeApp() {
   return typeof window !== "undefined" && typeof window.GymBooNative?.postMessage === "function";
 }
 
+// Inside the phone app's WebView (Android "; wv)", iOS without "Safari/"), bridge
+// or not. Same test as the inline script in admin-frontend/index.html.
+export function isAppShell() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /; wv\)/.test(ua) || (/iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua) && navigator.standalone !== true);
+}
+
 const pending = new Map();
 let nextId = 1;
 

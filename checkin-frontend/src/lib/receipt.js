@@ -1,6 +1,6 @@
 import { displayDate, displayPeriod } from "./format.js";
 import { rupees } from "./memberStats.js";
-import { isNativeApp, nativeCall } from "./native.js";
+import { isAppShell, isNativeApp, nativeCall } from "./native.js";
 
 const escapeHtml = (value) =>
   String(value ?? "").replace(
@@ -135,6 +135,12 @@ export function downloadInvoice({ gymName, member, payment }) {
         if (!result?.ok) throw new Error("unsupported");
       })
       .catch(() => alert("Could not download the receipt. Update the Gym Boo Member app and try again."));
+    return;
+  }
+  // Older app builds have no bridge, and a WebView ignores print(): the hidden
+  // frame below would silently do nothing.
+  if (isAppShell()) {
+    alert("Update the Gym Boo Member app from the Play Store to download receipts.");
     return;
   }
 
