@@ -178,6 +178,7 @@ class _WebShellState extends State<WebShell> {
   /// Requests from the web page: {"id": 1, "type": ...}
   ///   "status" | "enable"   member app: push notification permission (FCM)
   ///   "saveFile"            {name, mime, text}: share/save a generated file (CSV)
+  ///   "savePdf"             {name, html}: render to PDF and save it to Downloads (receipts)
   ///   "printHtml"           {name, html}: print dialog, where "Save as PDF" makes the file
   Future<void> _onBridgeMessage(JavaScriptMessage message) async {
     int? id;
@@ -188,6 +189,8 @@ class _WebShellState extends State<WebShell> {
       final type = request['type'] as String? ?? 'status';
       if (type == 'saveFile') {
         result = jsonEncode(await _saveFile(request));
+      } else if (type == 'savePdf') {
+        result = jsonEncode(await _savePdf(request));
       } else if (type == 'printHtml') {
         result = jsonEncode(await _printHtml(request));
       } else if (kIsMemberApp) {
@@ -215,6 +218,48 @@ class _WebShellState extends State<WebShell> {
       title: name,
     ));
     return {'ok': true, 'status': share.status.name};
+  }
+
+  /// Native side: MainActivity.kt.
+  static const _downloads = MethodChannel('app.gymboo/downloads');
+
+  /// Renders the page to a PDF and saves it straight to Downloads, with no print
+  /// dialog. Where the app can't write to Downloads (iOS, Android 9 and older) the
+  /// share sheet opens instead, which can save to Files / Drive.
+  Future<Map<String, Object?>> _savePdf(Map<String, dynamic> request) async {
+    final base = _safeFileName(request['name'] as String? ?? 'document');
+    final name = base.toLowerCase().endsWith('.pdf') ? base : '$base.pdf';
+    final html = request['html'] as String? ?? '';
+    // Same HTML-to-PDF conversion the print dialog used, minus the dialog.
+    // ignore: deprecated_member_use
+    final pdf = await Printing.convertHtml(html: html);
+
+    final uri = Platform.isAndroid
+        ? await _downloads.invokeMethod<String>('save', {'name': name, 'mime': 'application/pdf', 'bytes': pdf})
+        : null;
+    if (uri == null) {
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(pdf, mimeType: 'application/pdf', name: name)],
+        fileNameOverrides: [name],
+        title: name,
+      ));
+      return {'ok': true, 'saved': false};
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Saved to Downloads: $name'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => _downloads.invokeMethod<bool>('open', {'uri': uri, 'mime': 'application/pdf'}),
+          ),
+        ));
+    }
+    return {'ok': true, 'saved': true};
   }
 
   Future<Map<String, Object?>> _printHtml(Map<String, dynamic> request) async {
