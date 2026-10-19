@@ -116,9 +116,10 @@ export function invoiceHtml({ gymName, member, payment, title }) {
 }
 
 /**
- * Sends the invoice straight to the print dialog, where "Save as PDF" produces
- * the file. Printing is the only way to get a PDF here without either a PDF
- * library or a server endpoint, and there is neither.
+ * In the phone app: saved as a PDF in Downloads (the app renders it). In a
+ * browser: sent straight to the print dialog, where "Save as PDF" produces the
+ * file — the only way to get a PDF there without a PDF library or a server
+ * endpoint, and there is neither.
  *
  * Rendered in a hidden iframe so nothing opens on screen first — no tab, and no
  * intermediate file on disk. The document title becomes the suggested PDF
@@ -127,12 +128,16 @@ export function invoiceHtml({ gymName, member, payment, title }) {
 export function downloadInvoice({ gymName, member, payment }) {
   const title = `invoice-${member.gymId}-${payment.date}`;
 
-  // The phone app's WebView has no print(), so the app opens the print dialog
-  // itself. Builds from before this bridge answer without `ok`: ask for an update.
+  // The phone app's WebView can't print or download, so the app turns this HTML
+  // into a PDF and saves it to Downloads itself. App builds from before "savePdf"
+  // answer with their notification status (no `ok`); those get the print dialog,
+  // and builds older than that answer neither: ask for an update.
   if (isNativeApp()) {
-    nativeCall("printHtml", 120000, { name: title, html: invoiceHtml({ gymName, member, payment, title }) })
+    const request = { name: title, html: invoiceHtml({ gymName, member, payment, title }) };
+    nativeCall("savePdf", 120000, request)
+      .then((result) => (result && "ok" in result ? result : nativeCall("printHtml", 120000, request)))
       .then((result) => {
-        if (!result?.ok) throw new Error("unsupported");
+        if (!result?.ok) throw new Error(result?.error || "unsupported");
       })
       .catch(() => alert("Could not download the receipt. Update the Gym Boo Member app and try again."));
     return;
