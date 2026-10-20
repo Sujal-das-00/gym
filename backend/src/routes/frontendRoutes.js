@@ -212,6 +212,10 @@ function mountFrontendRoutes(app) {
   app.get("/signup", landingPage("signup.html"));
   app.get("/partner", landingPage("partner.html"));
   app.get("/plans", landingPage("plans.html"));
+  // Store listings (Play Console / App Store Connect) link to these.
+  app.get("/privacy", landingPage("privacy.html"));
+  app.get("/terms", landingPage("terms.html"));
+  app.get("/delete-account", landingPage("delete-account.html"));
   app.use("/landing", express.static(LANDING_DIR));
 }
 

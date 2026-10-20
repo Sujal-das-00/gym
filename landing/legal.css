@@ -1,0 +1,24 @@
+/* Legal pages (privacy, terms, delete-account). Reuses landing.css tokens. */
+.legal { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+.legal h1 { font-family: "Space Grotesk", Inter, sans-serif; font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; margin: 0 0 8px; }
+.legal .meta { color: var(--muted); font-size: .92rem; margin: 0 0 28px; }
+.legal h2 { font-family: "Space Grotesk", Inter, sans-serif; font-size: 1.35rem; margin: 36px 0 10px; scroll-margin-top: 80px; }
+.legal h3 { font-size: 1.02rem; margin: 20px 0 6px; }
+.legal p, .legal li { line-height: 1.7; }
+.legal ul { padding-left: 1.25rem; }
+.legal li { margin: 4px 0; }
+.legal .summary { background: var(--green-soft); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px; margin: 0 0 28px; }
+.legal .summary p { margin: 0 0 8px; }
+.legal .summary ul { margin: 0; }
+.legal nav.toc { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r-md); padding: 14px 18px; margin: 0 0 8px; }
+.legal nav.toc ol { margin: 6px 0 0; padding-left: 1.25rem; columns: 2; column-gap: 28px; }
+.legal nav.toc a { text-decoration: none; }
+.legal table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .94rem; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.legal th { background: var(--bg); }
+.legal .table-wrap { overflow-x: auto; }
+.legal-top { border-bottom: 1px solid var(--line); background: var(--panel); }
+.legal-top .wrap { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; max-width: 1100px; margin: 0 auto; }
+.legal-foot { text-align: center; color: var(--muted); font-size: .9rem; padding: 24px 20px 40px; }
+.legal-foot a { margin: 0 8px; }
+@media (max-width: 560px) { .legal nav.toc ol { columns: 1; } }
