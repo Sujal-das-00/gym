@@ -1,0 +1,35 @@
+name: gym_boo
+description: Gym Boo - mobile wrapper for the Gym Boo admin web app (/admin).
+publish_to: "none"
+version: 1.0.3+5
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+# No Firebase here: push notifications go to members only (member-app).
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.9.0
+  webview_flutter_android: ^4.14.1
+  url_launcher: ^6.3.0
+  image_picker: ^1.2.4
+  share_plus: ^13.3.1
+  printing: ^5.15.1
+  pdf: ^3.11.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.8
+
+# Icon and splash screen: flutter_launcher_icons.yaml and flutter_native_splash.yaml.
+
+flutter:
+  uses-material-design: true
+  # Only what the app draws itself; icon/splash sources are build-time inputs.
+  assets:
+    - assets/splash.png
+    # Receipt PDFs (lib/receipt_pdf.dart): the built-in PDF font has no ₹.
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf

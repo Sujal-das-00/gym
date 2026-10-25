@@ -1,9 +1,0 @@
-# dart run flutter_native_splash:create --flavors admin,member
-flutter_native_splash:
-  color: "#063a2b"
-  image: assets/admin/splash.png
-  android_12:
-    color: "#063a2b"
-    image: assets/admin/splash_android12.png
-  ios: false
-  web: false

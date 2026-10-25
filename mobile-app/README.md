@@ -1,45 +1,308 @@
-# Gym Boo mobile app
+# Gym Boo mobile apps
 
-A Flutter WebView wrapper around the Gym Boo web app, with native push notifications
-(Firebase Cloud Messaging). A gym admin sends a notification from the existing
-**Notifications** panel in the admin dashboard; it arrives on every member's phone
-that turned notifications on, titled by the app name **Gym Boo**.
+This folder holds **two separate Flutter apps**. Each one is a thin native shell (a WebView) around the Gym Boo website at `https://gymbot.toolszila.com/`:
 
-## How it fits together
+| | Admin app | Member app |
+|---|---|---|
+| Folder | [`admin-app/`](admin-app/) | [`member-app/`](member-app/) |
+| Name on the phone | **Gym Boo** | **Gym Boo Member** |
+| Who uses it | Gym owners and staff | Gym members |
+| Opens | `/admin` | `/checkin` (or `/checkin/<slug>`) |
+| Android package (`applicationId`) | `app.gymboo.gym_boo` | `app.gymboo.member` |
+| iOS bundle ID | `app.gymboo.gymBoo` | `app.gymboo.member` |
+| Dart package name (`pubspec.yaml`) | `gym_boo` | `gym_boo_member` |
+| Brand colour | dark green `#063A2B` | orange `#F76910` on white |
+| Firebase / push notifications | **No** | **Yes** (FCM, APNs on iOS) |
+| Camera | Photo picker only | QR check-in scanner + photo picker |
+
+The two apps are **fully independent Flutter projects**: each has its own `pubspec.yaml`, `lib/`, `assets/`, `android/` and `ios/`. There are **no flavors and no custom Xcode schemes**. `cd` into one folder and the normal Flutter commands work (`flutter run`, `flutter build ipa`, `flutter build appbundle`).
+
+> Older versions of this repo built both apps from one project with `--flavor admin|member` and gitignored `android/` and `ios/`. That is gone. Do not add flavors back, and don't follow old guides that mention `--flavor`, `setup.sh`, `android-overlay/` or custom schemes.
+
+---
+
+## 1. Folder structure
 
 ```
-Admin dashboard ──POST /api/notifications/custom──▶ backend ──FCM (firebase-admin)──▶ phones
-Member opens app ─▶ WebView loads /checkin/<slug> ─▶ "Turn on notifications"
-   web page ──GymBooNative channel──▶ Flutter asks OS permission, gets FCM token
-   web page ──POST /api/public/<slug>/account/push/native {token}──▶ stored in push_subscriptions
+mobile-app/
+├── README.md                    ← this file (structure + how to build on Mac and Linux)
+├── PLAY_STORE_GUIDE.md          ← Google Play Console walkthrough (store listing, data safety, upload)
+│
+├── admin-app/                   ← "Gym Boo" – Flutter project
+│   ├── pubspec.yaml             ← name: gym_boo, version: x.y.z+N, NO Firebase packages
+│   ├── pubspec.lock             ← committed, keeps package versions fixed
+│   ├── analysis_options.yaml
+│   ├── flutter_launcher_icons.yaml   ← icon generator config  (dart run flutter_launcher_icons)
+│   ├── flutter_native_splash.yaml    ← splash generator config (dart run flutter_native_splash:create)
+│   ├── assets/
+│   │   ├── icon.png, icon_foreground.png        ← icon sources
+│   │   ├── splash.png, splash_android12.png     ← splash sources (splash.png is also drawn by the app)
+│   │   └── fonts/NotoSans-Regular.ttf, NotoSans-Bold.ttf   ← for receipt PDFs (₹ sign)
+│   ├── lib/
+│   │   ├── main.dart            ← WebView shell, navigation rules, JS bridge, file/PDF export
+│   │   ├── config.dart          ← URL, start path, allowed paths, colours, app name
+│   │   └── receipt_pdf.dart     ← builds the payment receipt PDF in Dart
+│   ├── android/                 ← committed Android project
+│   │   ├── app/build.gradle.kts ← applicationId, signing (reads android/key.properties), R8
+│   │   ├── app/src/main/AndroidManifest.xml     ← label "Gym Boo", permissions
+│   │   ├── app/src/main/kotlin/app/gymboo/gym_boo/MainActivity.kt  ← "save to Downloads" channel
+│   │   └── key.properties       ← NOT in git (signing passwords)
+│   └── ios/                     ← committed iOS project (Xcode)
+│       ├── Runner.xcworkspace   ← open THIS in Xcode
+│       ├── Runner.xcodeproj/project.pbxproj   ← bundle ID, iOS 15.0, iPhone only
+│       └── Runner/Info.plist    ← display name, camera/photo texts, encryption flag
+│
+└── member-app/                  ← "Gym Boo Member" – Flutter project
+    ├── (same files as admin-app, plus:)
+    ├── lib/notifications.dart   ← FCM + local notifications (foreground banners, taps)
+    ├── lib/firebase_options.dart        ← NOT in git (Firebase client config)
+    ├── android/app/google-services.json ← NOT in git (Firebase Android config)
+    ├── android/app/src/main/res/drawable/ic_notification.xml   ← tray icon
+    ├── android/app/src/main/res/values/notification_colors.xml ← tray accent colour
+    ├── android/app/src/main/kotlin/app/gymboo/member/MainActivity.kt
+    └── ios/Runner/Runner.entitlements   ← Push Notifications (aps-environment)
 ```
 
-Tokens are saved in the existing `push_subscriptions` table as `fcm://<token>`, so no
-migration is needed and browser Web Push keeps working side by side.
+The rest of the repo (for context): `backend/` is the Node/Express API and also serves the websites, `admin-frontend/` is the `/admin` web app shown in the admin app, `checkin-frontend/` is the `/checkin` web app shown in the member app, and `landing/` is the marketing site plus `/privacy`, `/terms` and `/delete-account`.
 
-## One-time setup
+### Files that are not in git (copy them by hand)
 
-1. **Firebase**: create a project at console.firebase.google.com (Cloud Messaging is on by default).
-2. **Backend key**: Project settings → Service accounts → *Generate new private key*.
-   Set it on the server (either one):
-   - `FIREBASE_SERVICE_ACCOUNT` = the JSON (raw, or base64 of it), or
-   - `FIREBASE_SERVICE_ACCOUNT_FILE` = path to the JSON file.
-   Restart the backend. Never commit this file.
-3. **App**: install Flutter, `npm i -g firebase-tools && firebase login`,
-   `dart pub global activate flutterfire_cli`, then `./setup.sh` (pick your Firebase project
-   and the Android/iOS apps when asked).
-4. Run: `flutter run --dart-define=APP_URL=https://gymbot.toolszila.com/`
-   Release APK: `flutter build apk --release --dart-define=APP_URL=https://gymbot.toolszila.com/`
-5. Rebuild/redeploy the member web app (`npm run build:checkin`) — it contains the bridge code.
+| File | App | What it is | Where to get it |
+|---|---|---|---|
+| `member-app/lib/firebase_options.dart` | member | Firebase client config. **The member app does not compile without it.** | From the Linux PC (`~/Desktop/gym/mobile-app/member-app/lib/`), or regenerate (section 4.4) |
+| `member-app/android/app/google-services.json` | member (Android) | Firebase Android config | From the Linux PC, or Firebase Console → Project settings → Android app `app.gymboo.member` |
+| `admin-app/android/key.properties`, `member-app/android/key.properties` | both (Android) | Signing passwords + path to `upload-keystore.jks` | Owner only. Not needed on the Mac for iOS |
+| `/home/suajldas/upload-keystore.jks` | both (Android) | Play upload key | Owner only. **Back it up.** Not needed for iOS |
 
-## Using it
+The admin app needs **no** secret files to build for iOS.
 
-Member: open the app, sign in, tap **Turn on notifications** on the home screen → allow.
-Admin: Dashboard → Notifications → Send custom notification → audience *All members*.
+---
 
-## Known gaps
+## 2. How the apps work
 
-- File/photo upload inputs inside the WebView need a file-chooser handler
-  (`AndroidWebViewController.setOnShowFileSelector`); not included yet.
-- iOS: both apps build as Xcode schemes `admin` / `member`; see IOS_RELEASE_GUIDE.md (Apple Developer account, member Firebase iOS app, APNs key).
-- Pushes go to *members*; admins don't register devices (the existing notification model).
+1. On launch the app shows its splash colour and logo, then loads `APP_URL + start path` in a full-screen WebView (`lib/main.dart`, `WebShell`).
+2. **Navigation rules** (`kAllowedPathPrefixes` in `lib/config.dart`): pages on the same host under the allowed prefixes stay in the app. Everything else (`tel:`, `mailto:`, WhatsApp, UPI, other sites, the *other* app's pages) opens in the phone's browser or app.
+   - admin: `/admin`, `/plans`, `/api`
+   - member: `/checkin`, `/api`
+3. **JS bridge**: the website talks to the app through a JavaScript channel called `GymBooNative`. Messages are JSON `{"id": n, "type": ...}`, and the app answers by calling `window.__gymbooNativeResult(id, json)`. The web side is `admin-frontend/src/lib/native.js` and `checkin-frontend/src/lib/native.js`.
+
+   | type | App | Does |
+   |---|---|---|
+   | `saveFile` | both | Shares a generated file (CSV export) through the share sheet |
+   | `savePdf` | both | Builds the receipt PDF (`receipt_pdf.dart`). Android 10+ saves it to Downloads (`MainActivity.kt`); iOS opens the share sheet |
+   | `printHtml` | both | Print dialog for HTML |
+   | `status` / `enable` | member | Push permission + FCM token. The web page then sends the token to `POST /api/public/<slug>/account/push/native` |
+
+4. **File inputs** (`<input type=file>` for photos, logo): Android uses `image_picker` (system photo picker). iOS WKWebView shows its own picker.
+5. **Push notifications** (member only): the admin sends one from Dashboard → Notifications. The backend (`backend/src/services/fcmService.js`, `firebase-admin`) sends it to every member device token stored in `push_subscriptions` as `fcm://<token>`. The Android channel id `gymboo_default` must match the backend. Tapping a notification opens its `url` inside the WebView.
+6. **Website changes don't need an app release.** Only changes inside `admin-app/` or `member-app/` (Dart, icons, permissions, plugins, version) need a new build.
+
+### Code that exists in both apps
+
+`lib/main.dart` (minus the notification parts), `lib/receipt_pdf.dart`, `MainActivity.kt` and the fonts are **copies**. If you fix a bug in one, make the same change in the other. `receipt_pdf.dart` mirrors `invoiceHtml()` in `checkin-frontend/src/lib/receipt.js`.
+
+---
+
+## 3. Version numbers
+
+Each app has its own `version:` line in its own `pubspec.yaml`, for example `version: 1.0.2+4`:
+
+- `1.0.2` = version name users see
+- `+4` = build number. **It must be higher than the last upload of that app** to the App Store or Play (each store counts per app)
+
+Raise it before every store upload, or pass `--build-name=1.0.3 --build-number=5` to the build command.
+
+---
+
+## 4. Building for iOS on a Mac
+
+You need a Mac, Xcode, and a paid Apple Developer account ($99/year).
+
+### 4.1 Install the tools (one time)
+
+```bash
+xcode-select --install                 # Xcode command line tools
+sudo xcodebuild -license accept
+sudo xcodebuild -runFirstLaunch
+brew install --cask flutter            # needs Homebrew: https://brew.sh
+brew install cocoapods                 # Flutter falls back to CocoaPods for plugins without Swift Package Manager support
+flutter doctor                         # Flutter + Xcode must be green; Android can be ignored
+```
+
+Install **Xcode** itself from the Mac App Store first, and keep it up to date (Apple only accepts uploads from recent Xcode versions).
+
+### 4.2 Get the code
+
+```bash
+cd ~/Desktop
+git clone <REPO_URL> gym
+cd gym/mobile-app
+```
+
+### 4.3 Admin app (`admin-app/`)
+
+```bash
+cd ~/Desktop/gym/mobile-app/admin-app
+flutter pub get
+open ios/Runner.xcworkspace            # the .xcworkspace, not the .xcodeproj
+```
+
+In Xcode (one time): left sidebar **Runner** → **TARGETS: Runner** → **Signing & Capabilities** → tick **Automatically manage signing** → pick your **Team**. Bundle Identifier must show `app.gymboo.gymBoo`. Close Xcode.
+
+That is the only Xcode step. Everything else (name, icon, splash, iOS 15.0, iPhone only, camera/photo texts, `ITSAppUsesNonExemptEncryption = NO`) is already in the committed `ios/` folder. Choosing the Team writes `DEVELOPMENT_TEAM` into `project.pbxproj`. It isn't secret, so commit it and the step is never needed again.
+
+```bash
+flutter run                            # Simulator or a plugged-in iPhone
+flutter build ipa --release            # → build/ios/ipa/*.ipa
+```
+
+### 4.4 Member app (`member-app/`)
+
+```bash
+cd ~/Desktop/gym/mobile-app/member-app
+```
+
+**a) Firebase config file.** Copy `lib/firebase_options.dart` from the Linux PC into `member-app/lib/` (AirDrop, USB or a private drive). Then make sure its iOS block points at a Firebase iOS app registered for **`app.gymboo.member`**:
+
+1. https://console.firebase.google.com → project **gym-boo** → ⚙ Project settings → General.
+2. If there is no iOS app with bundle ID `app.gymboo.member`: **Add app → iOS**, bundle ID `app.gymboo.member`, nickname `Gym Boo Member iOS`, then download **GoogleService-Info.plist** (you only read two values from it).
+3. In `lib/firebase_options.dart` set the `ios` block:
+
+```dart
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: '<API_KEY from GoogleService-Info.plist>',
+    appId: '<GOOGLE_APP_ID from GoogleService-Info.plist>',   // 1:81583580868:ios:...
+    messagingSenderId: '81583580868',
+    projectId: 'gym-boo',
+    storageBucket: 'gym-boo.firebasestorage.app',
+    iosBundleId: 'app.gymboo.member',
+  );
+```
+
+The file copied from Linux still has the old iOS app (`iosBundleId: 'app.gymboo.gymBoo'`, appId `1:81583580868:ios:89f821408815e522e4cb91`), which belongs to the admin bundle ID. If you leave it, the app builds but **iPhone push notifications never arrive**. The admin app does not use Firebase, so that old Firebase iOS app can stay unused.
+
+**b) Signing.**
+
+```bash
+flutter pub get
+open ios/Runner.xcworkspace
+```
+
+In Xcode: **TARGETS: Runner** → **Signing & Capabilities** → **Automatically manage signing** → **Team**. Bundle Identifier must show `app.gymboo.member`. **Push Notifications** and **Background Modes → Remote notifications** should already be listed; they come from `ios/Runner/Runner.entitlements` and `Info.plist`. If Push Notifications is missing, click **+ Capability → Push Notifications**. Close Xcode and commit the `DEVELOPMENT_TEAM` change.
+
+**c) APNs key** (lets Firebase reach iPhones; one time per Apple account):
+
+1. https://developer.apple.com/account → Certificates, Identifiers & Profiles → **Keys → +** → name `GymBoo Push` → tick **Apple Push Notifications service (APNs)** → Register → **download the `.p8`**. You can download it only once, so keep it safe. Note the **Key ID** and your **Team ID**.
+2. Firebase Console → ⚙ Project settings → **Cloud Messaging** → Apple app configuration → app **`app.gymboo.member`** → **APNs Authentication Key → Upload** (`.p8`, Key ID, Team ID).
+
+**d) Run and build.**
+
+```bash
+flutter run                            # push + QR camera only work on a REAL iPhone, not the Simulator
+flutter build ipa --release            # → build/ios/ipa/*.ipa
+```
+
+### 4.5 Useful build options (both apps)
+
+```bash
+flutter run --dart-define=APP_URL=https://other-domain.com/       # point at another server
+flutter run --dart-define=APP_URL=http://192.168.1.20:5051/       # local backend (debug builds; iOS may need an ATS exception for plain http)
+flutter run --dart-define=GYM_SLUG=nova-fitness                   # member app only: open one gym directly
+flutter build ipa --release --build-name=1.0.3 --build-number=5   # set version without editing pubspec
+```
+
+### 4.6 App Store Connect (one time per app)
+
+https://appstoreconnect.apple.com → **Apps → + → New App**
+
+| Field | Admin | Member |
+|---|---|---|
+| Platform | iOS | iOS |
+| Name (unique on the store) | Gym Boo | Gym Boo Member |
+| Bundle ID | `app.gymboo.gymBoo` | `app.gymboo.member` |
+| SKU (any text) | `gymboo-admin-ios` | `gymboo-member-ios` |
+
+If the bundle ID isn't in the list, open each project once in Xcode with your Team selected (4.3 / 4.4); automatic signing registers it. You can also add it under developer.apple.com → Identifiers (tick Push Notifications for the member one).
+
+### 4.7 Upload, test, release
+
+1. Upload each `build/ios/ipa/*.ipa` with the **Transporter** app (Mac App Store): sign in, drag the file, **Deliver**. Or use Xcode → Window → Organizer → the archive → **Distribute App**.
+2. Wait 5–30 minutes for processing. Then use App Store Connect → the app → **TestFlight** → add testers → install via the TestFlight app on an iPhone.
+3. Test on a real iPhone:
+   - **Admin:** log in, upload a photo, CSV export (share sheet), receipt PDF.
+   - **Member:** log in, notification prompt, QR check-in (camera), send a test notification from the admin dashboard and check it **arrives**, receipt PDF.
+4. App Store tab → version → screenshots (iPhone 6.9" or 6.5"), description, keywords, support URL, **Privacy Policy URL** `https://gymbot.toolszila.com/privacy`, App Privacy answers, age rating, **demo login** (admin account for Gym Boo, member account for Gym Boo Member) → pick the build → **Add for Review → Submit**.
+
+Review tips: Apple dislikes "just a website in a box" apps (guideline 4.2), so list the native features in the review notes: push notifications, QR camera check-in, receipt PDFs and CSV export via the share sheet, native photo picker. Gym memberships are paid offline (real-world service), so in-app purchase rules don't apply; say so in the notes.
+
+### 4.8 Every later iOS release
+
+```bash
+cd ~/Desktop/gym && git pull
+cd mobile-app/member-app               # or admin-app
+# raise version: in pubspec.yaml (the +number must go up)
+flutter pub get
+flutter build ipa --release
+open build/ios/ipa                     # drag into Transporter
+```
+
+Then App Store Connect → the app → **+ Version** → choose the build → "What's New" → Submit.
+
+---
+
+## 5. Building for Android (Linux PC)
+
+Needs Flutter, Android SDK, `android/key.properties` in the app folder and `/home/suajldas/upload-keystore.jks`. The member app also needs `android/app/google-services.json`. Without `key.properties`, release builds silently fall back to the debug key, and Play rejects them.
+
+```bash
+cd ~/Desktop/gym/mobile-app/admin-app      # or member-app
+flutter pub get
+flutter build appbundle --release          # → build/app/outputs/bundle/release/app-release.aab  (upload to Play)
+flutter build apk --release                # → build/app/outputs/flutter-apk/app-release.apk     (install on a phone)
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
+Because each app has its own folder, the two AABs never overwrite each other. Play Console details are in [PLAY_STORE_GUIDE.md](PLAY_STORE_GUIDE.md).
+
+---
+
+## 6. Changing icons or splash screens
+
+Edit the PNGs in `<app>/assets/`, then from that app's folder:
+
+```bash
+dart run flutter_launcher_icons            # Android + iOS icons (iOS alpha removed automatically)
+dart run flutter_native_splash:create      # Android + iOS launch screens
+```
+
+If you change the splash colour, also change `kSplashColor` in `lib/config.dart`. The app keeps that look until the first page loads. Commit the generated files under `android/` and `ios/`.
+
+---
+
+## 7. Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `firebase_options.dart` not found (member) | Copy it in (section 1 table / 4.4a) |
+| "Signing requires a development team" | Xcode → Runner target → Signing & Capabilities → Team |
+| "No profiles for 'app.gymboo.member' were found" | Same place: Automatically manage signing on, Team set. Xcode then registers the App ID |
+| iPhone notifications never arrive | `firebase_options.dart` iOS block isn't the `app.gymboo.member` Firebase app; APNs key not uploaded for `app.gymboo.member`; testing on the Simulator; or the user denied permission (Settings → Gym Boo Member → Notifications) |
+| Upload error "missing purpose string" | `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` must be in `ios/Runner/Info.plist` (they are; check they weren't removed) |
+| Upload error "build number already used" | Raise the `+N` in that app's `pubspec.yaml` |
+| Upload error "invalid icon / alpha channel" | `remove_alpha_ios: true` in `flutter_launcher_icons.yaml`, rerun `dart run flutter_launcher_icons` |
+| CocoaPods errors (when Flutter falls back to it) | `cd ios && pod repo update && pod install && cd ..`, or `flutter clean && flutter pub get` |
+| Strange build errors after switching branches or Flutter versions | `flutter clean && flutter pub get` in that app's folder |
+| QR scanner doesn't open the camera | Real device only; check Settings → Gym Boo Member → Camera |
+| Play rejects the AAB: debug-signed / wrong key | `android/key.properties` missing in that app folder, or the wrong keystore |
+
+---
+
+## 8. Notes for an AI assistant helping with this project
+
+- These are two separate Flutter apps. Run every command **inside** `admin-app/` or `member-app/`, never in `mobile-app/` itself (it has no `pubspec.yaml`).
+- **Never change** the Android `applicationId` (`app.gymboo.gym_boo`, `app.gymboo.member`) or the iOS bundle IDs (`app.gymboo.gymBoo`, `app.gymboo.member`). They identify the existing store listings.
+- Don't add `--flavor`, product flavors or custom Xcode schemes. The plain `Runner` scheme is correct.
+- `android/` and `ios/` are committed on purpose. Change settings in the files (`Info.plist`, `project.pbxproj`, `build.gradle.kts`, `AndroidManifest.xml`) or in Xcode, and commit the result.
+- Only the member app uses Firebase. Don't add Firebase packages to the admin app.
+- Secrets (`key.properties`, `*.jks`, `google-services.json`, `firebase_options.dart`, `GoogleService-Info.plist`) must never be committed.
+- The real product is the website. For UI changes, edit `admin-frontend/` or `checkin-frontend/`, not the apps.

@@ -127,7 +127,8 @@ export function invoiceHtml({ gymName, member, payment, title }) {
  */
 /**
  * The invoice's fields, already formatted, for the phone app to lay out as a PDF
- * itself (mobile-app/lib/receipt_pdf.dart mirrors invoiceHtml above).
+ * itself (lib/receipt_pdf.dart in mobile-app/member-app and mobile-app/admin-app
+ * mirrors invoiceHtml above).
  */
 export const receiptData = ({ gymName, member, payment, title }) => ({
   title,

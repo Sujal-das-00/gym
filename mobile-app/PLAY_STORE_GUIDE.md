@@ -2,27 +2,27 @@
 
 Follow the parts in order. First release = Parts 1 → 5. Every later update = **Part 6 only**.
 
-> The older [RELEASE_GUIDE.md](RELEASE_GUIDE.md) is out of date (it does not know about the two app "flavors"). Use this guide.
+> How the two apps are laid out, and how to build them for iOS, is in [README.md](README.md).
 
 ---
 
 ## Part 0 – Know your two apps
 
-One codebase builds **two separate apps**. Each one is its own app in Play Console.
+There are **two separate Flutter apps**, each in its own folder. Each one is its own app in Play Console.
 
 | | Admin app | Member app |
 |---|---|---|
 | Name shown on phone | Gym Boo | Gym Boo Member |
 | **Package name** | `app.gymboo.gym_boo` | `app.gymboo.member` |
-| Build flag | `--flavor admin` | `--flavor member` |
+| Folder (run commands here) | `mobile-app/admin-app` | `mobile-app/member-app` |
 | For | Gym owners / staff | Gym members |
 
-**Always add `--flavor admin` or `--flavor member` to build commands.** Without it the build fails or makes the wrong app.
+**Always `cd` into the app's folder before building.** There are no `--flavor` flags any more.
 
 Things you need before starting:
 - Flutter installed (`flutter --version` works)
-- The signing key file `/home/suajldas/upload-keystore.jks` and `android/key.properties` (**ask the owner; they are not in git**)
-- `android/app/google-services.json` (Firebase file, also not in git)
+- The signing key file `/home/suajldas/upload-keystore.jks` and `android/key.properties` inside **each** app folder (**ask the owner; they are not in git**)
+- Member app only: `member-app/android/app/google-services.json` (Firebase file, also not in git)
 - A Google Play Console account (paid $25 once)
 
 ---
@@ -98,7 +98,7 @@ Left menu → **Grow → Store presence → Main store listing**.
 | App name | Up to 30 characters |
 | Short description | Up to 80 characters |
 | Full description | Up to 4000 characters |
-| App icon | 512 × 512 px PNG (use `assets/admin/icon.png` or `assets/member/icon.png`) |
+| App icon | 512 × 512 px PNG (use `admin-app/assets/icon.png` or `member-app/assets/icon.png`) |
 | Feature graphic | 1024 × 500 px PNG/JPG |
 | Phone screenshots | At least **2**, up to 8 (take from a real phone or emulator) |
 | Category | **Health & Fitness** |
@@ -113,30 +113,28 @@ Click **Save**.
 An **AAB** is the file you upload to Play. (An APK is only for installing on your own phone.)
 
 ```bash
-cd /home/suajldas/Desktop/gym/mobile-app
+cd /home/suajldas/Desktop/gym/mobile-app/member-app     # or admin-app
 flutter pub get
-flutter build appbundle --release --flavor member
+flutter build appbundle --release
 ```
 
-Use `--flavor admin` for the admin app.
-
-When it finishes you will see a line like `✓ Built build/app/outputs/bundle/memberRelease/app-member-release.aab`.
+When it finishes you will see `✓ Built build/app/outputs/bundle/release/app-release.aab`.
 
 **Where is the file?**
 
 | App | File |
 |---|---|
-| Member | `mobile-app/build/app/outputs/bundle/memberRelease/app-member-release.aab` |
-| Admin | `mobile-app/build/app/outputs/bundle/adminRelease/app-admin-release.aab` |
+| Member | `mobile-app/member-app/build/app/outputs/bundle/release/app-release.aab` |
+| Admin | `mobile-app/admin-app/build/app/outputs/bundle/release/app-release.aab` |
 
 Open the folder:
 ```bash
-xdg-open build/app/outputs/bundle/memberRelease
+xdg-open build/app/outputs/bundle/release
 ```
 
 Save a clearly named copy so versions never get mixed up:
 ```bash
-cp build/app/outputs/bundle/memberRelease/app-member-release.aab ~/Desktop/gym-boo-member-1.0.1+2.aab
+cp build/app/outputs/bundle/release/app-release.aab ~/Desktop/gym-boo-member-1.0.2+4.aab
 ```
 
 The file is **automatically signed** using `android/key.properties`. If that file is missing, the build silently uses a debug key and **Play will reject it** – so check the file exists first.
@@ -174,14 +172,14 @@ Start with **Internal testing** (fast, no review wait), then promote to Producti
 
 ## Part 5 – Do it again for the other app
 
-Repeat Parts 1 → 4 for the second app (admin ↔ member) with the other flavor and package name.
+Repeat Parts 1 → 4 for the second app (admin ↔ member) from the other app folder.
 
 ---
 
 ## Part 6 – Releasing an UPDATE (the part you will do most)
 
 ### Step 1 – Raise the build number
-Open [pubspec.yaml](pubspec.yaml), line 4:
+Open that app's `pubspec.yaml` ([admin-app/pubspec.yaml](admin-app/pubspec.yaml) or [member-app/pubspec.yaml](member-app/pubspec.yaml)), line 4:
 
 ```yaml
 version: 1.0.1+2
@@ -190,18 +188,16 @@ version: 1.0.1+2
 ```
 
 - The number after `+` must be **higher than the last one uploaded to Play for ANY track**. Never reuse, never go down.
-- Admin and member apps share this line, but each app needs its own increasing number. Raising it for both every time is the simplest rule.
-- Current value in the repo right now: **`1.0.1+2`**. Check Play Console → **Test and release → App bundle explorer** to see the last uploaded build number.
+- Each app has its own `pubspec.yaml`, so each has its own number. Check Play Console → **Test and release → App bundle explorer** to see the last uploaded build number.
 
-(Shortcut without editing the file: `flutter build appbundle --release --flavor member --build-name=1.0.2 --build-number=3`)
+(Shortcut without editing the file: `flutter build appbundle --release --build-name=1.0.3 --build-number=5`)
 
 ### Step 2 – Build the AAB again
 ```bash
-cd /home/suajldas/Desktop/gym/mobile-app
+cd /home/suajldas/Desktop/gym/mobile-app/member-app     # or admin-app
 flutter pub get
-flutter build appbundle --release --flavor member
+flutter build appbundle --release
 ```
-(Use `--flavor admin` for the admin app.)
 
 The new file is in the **same place as before** (see Part 3), and it **overwrites the old one**. Copy it to a new name first if you want to keep the old one.
 
@@ -213,15 +209,15 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 
 | I want to… | Command |
 |---|---|
-| Upload to Play (member) | `flutter build appbundle --release --flavor member` |
-| Upload to Play (admin) | `flutter build appbundle --release --flavor admin` |
-| Test on my phone (APK) | `flutter build apk --release --flavor member` |
-| Smaller APK for modern phones | `flutter build apk --release --flavor member --split-per-abi` (use the `arm64-v8a` file) |
-| Install APK on USB phone | `adb install -r build/app/outputs/flutter-apk/app-member-release.apk` |
+| Upload to Play (member) | in `member-app/`: `flutter build appbundle --release` |
+| Upload to Play (admin) | in `admin-app/`: `flutter build appbundle --release` |
+| Test on my phone (APK) | `flutter build apk --release` |
+| Smaller APK for modern phones | `flutter build apk --release --split-per-abi` (use the `arm64-v8a` file) |
+| Install APK on USB phone | `adb install -r build/app/outputs/flutter-apk/app-release.apk` |
 | Change the website URL the app opens | add `--dart-define=APP_URL=https://your-url/` |
 | Fresh start after errors | `flutter clean && flutter pub get` |
 
-> **Website-only changes do NOT need a new app release.** The app is a WebView of `https://gymbot.toolszila.com/`. Only publish a new AAB when you change something inside `mobile-app/` (Dart code, icons, permissions, plugins).
+> **Website-only changes do NOT need a new app release.** The app is a WebView of `https://gymbot.toolszila.com/`. Only publish a new AAB when you change something inside `admin-app/` or `member-app/` (Dart code, icons, permissions, plugins).
 
 ---
 
@@ -230,14 +226,14 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 | Problem / Play error | Why | Fix |
 |---|---|---|
 | **"Version code 2 has already been used"** | Build number not raised | Raise the number after `+` in `pubspec.yaml`, rebuild, upload again |
-| **"You uploaded a debug-signed APK/AAB"** or **"signed with wrong key"** | `android/key.properties` or the `.jks` file is missing, or a different key was used | Put back the correct `key.properties` and `/home/suajldas/upload-keystore.jks`, then rebuild. Always use the same key |
-| **"Package name already exists"** / wrong package | Wrong flavor or already used by another account | Make sure you used the right `--flavor`; package must be `app.gymboo.gym_boo` or `app.gymboo.member` |
+| **"You uploaded a debug-signed APK/AAB"** or **"signed with wrong key"** | `android/key.properties` (in that app's folder) or the `.jks` file is missing, or a different key was used | Put back the correct `key.properties` and `/home/suajldas/upload-keystore.jks`, then rebuild. Always use the same key |
+| **"Package name already exists"** / wrong package | Built in the wrong app folder, or already used by another account | Build from `admin-app/` for `app.gymboo.gym_boo` and from `member-app/` for `app.gymboo.member` |
 | **"Your app targets API level X, must target Y"** | Play raised the minimum target SDK | Run `flutter upgrade`, then `flutter pub upgrade`, then rebuild |
-| Build says "No flavor"/"Gradle task assembleRelease failed" | Forgot `--flavor` | Add `--flavor admin` or `--flavor member` |
-| **"google-services.json is missing"** | Firebase file not on this PC | Get `android/app/google-services.json` from the owner / Firebase console (it must include both apps) |
+| `pubspec.yaml` not found / "No pubspec.yaml file found" | Ran the command in `mobile-app/` | `cd admin-app` or `cd member-app` first |
+| **"google-services.json is missing"** (member app) | Firebase file not on this PC | Get `member-app/android/app/google-services.json` from the owner / Firebase console (Android app `app.gymboo.member`) |
 | `flutter: command not found` | Flutter not in PATH | Open a new terminal or add Flutter's `bin` folder to PATH |
 | Build fails after changing packages | Stale cache | `flutter clean`, `flutter pub get`, build again |
-| Can't find the AAB | Flavor changes the folder name | Look in `build/app/outputs/bundle/<flavor>Release/` (e.g. `memberRelease`) |
+| Can't find the AAB | Looking in the wrong app folder | `<app folder>/build/app/outputs/bundle/release/app-release.aab` |
 | Can't install the AAB on my phone | AABs only work through Play | Build an APK (cheat sheet above) |
 | **Rejected: "App access" / login not possible** | Reviewers had no test login | Add working demo credentials in **App content → App access** and resubmit |
 | **Rejected: Privacy policy** | Missing / broken URL | Publish the policy page, add its URL in **App content → Privacy policy** |
@@ -250,7 +246,7 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 
 ## Part 8 – Protect the signing key
 
-- Files: `/home/suajldas/upload-keystore.jks` and `android/key.properties` (passwords inside).
+- Files: `/home/suajldas/upload-keystore.jks` and `admin-app/android/key.properties` + `member-app/android/key.properties` (passwords inside; both point to the same `.jks`).
 - **Back them up** to a private place (password manager / private cloud / USB).
 - **Never commit them to git, never email or chat them.** Both are already git-ignored.
 
@@ -259,9 +255,9 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 ## Release checklist (print this)
 
 - [ ] Code finished and tested on a real phone
-- [ ] `version:` in `pubspec.yaml` – number after `+` is higher than the last upload
-- [ ] `android/key.properties`, the `.jks` file and `google-services.json` exist
-- [ ] `flutter build appbundle --release --flavor <admin|member>` succeeded
+- [ ] `version:` in that app's `pubspec.yaml` – number after `+` is higher than the last upload
+- [ ] `android/key.properties` (in the app folder), the `.jks` file and (member) `google-services.json` exist
+- [ ] `flutter build appbundle --release` (inside `admin-app/` or `member-app/`) succeeded
 - [ ] AAB copied to a clearly named file
 - [ ] Uploaded to Internal testing and checked on a phone
 - [ ] Release notes written
