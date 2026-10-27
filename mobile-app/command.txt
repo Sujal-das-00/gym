@@ -7,16 +7,21 @@ cd ~/Desktop/gym/mobile-app/admin-app
 #    version: 1.0.3+5   →   next time e.g. 1.0.4+6
 
 # 2. Build
+flutter clean
 flutter pub get
 flutter build appbundle --release   # → build/app/outputs/bundle/release/app-release.aab  (upload to Play)
 flutter build apk --release         # → build/app/outputs/flutter-apk/app-release.apk     (optional, to install on a phone)
 
+
+override the build no using command line 
+flutter build appbundle --release --build-name=1.0.4 --build-number=6
 
 IOS
 
 
 cd ~/Desktop/gym/mobile-app/admin-app
 git pull                      # get the version bump (commit and push it first, see below)
+flutter clean
 flutter pub get
 cd ios && pod install && cd ..
 flutter build ipa --release   # → build/ios/ipa/*.ipa

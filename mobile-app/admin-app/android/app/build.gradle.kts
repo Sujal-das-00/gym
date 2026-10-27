@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        // The Play Store listing "Gym Boo". Never change it.
+        // The Play Store listing (shown as "Simple Gym Manager"). Never change it.
         applicationId = "app.gymboo.gym_boo"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion

@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart' show Color;
 
-/// The admin app: "Gym Boo" (Android app.gymboo.gym_boo, iOS app.gymboo.gymBoo).
+/// The admin app: "Simple Gym Manager" (Android app.gymboo.gym_boo, iOS app.gymboo.gymBoo).
 /// Opens /admin; no push notifications. Its twin is ../member-app.
 
 /// Where the Gym Boo web app lives. Defaults to production; override at build
@@ -13,7 +13,7 @@ const String kAppUrl = String.fromEnvironment(
   defaultValue: 'https://gymbot.toolszila.com/',
 );
 
-const String kAppName = 'Gym Boo';
+const String kAppName = 'Simple Gym Manager';
 
 const String kStartPath = 'admin';
 
