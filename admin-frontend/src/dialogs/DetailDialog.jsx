@@ -1,10 +1,14 @@
+import { useEffect, useState } from "react";
 import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
+import PaymentHistoryItem from "../components/PaymentHistoryItem.jsx";
 import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
 import { currency, dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { sendFeeReminder, sendLoginDetails } from "../lib/whatsapp.js";
+import { FEE_STATUS_LABELS } from "../lib/billing.js";
+import { changeMoneyNotes, changeTimestamp, changedByLabel, changedFields, fetchPlanChanges } from "../lib/planChanges.js";
 
 /** Member profile sheet: status, quick actions, key numbers, attendance and payments. */
 export default function DetailDialog() {
@@ -15,6 +19,8 @@ export default function DetailDialog() {
     closeDetail,
     openMemberDialog,
     openFeeDialog,
+    openPlanDialog,
+    planChangeRevision,
     attendanceDate,
     setMemberAttendanceStatus,
     user,
@@ -23,6 +29,19 @@ export default function DetailDialog() {
     settings,
   } = useApp();
   const { detailMemberId } = useDialogs();
+  const [planHistory, setPlanHistory] = useState({ memberId: "", rows: [], failed: false });
+
+  // This member's plan-change log; refetched after a change made from here.
+  useEffect(() => {
+    if (!detailMemberId) return undefined;
+    let cancelled = false;
+    fetchPlanChanges(detailMemberId)
+      .then((rows) => !cancelled && setPlanHistory({ memberId: detailMemberId, rows, failed: false }))
+      .catch(() => !cancelled && setPlanHistory({ memberId: detailMemberId, rows: [], failed: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, [detailMemberId, planChangeRevision]);
 
   const member = members.find((item) => item.id === detailMemberId);
   const open = Boolean(member);
@@ -50,8 +69,8 @@ export default function DetailDialog() {
   });
 
   const overdue = domain.isOverdue(member);
-  const paid = domain.isPaidThisPeriod(member);
-  const status = overdue ? "overdue" : paid ? "paid" : "pending";
+  const status = domain.getFeeStatus(member);
+  const balance = domain.getBalanceDue(member);
   const hasDues = domain.getUnpaidPeriods(member).length > 0;
   const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
   const payments = [...(member.payments || [])].reverse();
@@ -60,6 +79,7 @@ export default function DetailDialog() {
 
   const actions = [
     hasDues && { key: "collect", icon: "currency_rupee", label: "Collect", primary: true, run: () => openFeeDialog(member.id) },
+    { key: "plan", icon: "swap_horiz", label: "Plan", run: () => openPlanDialog(member.id) },
     { key: "edit", icon: "edit", label: "Edit", run: () => openMemberDialog(member) },
     {
       key: "login",
@@ -91,7 +111,7 @@ export default function DetailDialog() {
               <small>{[member.phone, domain.getMembershipLabel(member)].filter(Boolean).join(" · ")}</small>
             </div>
             <span className={"status-pill " + status} id="detailStatus">
-              {overdue ? "Overdue" : paid ? "Paid" : "Pending"}
+              {FEE_STATUS_LABELS[status]}
             </span>
           </div>
 
@@ -120,6 +140,12 @@ export default function DetailDialog() {
               <dt>{overdue ? "Overdue since" : "Next due"}</dt>
               <dd id="detailDueDate">{displayDate(domain.getDueDateKey(member))}</dd>
             </div>
+            {balance > 0 ? (
+              <div className="is-balance">
+                <dt>Balance due</dt>
+                <dd id="detailBalance">{currency(balance)}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Visits this month</dt>
               <dd id="detailAttendance">{domain.getMonthlyAttendance(member)}</dd>
@@ -175,6 +201,36 @@ export default function DetailDialog() {
             </div>
           </section>
 
+          {planHistory.memberId === member.id && (planHistory.rows.length || planHistory.failed) ? (
+            <details className="sheet-history plan-history">
+              <summary>
+                Plan changes · {planHistory.rows.length}
+                <Icon name="expand_more" />
+              </summary>
+              {planHistory.failed ? (
+                <p className="member-empty">Could not load the plan history. Check your connection.</p>
+              ) : (
+                <ul>
+                  {planHistory.rows.map((change) => (
+                    <li key={change.id}>
+                      <span>
+                        <strong>{changedFields(change).join(" · ")}</strong>
+                        <small>
+                          {[changeTimestamp(change), changedByLabel(change)].filter(Boolean).join(" ")}
+                        </small>
+                        <small>
+                          {["Starts " + displayDate(change.effectiveDate), ...changeMoneyNotes(change), change.note]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          ) : null}
+
           <details className="sheet-history" open>
             <summary>
               Payment history
@@ -183,17 +239,7 @@ export default function DetailDialog() {
             {payments.length ? (
               <ul id="paymentHistory">
                 {payments.map((payment) => (
-                  <li key={payment.id}>
-                    <span>
-                      <strong>{domain.getPaymentLabel(payment, member)}</strong>
-                      <small>
-                        {[displayDate(String(payment.date || "").slice(0, 10)), domain.paymentModeLabel(payment.mode)]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </small>
-                    </span>
-                    <strong>{currency(payment.amount)}</strong>
-                  </li>
+                  <PaymentHistoryItem key={payment.id} payment={payment} member={member} domain={domain} />
                 ))}
               </ul>
             ) : (

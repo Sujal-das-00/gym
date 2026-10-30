@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { login, setToken, signup } from "../lib/api.js";
+import { isValidPhone, toPhoneDigits } from "../lib/validation.js";
 
 const NAME_PATTERN = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
 
@@ -48,6 +49,7 @@ export default function LoginOverlay() {
   const [mode, setMode] = useState("login");
   const [gymName, setGymName] = useState("");
   const [ownerName, setOwnerName] = useState("");
+  const [gymPhone, setGymPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -78,6 +80,7 @@ export default function LoginOverlay() {
     if (!NAME_PATTERN.test(owner) || owner.length < 2 || owner.length > 30) {
       return "Your name must be 2-30 letters, with no numbers or symbols.";
     }
+    if (!isValidPhone(gymPhone)) return "Enter the gym's 10-digit phone number.";
     if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
       return "Password must be at least 8 characters with a letter and a number.";
     }
@@ -105,6 +108,7 @@ export default function LoginOverlay() {
             email: email.trim(),
             password,
             referralCode: referralCode.trim(),
+            gymPhone,
           })
         : await login(email.trim(), password);
       setToken(data.token);
@@ -149,6 +153,20 @@ export default function LoginOverlay() {
                 required
                 value={ownerName}
                 onChange={(event) => setOwnerName(event.target.value)}
+              />
+            </label>
+            <label>
+              Gym phone
+              <input
+                type="tel"
+                id="signupGymPhone"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                placeholder="10-digit mobile number"
+                maxLength={10}
+                required
+                value={gymPhone}
+                onChange={(event) => setGymPhone(toPhoneDigits(event.target.value))}
               />
             </label>
           </>

@@ -13,6 +13,8 @@ const state = {
   checkins: [],
   expenses: [],
   trainers: [],
+  // Member plan change log (see member_plan_changes in schema.sql).
+  planChanges: [],
   attendanceRevision: 0,
 };
 
@@ -23,6 +25,7 @@ function normalizeLoaded(data = {}) {
   state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
   state.archivedMembers = Array.isArray(data.archivedMembers) ? data.archivedMembers : [];
   state.trainers = Array.isArray(data.trainers) ? data.trainers : [];
+  state.planChanges = Array.isArray(data.planChanges) ? data.planChanges : [];
   state.attendanceRevision = Number(data.attendanceRevision || 0);
 }
 

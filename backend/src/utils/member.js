@@ -47,6 +47,9 @@ function normalizeMember(member) {
       ? member.collectionTiming || member.collection_timing
       : "",
     startDate: toDateKey(member.startDate || member.start_date || todayKey()),
+    // Set by a plan change: billing periods count from here instead of startDate
+    // (which stays the joining date). "" = the plan was never changed.
+    planStartDate: member.planStartDate || member.plan_start_date ? toDateKey(member.planStartDate || member.plan_start_date) : "",
     photo: String(member.photo || ""),
     // trainers.id of the assigned trainer; "" when none.
     trainerId: String(member.trainerId ?? member.trainer_id ?? "").trim().slice(0, 64),
@@ -67,6 +70,8 @@ function normalizeMember(member) {
                 : ""),
           ),
           amount: Number(payment.amount || 0),
+          // null: recorded before part payments, so it paid its period in full.
+          periodFee: (payment.periodFee ?? payment.period_fee ?? null) === null ? null : Number(payment.periodFee ?? payment.period_fee),
           kind: payment.kind === "admission" ? "admission" : "membership",
           mode: normalizePaymentMode(payment.mode || payment.payment_mode),
         }))

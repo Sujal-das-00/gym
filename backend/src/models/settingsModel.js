@@ -10,16 +10,17 @@ async function saveSettings(gymId, settings) {
   const normalized = normalizeSettings(settings);
   await exec(
     `INSERT INTO gym_settings
-       (tenant_id, gym_name, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, allow_expired_checkin, weekly_holidays, holiday_dates, theme)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (tenant_id, gym_name, gym_phone, logo, billing_cycle_mode, custom_billing_days, default_collection_timing, allow_expired_checkin, weekly_holidays, holiday_dates, theme)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       gym_name = VALUES(gym_name), logo = VALUES(logo), billing_cycle_mode = VALUES(billing_cycle_mode),
+       gym_name = VALUES(gym_name), gym_phone = VALUES(gym_phone), logo = VALUES(logo), billing_cycle_mode = VALUES(billing_cycle_mode),
        custom_billing_days = VALUES(custom_billing_days), default_collection_timing = VALUES(default_collection_timing),
        allow_expired_checkin = VALUES(allow_expired_checkin),
        weekly_holidays = VALUES(weekly_holidays), holiday_dates = VALUES(holiday_dates), theme = VALUES(theme)`,
     [
       gymId,
       normalized.gymName,
+      normalized.gymPhone,
       normalized.logo,
       normalized.billingCycleMode,
       normalized.customBillingDays,
@@ -31,6 +32,10 @@ async function saveSettings(gymId, settings) {
     ],
   );
   return normalized;
+}
+
+async function setGymPhone(gymId, phone) {
+  await exec("UPDATE gym_settings SET gym_phone = ? WHERE tenant_id = ?", [phone, gymId]);
 }
 
 async function getAttendanceRevision(gymId) {
@@ -52,4 +57,5 @@ module.exports = {
   getSettings,
   saveSettings,
   setAttendanceRevision,
+  setGymPhone,
 };

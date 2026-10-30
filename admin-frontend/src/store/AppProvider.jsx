@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppContext, DialogContext, ShellContext } from "./AppContext.jsx";
 import { api, clearToken, fetchMe, jsonRequest, logout as apiLogout, setApiContext } from "../lib/api.js";
 import { ACTIVE_GYM_KEY, DEFAULT_SETTINGS, VIEW_COPY } from "../lib/constants.js";
-import { localDateKey, monthKey, todayKey } from "../lib/dates.js";
+import { currency, localDateKey, monthKey, todayKey } from "../lib/dates.js";
 import { createDomain, getBillingPeriodKeys } from "../lib/billing.js";
 import { applyTheme, normalizeTheme } from "../lib/theme.js";
 import { loadTrainers as readLocalTrainers, clearLocalTrainers } from "../lib/trainers.js";
@@ -12,6 +12,7 @@ const CLOSED_MEMBER_DIALOG = { open: false, member: null };
 const CLOSED_TRAINER_DIALOG = { open: false, trainer: null };
 const CLOSED_EXPENSE_DIALOG = { open: false, expense: null };
 const CLOSED_FEE_DIALOG = { open: false, memberId: "", selectedPeriods: [] };
+const CLOSED_PLAN_DIALOG = { open: false, memberId: "" };
 
 function generateGymId(members) {
   const existing = new Set(members.map((member) => member.gymId || member.id).filter(Boolean));
@@ -76,6 +77,9 @@ export function AppProvider({ children }) {
   const [trainerDialog, setTrainerDialog] = useState(CLOSED_TRAINER_DIALOG);
   const [expenseDialog, setExpenseDialog] = useState(CLOSED_EXPENSE_DIALOG);
   const [feeDialog, setFeeDialog] = useState(CLOSED_FEE_DIALOG);
+  const [planDialog, setPlanDialog] = useState(CLOSED_PLAN_DIALOG);
+  // Bumped after every plan change, so the screens listing the change log refetch.
+  const [planChangeRevision, setPlanChangeRevision] = useState(0);
   const [detailMemberId, setDetailMemberId] = useState("");
   // The day whose earning/expense breakdown the Insights screen is showing ("" = closed).
   const [dayLedgerDate, setDayLedgerDate] = useState("");
@@ -168,6 +172,8 @@ export function AppProvider({ children }) {
   const closeTrainerDialog = useCallback(() => setTrainerDialog(CLOSED_TRAINER_DIALOG), []);
   const openExpenseDialog = useCallback((expense = null) => setExpenseDialog({ open: true, expense }), []);
   const closeExpenseDialog = useCallback(() => setExpenseDialog(CLOSED_EXPENSE_DIALOG), []);
+  const openPlanDialog = useCallback((memberId) => setPlanDialog({ open: true, memberId }), []);
+  const closePlanDialog = useCallback(() => setPlanDialog(CLOSED_PLAN_DIALOG), []);
   const openDetail = useCallback((memberId) => setDetailMemberId(memberId), []);
   const closeDetail = useCallback(() => setDetailMemberId(""), []);
   const openDayLedger = useCallback((date) => setDayLedgerDate(date), []);
@@ -392,6 +398,10 @@ export function AppProvider({ children }) {
       let selectedPeriods =
         currentPeriod && unpaidPeriods.includes(currentPeriod) ? [currentPeriod] : unpaidPeriods.slice(0, 1);
       if (!selectedPeriods.length && unpaidPeriods.length) selectedPeriods = [unpaidPeriods[0]];
+      // A balance left from a part payment is collected with the next payment,
+      // so it comes pre-selected alongside the current period.
+      const balances = currentDomain.getPartPaidPeriods(member);
+      selectedPeriods = [...new Set([...balances, ...selectedPeriods])].sort();
       setFeeDialog({ open: true, memberId: member.id, selectedPeriods });
     },
     [],
@@ -403,15 +413,18 @@ export function AppProvider({ children }) {
     setFeeDialog((dialog) => ({ ...dialog, selectedPeriods: periods }));
   }, []);
 
+  // `lines` come from allocatePayment(): what to record against each period
+  // (`pay`) and what that leaves on it (`after`). The server re-checks every
+  // amount against what the period still owes.
   const collectFees = useCallback(
-    async (member, periods, mode = "cash") => {
-      const payments = periods.map((billingPeriod) => ({
+    async (member, lines, mode = "cash") => {
+      const payments = lines.map(({ period, pay }) => ({
         id: crypto.randomUUID(),
         date: todayKey(),
         month: monthKey(),
-        billingMonth: String(billingPeriod).length === 7 ? billingPeriod : "",
-        billingPeriod,
-        amount: Number(member.fee),
+        billingMonth: String(period).length === 7 ? period : "",
+        billingPeriod: period,
+        amount: pay,
         // How it was collected at the desk; shown on the member's invoice.
         mode,
       }));
@@ -422,10 +435,30 @@ export function AppProvider({ children }) {
       setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
       setSelectedPaymentMemberId(saved.id);
       closeFeeDialog();
-      const unit = domain.getPeriodUnitLabel(member);
-      showToast("Collected " + payments.length + " " + unit + (payments.length === 1 ? "" : "s") + " from " + saved.name);
+      const received = lines.reduce((sum, line) => sum + line.pay, 0);
+      const left = lines.reduce((sum, line) => sum + line.after, 0);
+      showToast(
+        "Collected " + currency(received) + " from " + saved.name + (left > 0 ? " · " + currency(left) + " balance left" : ""),
+      );
     },
-    [closeFeeDialog, domain, showToast],
+    [closeFeeDialog, showToast],
+  );
+
+  /* ---- Plan changes ----------------------------------------------------- */
+  // One request: the server moves the billing start, records any payments
+  // taken with the change and writes the log entry together.
+  const changePlan = useCallback(
+    async (memberId, payload) => {
+      const { member: saved, change } = await api(
+        "/api/members/" + encodeURIComponent(memberId) + "/plan",
+        jsonRequest("POST", payload),
+      );
+      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
+      setPlanChangeRevision((revision) => revision + 1);
+      showToast("Plan updated for " + saved.name);
+      return change;
+    },
+    [showToast],
   );
 
   /* ---- Expenses --------------------------------------------------------- */
@@ -623,8 +656,12 @@ export function AppProvider({ children }) {
       closeDetail,
       openDayLedger,
       closeDayLedger,
+      openPlanDialog,
+      closePlanDialog,
+      planChangeRevision,
       // actions
       saveMember,
+      changePlan,
       deleteMember,
       setMemberAttendanceStatus,
       collectFees,
@@ -680,7 +717,11 @@ export function AppProvider({ children }) {
       closeDetail,
       openDayLedger,
       closeDayLedger,
+      openPlanDialog,
+      closePlanDialog,
+      planChangeRevision,
       saveMember,
+      changePlan,
       deleteMember,
       setMemberAttendanceStatus,
       collectFees,
@@ -697,8 +738,8 @@ export function AppProvider({ children }) {
 
   const shell = useMemo(() => ({ toast, drawerOpen }), [toast, drawerOpen]);
   const dialogs = useMemo(
-    () => ({ memberDialog, trainerDialog, expenseDialog, feeDialog, detailMemberId, dayLedgerDate }),
-    [memberDialog, trainerDialog, expenseDialog, feeDialog, detailMemberId, dayLedgerDate],
+    () => ({ memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, detailMemberId, dayLedgerDate }),
+    [memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, detailMemberId, dayLedgerDate],
   );
 
   return (

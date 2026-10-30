@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import Icon from "../components/Icon.jsx";
 import { displayDate } from "../lib/format.js";
 import { rupees } from "../lib/memberStats.js";
-import { downloadInvoice, paymentMode, paymentTitle } from "../lib/receipt.js";
+import { downloadInvoice, partPaymentNotes, paymentMode, paymentTitle } from "../lib/receipt.js";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -115,6 +115,11 @@ export default function MemberReceipts({ gymName, member }) {
                       </>
                     )}
                   </div>
+                  {partPaymentNotes(payment, member.payments).length > 0 && (
+                    <span className="font-body-sm text-body-sm text-indigo-700 truncate">
+                      {partPaymentNotes(payment, member.payments).join(" • ")}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-space-sm shrink-0">
@@ -122,7 +127,11 @@ export default function MemberReceipts({ gymName, member }) {
                     <span className="font-headline-sm text-headline-sm text-on-surface font-semibold">
                       {rupees(payment.amount)}
                     </span>
-                    <span className="font-label-sm text-label-sm text-primary font-semibold">Paid</span>
+                    {partPaymentNotes(payment, member.payments).length ? (
+                      <span className="font-label-sm text-label-sm text-indigo-700 font-semibold">Part</span>
+                    ) : (
+                      <span className="font-label-sm text-label-sm text-primary font-semibold">Paid</span>
+                    )}
                   </div>
                   <button
                     aria-busy={downloadingId === payment.id}

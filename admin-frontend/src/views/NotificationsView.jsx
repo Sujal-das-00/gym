@@ -91,9 +91,10 @@ export default function NotificationsView() {
 
   // isOverdue, not getOverdueAmount > 0 — the same test the Dashboard, Members
   // and Payments screens use, and the one membersWithPendingFees() applies on the
-  // backend. An amount test silently drops members whose fee is 0.
+  // backend. An amount test silently drops members whose fee is 0. Members
+  // carrying a part-payment balance are reminded too.
   const pendingCount = useMemo(
-    () => members.filter((member) => domain.isOverdue(member)).length,
+    () => members.filter((member) => domain.isOverdue(member) || domain.getBalanceDue(member) > 0).length,
     [members, domain],
   );
 

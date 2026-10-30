@@ -15,11 +15,20 @@ function openChat(phone, text) {
 
 export function sendFeeReminder(member, domain) {
   if (!domain.getUnpaidPeriods(member).length) return;
+  const balance = domain.getBalanceDue(member);
+  // Only a part-payment balance is owed: there is no new fee to quote yet.
+  if (balance > 0 && !domain.isOverdue(member)) {
+    openChat(
+      member.phone,
+      `Hello ${member.name}, a balance of ${currency(balance)} is pending on your gym fee. Please clear it with your next payment. Thank you.`,
+    );
+    return;
+  }
   openChat(
     member.phone,
     `Hello ${member.name}, your gym fee of ${currency(member.fee)} is due on ${displayDate(
       domain.getDueDateKey(member),
-    )}. Please clear it soon. Thank you.`,
+    )}${balance > 0 ? `, along with a pending balance of ${currency(balance)}` : ""}. Please clear it soon. Thank you.`,
   );
 }
 

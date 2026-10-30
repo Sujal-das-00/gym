@@ -44,7 +44,7 @@ export default function ExpensesView() {
   const net = earnedTotal - spentTotal;
 
   const overdue = members.filter((member) => domain.isOverdue(member));
-  const overdueTotal = overdue.reduce((sum, member) => sum + domain.getOverdueAmount(member), 0);
+  const overdueTotal = overdue.reduce((sum, member) => sum + domain.getOutstandingAmount(member), 0);
 
   const byCategory = entries.filter((entry) => categoryFilter === "all" || entry.category === categoryFilter);
   const counts = {

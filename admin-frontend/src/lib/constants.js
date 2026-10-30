@@ -38,6 +38,7 @@ export const PAYMENT_MODES = [
 
 export const DEFAULT_SETTINGS = {
   gymName: "Gym Admin",
+  gymPhone: "",
   logo: "",
   billingCycleMode: "30-days",
   customBillingDays: 25,
@@ -64,7 +65,7 @@ export const VIEW_COPY = {
   members: ["Members", "Search and manage members."],
   payments: ["Payments", "Collect fees and track who has paid."],
   expenses: ["Expense Tracker", "Expenses and earnings in one ledger."],
-  insights: ["Detailed Insights", "Income and spending for any period."],
+  insights: ["Detailed Insights", "Income, spending and plan changes for any period."],
   trainers: ["Trainers", "Trainer profiles and shifts."],
   plan: ["Plan & Billing", "Your plan and payment history."],
   notifications: ["Send Notification", "Send reminders and announcements to members."],

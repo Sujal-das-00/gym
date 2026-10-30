@@ -151,7 +151,8 @@ function addPayments(member, payments = []) {
       month: String(payment.month || todayKey().slice(0, 7)),
       billingMonth: String(payment.billingMonth || (billingPeriod.length === 7 ? billingPeriod : "")),
       billingPeriod,
-      amount: Number(payment.amount || member.fee || 0),
+      amount: Number(payment.amount ?? member.fee ?? 0),
+      periodFee: payment.kind === "admission" ? null : Number(payment.periodFee ?? member.fee ?? 0),
       kind: payment.kind === "admission" ? "admission" : "membership",
       mode: normalizePaymentMode(payment.mode),
     });
@@ -181,6 +182,57 @@ function syncAdmissionPayment(member) {
     });
   }
   store.persist();
+}
+
+// Mirrors memberModel.applyPlanChange; everything lands in one persist().
+function applyPlanChange(gymId, { member, previous, payments, change }) {
+  const state = store.getState();
+  const target = state.members.find((item) => item.id === member.id);
+  const current = target ? normalizeMember(target) : null;
+  if (
+    !current ||
+    current.membershipType !== previous.membershipType ||
+    current.packageMonths !== previous.packageMonths ||
+    current.fee !== previous.fee ||
+    current.collectionTiming !== (previous.collectionTiming || "") ||
+    current.planStartDate !== (previous.planStartDate || "")
+  ) {
+    const error = new Error("This plan was just changed on another device. Reload and try again.");
+    error.status = 409;
+    throw error;
+  }
+  Object.assign(target, {
+    membershipType: member.membershipType,
+    packageMonths: member.packageMonths,
+    fee: member.fee,
+    collectionTiming: member.collectionTiming,
+    planStartDate: member.planStartDate,
+  });
+  target.payments ||= [];
+  for (const payment of payments) {
+    target.payments.push({
+      id: crypto.randomUUID(),
+      date: toDateKey(payment.date || todayKey()),
+      month: String(payment.month),
+      billingMonth: String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
+      billingPeriod: payment.billingPeriod,
+      amount: Number(payment.amount || 0),
+      periodFee: Number(payment.periodFee ?? payment.amount ?? 0),
+      kind: "membership",
+      mode: normalizePaymentMode(payment.mode),
+    });
+  }
+  state.planChanges ||= [];
+  state.planChanges.push({ ...change, memberId: member.id });
+  store.persist();
+  return change;
+}
+
+function listPlanChanges(gymId, { memberId = "", limit = 2000 } = {}) {
+  return (store.getState().planChanges || [])
+    .filter((change) => !memberId || change.memberId === memberId)
+    .sort((a, b) => String(b.changedAt).localeCompare(String(a.changedAt)))
+    .slice(0, Math.max(1, Math.trunc(Number(limit) || 2000)));
 }
 
 // Expense functions mirror expenseModel's (gymId, ...) signatures; the JSON
@@ -273,6 +325,7 @@ function memberCheckinHistory(member, limit = 12) {
 
 module.exports = {
   addPayments,
+  applyPlanChange,
   attendanceStatusRows,
   createCheckin,
   deleteExpense,
@@ -292,6 +345,7 @@ module.exports = {
   getExpenseById,
   getMemberById,
   getSettings,
+  listPlanChanges,
   saveExpense,
   memberCheckinHistory,
   saveMember,

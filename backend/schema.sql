@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS gym_settings (
   tenant_id CHAR(36) NOT NULL PRIMARY KEY,
   gym_name VARCHAR(160) NOT NULL DEFAULT 'Gym Admin',
+  -- The gym's contact number, bare 10 digits (no +91); '' when not given.
+  gym_phone VARCHAR(15) NOT NULL DEFAULT '',
   logo VARCHAR(512) NOT NULL DEFAULT '',
   billing_cycle_mode ENUM('month-start', '30-days', 'custom-days') NOT NULL DEFAULT '30-days',
   custom_billing_days INT UNSIGNED NOT NULL DEFAULT 25,
@@ -95,6 +97,10 @@ CREATE TABLE IF NOT EXISTS members (
   package_months INT UNSIGNED NOT NULL DEFAULT 1,
   collection_timing VARCHAR(16) NOT NULL DEFAULT '',
   start_date DATE NOT NULL,
+  -- Where billing periods count from once the plan has been changed (see
+  -- member_plan_changes). NULL = never changed: billing counts from start_date,
+  -- which stays the joining date either way.
+  plan_start_date DATE NULL DEFAULT NULL,
   photo VARCHAR(512) NOT NULL DEFAULT '',
   -- trainers.id of the assigned trainer; '' when none.
   trainer_id VARCHAR(64) NOT NULL DEFAULT '',
@@ -112,6 +118,42 @@ CREATE TABLE IF NOT EXISTS members (
   INDEX idx_members_name (name),
   INDEX idx_members_phone (phone),
   CONSTRAINT fk_members_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
+-- Every change to a member's plan (type, package length, fee, collection
+-- timing), written in the same transaction as the change itself. Plans and
+-- names are snapshots, so the log still reads right after later edits or an
+-- archive. changed_at is an ISO-8601 UTC string, like members.created_at.
+CREATE TABLE IF NOT EXISTS member_plan_changes (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  member_id CHAR(36) NOT NULL,
+  member_name VARCHAR(160) NOT NULL DEFAULT '',
+  member_code VARCHAR(40) NOT NULL DEFAULT '',
+  old_membership_type ENUM('monthly', 'package') NOT NULL,
+  old_package_months INT UNSIGNED NOT NULL DEFAULT 1,
+  old_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+  old_collection_timing VARCHAR(16) NOT NULL DEFAULT '',
+  new_membership_type ENUM('monthly', 'package') NOT NULL,
+  new_package_months INT UNSIGNED NOT NULL DEFAULT 1,
+  new_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+  new_collection_timing VARCHAR(16) NOT NULL DEFAULT '',
+  -- The day the new plan's first billing period starts.
+  effective_date DATE NOT NULL,
+  -- Unpaid periods of the old plan that ended before effective_date: collected
+  -- with the change, or waived (never billed). 0 when there were none.
+  dues_collected DECIMAL(10,2) NOT NULL DEFAULT 0,
+  dues_waived DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- First term of the new plan, when it was collected with the change.
+  first_term_collected DECIMAL(10,2) NOT NULL DEFAULT 0,
+  note VARCHAR(200) NOT NULL DEFAULT '',
+  changed_by_id VARCHAR(64) NOT NULL DEFAULT '',
+  changed_by_name VARCHAR(160) NOT NULL DEFAULT '',
+  changed_by_role VARCHAR(32) NOT NULL DEFAULT '',
+  changed_at VARCHAR(32) NOT NULL,
+  INDEX idx_plan_changes_tenant_time (tenant_id, changed_at),
+  INDEX idx_plan_changes_member (member_id, changed_at),
+  CONSTRAINT fk_plan_changes_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
 
 -- Gym trainers. attendance is a JSON array of YYYY-MM-DD days marked present.
@@ -183,6 +225,10 @@ CREATE TABLE IF NOT EXISTS payments (
   billing_month VARCHAR(7) NOT NULL DEFAULT '',
   billing_period VARCHAR(20) NOT NULL,
   amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- The billing period's full fee when this row was taken. A period can be paid
+  -- in parts; it counts as paid once its rows' amounts add up to this. NULL on
+  -- rows from before part payments existed: each of those paid its period in full.
+  period_fee DECIMAL(10,2) NULL DEFAULT NULL,
   -- 'membership' rows pay for a billing period (billing_period names it).
   -- 'admission' rows are the one-off joining fee and never mark a period paid
   -- (billing_period is the literal 'admission'); one per member, kept in sync

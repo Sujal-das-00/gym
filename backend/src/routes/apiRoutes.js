@@ -104,6 +104,8 @@ router.post("/members", asyncHandler(memberController.postMember));
 router.put("/members/:id", asyncHandler(memberController.putMember));
 router.delete("/members/:id", asyncHandler(memberController.deleteMember));
 router.post("/members/:id/payments", asyncHandler(memberController.addPayments));
+router.post("/members/:id/plan", asyncHandler(memberController.postPlanChange));
+router.get("/plan-changes", asyncHandler(memberController.listPlanChanges));
 
 router.get("/trainers", asyncHandler(trainerController.listTrainers));
 router.put("/trainers/:id", asyncHandler(trainerController.putTrainer));

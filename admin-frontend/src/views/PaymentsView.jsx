@@ -6,18 +6,13 @@ import Icon from "../components/Icon.jsx";
 
 const VISIBLE_LIMIT = 120;
 
+// One status per member (domain.getFeeStatus) so every contact lands in exactly one group.
 const GROUPS = [
   { key: "overdue", label: "Overdue" },
+  { key: "balance", label: "Balance due" },
   { key: "pending", label: "Pending" },
   { key: "paid", label: "Paid" },
 ];
-
-// One status per member so every contact lands in exactly one group.
-function statusOf(domain, member) {
-  if (domain.isOverdue(member)) return "overdue";
-  if (domain.isPaidThisPeriod(member)) return "paid";
-  return "pending";
-}
 
 // Memoised: recording one payment re-renders that row only.
 const PaymentRow = memo(function PaymentRow({ row, hasRange, domain, openFeeDialog }) {
@@ -39,7 +34,12 @@ const PaymentRow = memo(function PaymentRow({ row, hasRange, domain, openFeeDial
           {row.status === "overdue" ? (
             <>
               <strong>{currency(row.overdueAmount)}</strong>
-              <small>{row.duePeriods} due</small>
+              <small>{row.duePeriods ? `${row.duePeriods} due` : "Balance"}</small>
+            </>
+          ) : row.status === "balance" ? (
+            <>
+              <strong>{currency(row.overdueAmount)}</strong>
+              <small>Balance left</small>
             </>
           ) : row.status === "paid" ? (
             <>
@@ -82,14 +82,15 @@ export default function PaymentsView() {
       return day.startsWith(month);
     };
     return members.map((member) => {
-      const status = statusOf(domain, member);
+      const status = domain.getFeeStatus(member);
       const payments = (member.payments || []).filter(inRange);
       return {
         member,
         status,
         collected: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
         paymentCount: payments.length,
-        overdueAmount: status === "overdue" ? domain.getOverdueAmount(member) : 0,
+        // Overdue periods plus any balance left from part payments.
+        overdueAmount: domain.getOutstandingAmount(member),
         duePeriods: status === "overdue" ? domain.getDueUnpaidPeriods(member).length : 0,
         dueDate: domain.getDueDateKey(member),
       };
@@ -98,7 +99,7 @@ export default function PaymentsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, domain, hasRange, startDate, endDate, today]);
 
-  const counts = { all: rows.length, overdue: 0, pending: 0, paid: 0 };
+  const counts = { all: rows.length, overdue: 0, balance: 0, pending: 0, paid: 0 };
   let collected = 0;
   let outstanding = 0;
   rows.forEach((row) => {

@@ -1,5 +1,6 @@
-const { exec, query } = require("../config/database");
-const { toDateKey } = require("../utils/date");
+const crypto = require("crypto");
+const { exec, getPool, query } = require("../config/database");
+const { toDateKey, todayKey } = require("../utils/date");
 const { normalizeMember, normalizePhone } = require("../utils/member");
 const { mapPaymentRow } = require("./paymentModel");
 
@@ -44,6 +45,7 @@ async function hydrateMembers(rows) {
           packageMonths: row.package_months,
           collectionTiming: row.collection_timing,
           startDate: row.start_date,
+          planStartDate: row.plan_start_date || "",
           photo: row.photo,
           trainerId: row.trainer_id || "",
           createdAt: row.created_at,
@@ -96,14 +98,14 @@ async function findMemberByCredentials(gymId, gymCode, phone) {
 
 async function saveMember(gymId, member) {
   await exec(
-    `INSERT INTO members (id, tenant_id, gym_id, name, phone, address, fee, admission_fee, membership_type, package_months, collection_timing, start_date, photo, trainer_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO members (id, tenant_id, gym_id, name, phone, address, fee, admission_fee, membership_type, package_months, collection_timing, start_date, plan_start_date, photo, trainer_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        gym_id = VALUES(gym_id), name = VALUES(name), phone = VALUES(phone), address = VALUES(address),
        fee = VALUES(fee), admission_fee = VALUES(admission_fee), membership_type = VALUES(membership_type),
        package_months = VALUES(package_months), collection_timing = VALUES(collection_timing),
-       start_date = VALUES(start_date), photo = VALUES(photo), trainer_id = VALUES(trainer_id)`,
-    [member.id, gymId, member.gymId, member.name, member.phone, member.address, member.fee, member.admissionFee, member.membershipType, member.packageMonths, member.collectionTiming || "", member.startDate, member.photo, member.trainerId || "", member.createdAt],
+       start_date = VALUES(start_date), plan_start_date = VALUES(plan_start_date), photo = VALUES(photo), trainer_id = VALUES(trainer_id)`,
+    [member.id, gymId, member.gymId, member.name, member.phone, member.address, member.fee, member.admissionFee, member.membershipType, member.packageMonths, member.collectionTiming || "", member.startDate, member.planStartDate || null, member.photo, member.trainerId || "", member.createdAt],
   );
   return getMemberById(gymId, member.id);
 }
@@ -124,11 +126,146 @@ async function countMembers(gymId) {
   return Number(rows[0]?.count || 0);
 }
 
+function mapPlanChangeRow(row) {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    memberName: row.member_name,
+    memberCode: row.member_code,
+    from: {
+      membershipType: row.old_membership_type,
+      packageMonths: Number(row.old_package_months || 1),
+      fee: Number(row.old_fee || 0),
+      collectionTiming: row.old_collection_timing,
+    },
+    to: {
+      membershipType: row.new_membership_type,
+      packageMonths: Number(row.new_package_months || 1),
+      fee: Number(row.new_fee || 0),
+      collectionTiming: row.new_collection_timing,
+    },
+    effectiveDate: toDateKey(row.effective_date),
+    duesCollected: Number(row.dues_collected || 0),
+    duesWaived: Number(row.dues_waived || 0),
+    firstTermCollected: Number(row.first_term_collected || 0),
+    note: row.note || "",
+    changedBy: { id: row.changed_by_id, name: row.changed_by_name, role: row.changed_by_role },
+    changedAt: row.changed_at,
+  };
+}
+
+/**
+ * Applies a plan change in one transaction: the member's new plan and billing
+ * anchor, any payments taken with it, and the log entry. The member UPDATE is
+ * conditional on the plan read before the change, so two people changing the
+ * same plan at once can't both win — the second gets a 409.
+ */
+async function applyPlanChange(gymId, { member, previous, payments, change }) {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    const [updated] = await connection.execute(
+      `UPDATE members SET membership_type = ?, package_months = ?, fee = ?, collection_timing = ?, plan_start_date = ?
+       WHERE tenant_id = ? AND id = ? AND archived_at IS NULL
+         AND membership_type = ? AND package_months = ? AND fee = ? AND collection_timing = ? AND plan_start_date <=> ?`,
+      [
+        member.membershipType,
+        member.packageMonths,
+        member.fee,
+        member.collectionTiming,
+        member.planStartDate,
+        gymId,
+        member.id,
+        previous.membershipType,
+        previous.packageMonths,
+        previous.fee,
+        previous.collectionTiming || "",
+        previous.planStartDate || null,
+      ],
+    );
+    if (!updated.affectedRows) {
+      const error = new Error("This plan was just changed on another device. Reload and try again.");
+      error.status = 409;
+      throw error;
+    }
+    for (const payment of payments) {
+      await connection.execute(
+        `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'membership', ?)`,
+        [
+          crypto.randomUUID(),
+          member.id,
+          toDateKey(payment.date || todayKey()),
+          String(payment.month),
+          String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
+          payment.billingPeriod,
+          Number(payment.amount || 0),
+          Number(payment.periodFee ?? payment.amount ?? 0),
+          payment.mode || null,
+        ],
+      );
+    }
+    await connection.execute(
+      `INSERT INTO member_plan_changes
+         (id, tenant_id, member_id, member_name, member_code,
+          old_membership_type, old_package_months, old_fee, old_collection_timing,
+          new_membership_type, new_package_months, new_fee, new_collection_timing,
+          effective_date, dues_collected, dues_waived, first_term_collected, note,
+          changed_by_id, changed_by_name, changed_by_role, changed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        change.id,
+        gymId,
+        member.id,
+        change.memberName,
+        change.memberCode,
+        change.from.membershipType,
+        change.from.packageMonths,
+        change.from.fee,
+        change.from.collectionTiming,
+        change.to.membershipType,
+        change.to.packageMonths,
+        change.to.fee,
+        change.to.collectionTiming,
+        change.effectiveDate,
+        change.duesCollected,
+        change.duesWaived,
+        change.firstTermCollected,
+        change.note,
+        change.changedBy.id,
+        change.changedBy.name,
+        change.changedBy.role,
+        change.changedAt,
+      ],
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+  return change;
+}
+
+// Newest first. Archived members' changes stay in the log on purpose.
+async function listPlanChanges(gymId, { memberId = "", limit = 2000 } = {}) {
+  const cap = Math.max(1, Math.min(5000, Math.trunc(Number(limit) || 2000)));
+  const rows = memberId
+    ? await query(
+        `SELECT * FROM member_plan_changes WHERE tenant_id = ? AND member_id = ? ORDER BY changed_at DESC LIMIT ${cap}`,
+        [gymId, memberId],
+      )
+    : await query(`SELECT * FROM member_plan_changes WHERE tenant_id = ? ORDER BY changed_at DESC LIMIT ${cap}`, [gymId]);
+  return rows.map(mapPlanChangeRow);
+}
+
 function duplicateMemberError(error) {
   return error && (error.code === "ER_DUP_ENTRY" || error.errno === 1062);
 }
 
 module.exports = {
+  applyPlanChange,
   clearTrainerFromMembers,
   countMembers,
   deleteMember,
@@ -137,5 +274,6 @@ module.exports = {
   findMemberByCredentials,
   getAllMembers,
   getMemberById,
+  listPlanChanges,
   saveMember,
 };

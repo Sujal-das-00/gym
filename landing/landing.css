@@ -551,6 +551,81 @@ button { cursor: pointer; }
 .link-box { display: flex; align-items: center; gap: 10px; margin: 8px 0 20px; padding: 12px 14px; border: 1px dashed #b5dcc5; border-radius: 10px; background: var(--green-soft); color: var(--green-dark); font-weight: 700; word-break: break-all; }
 .link-box .i { color: var(--green); }
 
+/* Gym card on the signup page: fills in live as the owner types (auth.js). */
+.gym-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, 100%);
+  aspect-ratio: 1.586;
+  margin: auto 0 0;
+  padding: 22px 24px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(198, 242, 107, .16), transparent 42%),
+    linear-gradient(135deg, #0e5a40 0%, var(--green-dark) 55%, #032219 100%);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .12);
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 300ms var(--ease);
+  will-change: transform;
+}
+.gym-card-watermark { position: absolute; right: -30px; bottom: -46px; width: 200px; height: 200px; color: #c6f26b; opacity: .1; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; transform: rotate(-28deg); pointer-events: none; }
+.gym-card-shine { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .16) 50%, transparent 65%); transform: translateX(-120%); pointer-events: none; }
+.gym-card.is-shining .gym-card-shine { animation: card-shine 900ms var(--ease); }
+@keyframes card-shine { to { transform: translateX(120%); } }
+.gym-card-top { display: flex; align-items: center; justify-content: space-between; }
+.gym-card-logo { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: #c6f26b; }
+.gym-card-logo::before {
+  content: "";
+  width: 30px;
+  height: 20px;
+  background: var(--green-dark);
+  -webkit-mask: url("/landing/logo-mark.png") center / contain no-repeat;
+  mask: url("/landing/logo-mark.png") center / contain no-repeat;
+}
+.gym-card-tag { padding: 4px 10px; border-radius: 999px; background: #c6f26b; color: var(--green-dark); font-size: .72rem; font-weight: 800; letter-spacing: .04em; }
+.gym-card-name {
+  margin-top: auto;
+  overflow: hidden;
+  font-family: "Space Grotesk", Inter, sans-serif;
+  font-size: clamp(1.45rem, 2.3vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* Foil-pressed lettering: a light metallic face with a dark edge above. */
+  background: linear-gradient(180deg, #ffffff 0%, #e4f7ea 48%, #a9d9bd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, .5)) drop-shadow(0 1px 0 rgba(255, 255, 255, .1));
+}
+.gym-card-name.is-empty { background: none; color: rgba(255, 255, 255, .32); filter: none; }
+.gym-card-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; color: rgba(255, 255, 255, .78); font-size: .9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gym-card-meta span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #c6f26b; vertical-align: 2px; }
+.gym-card-meta .is-empty { color: rgba(255, 255, 255, .34); }
+.auth-aside .gym-card + h2 { margin-top: 30px; }
+
+.phone-wrap { display: flex; }
+.phone-prefix { display: grid; place-items: center; padding: 0 12px; border: 1px solid #cfd9d1; border-right: 0; border-radius: var(--r-sm) 0 0 var(--r-sm); background: var(--bg); color: var(--muted); font-weight: 700; }
+.phone-wrap input { border-radius: 0 var(--r-sm) var(--r-sm) 0 !important; }
+
+.signup-steps { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.signup-steps span { width: 10px; height: 6px; border-radius: 99px; background: var(--line); transition: width var(--t-med) var(--ease), background var(--t-med); }
+.signup-steps span.on { background: var(--green-dark); }
+.signup-steps span.current { width: 26px; }
+.signup-steps small { margin-left: 6px; color: var(--muted); font-size: .8rem; font-weight: 700; }
+#signupCard h1 { margin-bottom: 22px; }
+.step-actions { display: flex; gap: 12px; margin-top: 18px; }
+.step-actions .btn-block { flex: 1; }
+.step-back { flex: none; width: 56px; padding: 0; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.step-back .i { transform: rotate(180deg); }
+.field-grid[hidden], .step-actions[hidden], #nextBtn[hidden] { display: none; }
+.field-grid:not([hidden]) { animation: card-in 280ms var(--ease); }
+
 /* Terms dialog */
 dialog.terms { width: min(480px, calc(100% - 32px)); padding: 26px; border: 0; border-radius: var(--r-lg); box-shadow: var(--shadow-lg); color: var(--ink); }
 dialog.terms::backdrop { background: rgba(5, 45, 33, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
@@ -604,6 +679,8 @@ dialog.terms .btn { margin-top: 8px; }
   .auth-aside { padding: 26px 24px; gap: 14px; }
   .auth-aside h2 { margin-top: 8px; font-size: 1.5rem; }
   .auth-aside .check-list, .auth-aside .aside-price, .aside-foot { display: none; }
+  .gym-card { width: min(360px, 100%); margin: 6px auto 0; padding: 18px 20px; }
+  .auth-aside .gym-card + h2 { margin-top: 14px; text-align: center; }
   .auth-main { padding: 28px 16px 44px; }
 }
 
@@ -628,6 +705,8 @@ dialog.terms .btn { margin-top: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gym-card { transition: none; transform: none; }
+  .gym-card.is-shining .gym-card-shine { animation: none; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0ms !important; }
   .js .reveal { opacity: 1; transform: none; }

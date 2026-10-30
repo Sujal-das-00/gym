@@ -22,10 +22,52 @@ const MODE_LABELS = {
 // rather than shown as an empty or invented value.
 export const paymentMode = (payment) => MODE_LABELS[payment?.mode] || "";
 
+// A membership payment that covered only part of its period's fee. Rows from
+// before part payments have no periodFee and were always full payments.
+export const isPartPayment = (payment) =>
+  payment?.kind !== "admission" &&
+  payment?.periodFee !== null &&
+  payment?.periodFee !== undefined &&
+  Number(payment.amount || 0) < Number(payment.periodFee);
+
+const samePeriod = (payment) => (other) => other.kind !== "admission" && other.billingPeriod === payment.billingPeriod;
+
+/**
+ * What is still owed on a part payment's period, from every payment toward it.
+ * A row without periodFee (recorded before part payments) paid its period in full.
+ */
+export function periodBalance(payment, payments = []) {
+  const rows = payments.filter(samePeriod(payment));
+  if (rows.some((row) => row.periodFee === null || row.periodFee === undefined)) return 0;
+  const paid = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  return Math.max(0, Number(payment.periodFee) - paid);
+}
+
+// What was left on the period right after this payment — fixed, for the invoice.
+export function balanceAfter(payment, payments = []) {
+  const rows = payments.filter(samePeriod(payment));
+  const upTo = rows.slice(0, rows.findIndex((row) => row.id === payment.id) + 1 || rows.length);
+  const paid = upTo.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  return Math.max(0, Number(payment.periodFee) - paid);
+}
+
+/**
+ * The words every payment list adds to a part payment, matching the admin
+ * panel: the period's full fee, then what is still due on it (or that it has
+ * since been paid off). Empty for full and admission payments.
+ */
+export const partPaymentNotes = (payment, payments = []) => {
+  if (!isPartPayment(payment)) return [];
+  const left = periodBalance(payment, payments);
+  return [`of ${rupees(payment.periodFee)}`, left > 0 ? `${rupees(left)} due` : "balance cleared"];
+};
+
 export const paymentTitle = (payment) =>
   payment.kind === "admission"
     ? "One-time admission fee"
-    : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}`;
+    : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}${
+        isPartPayment(payment) ? " • Part payment" : ""
+      }`;
 
 /**
  * The invoice for one payment: what was paid, when, what for, and by whom.
@@ -36,6 +78,7 @@ export const paymentTitle = (payment) =>
  */
 export function invoiceHtml({ gymName, member, payment, title }) {
   const paidOn = displayDate(payment.date);
+  const left = isPartPayment(payment) ? balanceAfter(payment, member.payments) : 0;
 
   const mode = paymentMode(payment);
 
@@ -101,6 +144,12 @@ export function invoiceHtml({ gymName, member, payment, title }) {
           ? `<div class="row bordered"><span class="row-label">Mode of payment</span><span class="row-value">${escapeHtml(mode)}</span></div>`
           : ""
       }
+      ${
+        isPartPayment(payment)
+          ? `<div class="row bordered"><span class="row-label">Full fee for the period</span><span class="row-value">${escapeHtml(rupees(payment.periodFee))}</span></div>
+             <div class="row bordered"><span class="row-label">Balance after this payment</span><span class="row-value">${escapeHtml(rupees(left))}</span></div>`
+          : ""
+      }
     </section>
 
     <section class="total">
@@ -139,6 +188,9 @@ export const receiptData = ({ gymName, member, payment, title }) => ({
   paidFor: paymentTitle(payment),
   mode: paymentMode(payment),
   amount: rupees(payment.amount),
+  // Blank unless this was a part payment; the app adds the two rows only then.
+  periodFee: isPartPayment(payment) ? rupees(payment.periodFee) : "",
+  balanceAfter: isPartPayment(payment) ? rupees(balanceAfter(payment, member.payments)) : "",
 });
 
 /**

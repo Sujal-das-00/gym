@@ -4,7 +4,9 @@ const { hashPassword, verifyPassword } = require("../utils/password");
 const { createHttpError } = require("../utils/http");
 const userModel = require("../models/userModel");
 const gymModel = require("../models/gymModel");
+const settingsModel = require("../models/settingsModel");
 const referralService = require("./referralService");
+const { normalizeGymPhone } = require("../utils/settings");
 
 function tokenFor(user) {
   const { jwtSecret, tokenTtlSeconds } = authConfig();
@@ -83,7 +85,7 @@ const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-
 // one step, returning a session so the owner lands in the dashboard signed in.
 // The landing form checks the same rules for instant feedback; these are the ones
 // that count.
-async function signupOwner({ gymName, ownerName, email, password, referralCode }) {
+async function signupOwner({ gymName, ownerName, email, password, referralCode, gymPhone = "" }) {
   if (!NAME_PATTERN.test(gymName) || gymName.length < 2 || gymName.length > 30) {
     throw createHttpError(400, "Gym name must be 2-30 letters, with no numbers or symbols");
   }
@@ -92,6 +94,11 @@ async function signupOwner({ gymName, ownerName, email, password, referralCode }
   }
   if (email.length > 120 || email.includes("..") || !EMAIL_PATTERN.test(email)) {
     throw createHttpError(400, "Enter a valid email address");
+  }
+  // Optional (the landing page form doesn't ask for it), but checked when given.
+  const phone = normalizeGymPhone(gymPhone);
+  if (String(gymPhone || "").trim() && !phone) {
+    throw createHttpError(400, "Enter a valid 10-digit gym phone number");
   }
   if (password.length < 8 || password.length > 72 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
     throw createHttpError(400, "Password must be 8-72 characters with at least one letter and one number");
@@ -107,6 +114,7 @@ async function signupOwner({ gymName, ownerName, email, password, referralCode }
     adminName: ownerName,
     referralCode,
   });
+  if (phone) await settingsModel.setGymPhone(gym.id, phone);
   await userModel.setLastLogin(admin.id);
   return { token: tokenFor(admin), user: admin, gym: { id: gym.id, slug: gym.slug, name: gym.name } };
 }

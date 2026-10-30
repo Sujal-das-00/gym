@@ -108,6 +108,9 @@ Future<Uint8List> buildReceiptPdf(Map<String, dynamic> receipt) async {
               ),
               row('Paid for', text('paidFor')),
               if (mode.isNotEmpty) row('Mode of payment', mode, bordered: true),
+              // Part payments only: sent blank otherwise (and absent from older web builds).
+              if (text('periodFee').isNotEmpty) row('Full fee for the period', text('periodFee'), bordered: true),
+              if (text('balanceAfter').isNotEmpty) row('Balance after this payment', text('balanceAfter'), bordered: true),
             ],
           ),
         ),

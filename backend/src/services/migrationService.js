@@ -217,6 +217,20 @@ async function ensureFeatureColumns() {
       "payments.payment_mode",
     );
   }
+  // A period's full fee on each payment row, so a period can be paid in parts.
+  // Existing rows stay NULL: every one of them paid its period in full.
+  if (!(await columnExists("payments", "period_fee"))) {
+    await tryRaw("ALTER TABLE payments ADD COLUMN period_fee DECIMAL(10,2) NULL DEFAULT NULL AFTER amount", "payments.period_fee");
+  }
+  // Gym contact number, collected at signup (phone app onboarding) or in Settings.
+  if (!(await columnExists("gym_settings", "gym_phone"))) {
+    await tryRaw("ALTER TABLE gym_settings ADD COLUMN gym_phone VARCHAR(15) NOT NULL DEFAULT '' AFTER gym_name", "gym_settings.gym_phone");
+  }
+  // Billing anchor after a plan change. Existing members stay NULL, so their
+  // billing keeps counting from start_date exactly as before.
+  if (!(await columnExists("members", "plan_start_date"))) {
+    await tryRaw("ALTER TABLE members ADD COLUMN plan_start_date DATE NULL DEFAULT NULL AFTER start_date", "members.plan_start_date");
+  }
   // Assigned trainer. Existing members have none ('').
   if (!(await columnExists("members", "trainer_id"))) {
     await tryRaw("ALTER TABLE members ADD COLUMN trainer_id VARCHAR(64) NOT NULL DEFAULT '' AFTER photo", "members.trainer_id");

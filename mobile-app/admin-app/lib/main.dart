@@ -11,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'config.dart';
+import 'onboarding.dart';
 import 'receipt_pdf.dart';
 
 void main() {
@@ -72,10 +73,13 @@ class _WebShellState extends State<WebShell> {
           _loading = true;
           _failed = false;
         }),
-        onPageFinished: (_) => setState(() {
-          _loading = false;
-          _firstLoadDone = true;
-        }),
+        onPageFinished: (_) {
+          setState(() {
+            _loading = false;
+            _firstLoadDone = true;
+          });
+          _applySession();
+        },
         onWebResourceError: (error) {
           // Only a failed main-frame load should replace the page.
           if (error.isForMainFrame ?? true) setState(() => _failed = true);
@@ -91,6 +95,36 @@ class _WebShellState extends State<WebShell> {
     // CSV exports and receipts are handed to the app over this bridge.
     _controller.addJavaScriptChannel('GymBooNative', onMessageReceived: _onBridgeMessage);
     _controller.loadRequest(_start);
+
+    // First install: onboarding over the panel, which keeps loading behind.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!await OnboardingStore.seen() && mounted) showOnboarding(context);
+    });
+    // An account created in onboarding signs the panel straight in.
+    SessionHandoff.token.addListener(_applySession);
+  }
+
+  @override
+  void dispose() {
+    SessionHandoff.token.removeListener(_applySession);
+    super.dispose();
+  }
+
+  /// Signs the panel in with the session from onboarding: the token goes where
+  /// the panel keeps its login (admin-frontend lib/api.js, "gym-admin-token"),
+  /// then the panel reloads signed in, and its menu tour starts.
+  Future<void> _applySession() async {
+    final token = SessionHandoff.token.value;
+    if (token == null || !_firstLoadDone) return; // onPageFinished retries
+    try {
+      await _controller.runJavaScript(
+        'localStorage.setItem("gym-admin-token", ${jsonEncode(token)});'
+        'location.replace(${jsonEncode(_start.toString())});',
+      );
+      SessionHandoff.token.value = null;
+    } catch (_) {
+      // Page mid-navigation; onPageFinished tries again.
+    }
   }
 
   /// Photo picker for file inputs. Android 13+ uses the system photo picker,
@@ -120,6 +154,7 @@ class _WebShellState extends State<WebShell> {
   ///   "saveFile"           {name, mime, text}: share/save a generated file (CSV)
   ///   "savePdf"             {name, receipt, html}: build the PDF and save it to Downloads (receipts)
   ///   "printHtml"           {name, html}: print dialog, where "Save as PDF" makes the file
+  ///   "showTour"            replay the first-run onboarding screens
   Future<void> _onBridgeMessage(JavaScriptMessage message) async {
     int? id;
     String result;
@@ -133,6 +168,11 @@ class _WebShellState extends State<WebShell> {
         result = jsonEncode(await _savePdf(request));
       } else if (type == 'printHtml') {
         result = jsonEncode(await _printHtml(request));
+      } else if (type == 'showTour') {
+        if (mounted) {
+          showOnboarding(context);
+        }
+        result = jsonEncode({'ok': true});
       } else {
         // "status" / "enable" (push notifications) are member-app only.
         result = jsonEncode({'ok': false, 'error': 'unsupported'});
@@ -247,6 +287,24 @@ class _WebShellState extends State<WebShell> {
               WebViewWidget(controller: _controller),
               if (_loading && !_failed && _firstLoadDone)
                 const LinearProgressIndicator(minHeight: 3, color: kBrandColor),
+              if (kShowTourButton && _firstLoadDone && !_failed)
+                Positioned(
+                  right: 12,
+                  bottom: 92,
+                  child: FloatingActionButton.small(
+                    heroTag: 'tour',
+                    tooltip: 'App tour',
+                    backgroundColor: kBrandColor,
+                    foregroundColor: Colors.white,
+                    onPressed: () => showTourMenu(
+                      context,
+                      // admin-frontend/src/components/MenuTour.jsx listens for this.
+                      onMenuTour: () =>
+                          _controller.runJavaScript('window.dispatchEvent(new Event("gymboo:menu-tour"));'),
+                    ),
+                    child: const Icon(Icons.school_rounded),
+                  ),
+                ),
               if (!_firstLoadDone && !_failed)
                 Container(
                   color: kSplashColor,

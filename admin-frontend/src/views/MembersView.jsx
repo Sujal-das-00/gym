@@ -1,6 +1,7 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { displayDate, todayKey } from "../lib/dates.js";
+import { currency, displayDate, todayKey } from "../lib/dates.js";
+import { FEE_STATUS_LABELS } from "../lib/billing.js";
 import { sendFeeReminder } from "../lib/whatsapp.js";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
@@ -42,11 +43,11 @@ const MemberRow = memo(function MemberRow({ member, status, present, hasDues, tr
         </span>
         <span className="contact-state">
           <span className={"status-pill " + status}>
-            {status === "overdue"
-              ? "Overdue"
-              : status === "paid"
-                ? "Paid"
-                : `Due ${displayDate(domain.getDueDateKey(member)).slice(0, 6)}`}
+            {status === "pending"
+              ? `Due ${displayDate(domain.getDueDateKey(member)).slice(0, 6)}`
+              : status === "balance"
+                ? `${currency(domain.getBalanceDue(member))} balance`
+                : FEE_STATUS_LABELS[status]}
           </span>
         </span>
       </button>
@@ -92,7 +93,7 @@ export default function MembersView() {
           present: domain.isPresentToday(member),
           hasDues: domain.getUnpaidPeriods(member).length > 0,
           // One status per member: owing an older period outranks paying this one.
-          status: overdue ? "overdue" : paid ? "paid" : "pending",
+          status: domain.getFeeStatus(member),
         };
       }),
     // `today` is a dependency only so the rows roll over with the date.

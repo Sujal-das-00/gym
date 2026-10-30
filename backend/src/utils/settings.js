@@ -1,4 +1,11 @@
 const { DEFAULT_SETTINGS } = require("../config/constants");
+const { normalizePhone } = require("./member");
+
+// A valid Indian mobile number as bare 10 digits, or "" (not given / not valid).
+function normalizeGymPhone(value) {
+  const digits = normalizePhone(value);
+  return /^[6-9]\d{9}$/.test(digits) ? digits : "";
+}
 
 function isHexColor(value) {
   return /^#[0-9a-f]{6}$/i.test(String(value || ""));
@@ -62,6 +69,7 @@ function normalizeSettings(settings = {}) {
 
   return {
     gymName: String(settings.gymName || DEFAULT_SETTINGS.gymName).trim() || DEFAULT_SETTINGS.gymName,
+    gymPhone: normalizeGymPhone(settings.gymPhone),
     logo: String(settings.logo || ""),
     billingCycleMode: mode,
     customBillingDays: Math.max(1, Math.round(Number(settings.customBillingDays || DEFAULT_SETTINGS.customBillingDays))),
@@ -76,6 +84,7 @@ function normalizeSettings(settings = {}) {
 function mapSettingsRow(row) {
   return normalizeSettings({
     gymName: row?.gym_name,
+    gymPhone: row?.gym_phone,
     logo: row?.logo,
     billingCycleMode: row?.billing_cycle_mode,
     customBillingDays: row?.custom_billing_days,
@@ -89,5 +98,6 @@ function mapSettingsRow(row) {
 
 module.exports = {
   mapSettingsRow,
+  normalizeGymPhone,
   normalizeSettings,
 };

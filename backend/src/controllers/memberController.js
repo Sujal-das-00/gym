@@ -2,6 +2,8 @@ const { publicMember } = require("../utils/member");
 const { repo } = require("../models");
 const { createMember, updateMember } = require("../services/memberService");
 const { notifyPayment } = require("../services/autoNotificationService");
+const planChangeService = require("../services/planChangeService");
+const { preparePeriodPayments } = require("../services/paymentService");
 
 async function listMembers(req, res) {
   res.json((await repo().getAllMembers(req.gymId)).map(publicMember));
@@ -26,14 +28,27 @@ async function deleteMember(req, res) {
 async function addPayments(req, res) {
   const member = await repo().getMemberById(req.gymId, req.params.id);
   if (!member) return res.status(404).json({ error: "Member not found" });
-  const payments = Array.isArray(req.body.payments) ? req.body.payments : [];
+  const payments = preparePeriodPayments(member, Array.isArray(req.body.payments) ? req.body.payments : []);
   await repo().addPayments(member, payments);
   notifyPayment(req.gymId, member, payments);
   return res.json(publicMember(await repo().getMemberById(req.gymId, member.id)));
 }
 
+// Change a member's plan from a chosen date; logged with who and when.
+async function postPlanChange(req, res) {
+  const result = await planChangeService.changeMemberPlan(req.gymId, req.params.id, req.body || {}, req.user);
+  if (result.payments.length) notifyPayment(req.gymId, result.member, result.payments);
+  return res.json({ member: result.member, change: result.change });
+}
+
+async function listPlanChanges(req, res) {
+  res.json(await planChangeService.listPlanChanges(req.gymId, { memberId: req.query.memberId }));
+}
+
 module.exports = {
   addPayments,
+  listPlanChanges,
+  postPlanChange,
   deleteMember,
   listMembers,
   postMember,

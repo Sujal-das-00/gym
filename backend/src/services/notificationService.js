@@ -1,5 +1,5 @@
 const { createHttpError } = require("../utils/http");
-const { dueUnpaidPeriods, memberOutstanding } = require("../utils/billing");
+const { balanceDue, dueUnpaidPeriods, memberOutstanding } = require("../utils/billing");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
 const { pushAvailable, pushDisabledReason, sendToSubscriptions } = require("./pushService");
@@ -92,8 +92,11 @@ function membersWithPendingFees(members, settings) {
       member,
       outstanding: memberOutstanding(member, settings),
       unpaidPeriods: dueUnpaidPeriods(member, settings).length,
+      balance: balanceDue(member, settings),
     }))
-    .filter((entry) => entry.unpaidPeriods > 0)
+    // A balance left from a part payment is owed too, even though it doesn't
+    // make the member overdue.
+    .filter((entry) => entry.unpaidPeriods > 0 || entry.balance > 0)
     .sort((a, b) => b.outstanding - a.outstanding || b.unpaidPeriods - a.unpaidPeriods);
 }
 

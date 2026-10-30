@@ -26,6 +26,7 @@ async function postSignup(req, res) {
     email: String(req.body?.email || "").trim(),
     password: String(req.body?.password || ""),
     referralCode: String(req.body?.referralCode || ""),
+    gymPhone: String(req.body?.gymPhone || ""),
   });
   setSessionCookie(res, result.token);
   res.status(201).json(result);

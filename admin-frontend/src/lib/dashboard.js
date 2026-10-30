@@ -55,7 +55,8 @@ export function buildDashboard({ members, expenses, domain, now = new Date() }) 
 
     const duePeriods = domain.getDueUnpaidPeriods(member);
     if (duePeriods.length) {
-      const amount = duePeriods.length * Number(member.fee || 0);
+      // Includes any balance left from part payments.
+      const amount = domain.getOutstandingAmount(member);
       overdueAmount += amount;
       overdue.push({ member, amount, periods: duePeriods.length, since: localDateKey(domain.getDueDate(member)) });
     } else if (paidNow) {

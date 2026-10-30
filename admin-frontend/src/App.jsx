@@ -24,11 +24,13 @@ import MemberDialog from "./dialogs/MemberDialog.jsx";
 import TrainerDialog from "./dialogs/TrainerDialog.jsx";
 import ExpenseDialog from "./dialogs/ExpenseDialog.jsx";
 import FeeDialog from "./dialogs/FeeDialog.jsx";
+import PlanDialog from "./dialogs/PlanDialog.jsx";
 import DetailDialog from "./dialogs/DetailDialog.jsx";
 import DayLedgerDialog from "./dialogs/DayLedgerDialog.jsx";
 import LoginOverlay from "./auth/LoginOverlay.jsx";
 import GymsDialog from "./auth/GymsDialog.jsx";
 import StaffDialog from "./auth/StaffDialog.jsx";
+import MenuTour from "./components/MenuTour.jsx";
 
 // A view mounts on first visit and then stays mounted, shown/hidden by the
 // `.view.active` class — that keeps each view's filters and scroll position
@@ -115,12 +117,14 @@ export default function App() {
       <TrainerDialog />
       <ExpenseDialog />
       <FeeDialog />
+      <PlanDialog />
       <DetailDialog />
       <DayLedgerDialog />
 
       <LoginOverlay />
       <GymsDialog />
       <StaffDialog />
+      <MenuTour />
     </>
   );
 }

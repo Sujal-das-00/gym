@@ -2,6 +2,8 @@ import { useState } from "react";
 import { HELP_FAQ, HELP_GUIDE, HELP_VIDEO_LABEL, HELP_VIDEOS } from "../lib/help.js";
 import Icon from "../components/Icon.jsx";
 import VideoDialog from "../dialogs/VideoDialog.jsx";
+import { isNativeApp, nativeCall } from "../lib/native.js";
+import { MENU_TOUR_EVENT } from "../components/MenuTour.jsx";
 
 const TABS = [
   { key: "hi", icon: "smart_display", label: "Hindi Tutorials" },
@@ -41,8 +43,36 @@ export default function HelpView() {
   const howLabel = lang === "hi" ? "कैसे इस्तेमाल करें" : "How to use it";
   const tipLabel = lang === "hi" ? "सुझाव" : "Tip";
 
+  // Phone app only: replays its native welcome screens.
+  const openWelcome = () =>
+    nativeCall("showTour", {}, 10000)
+      .then((result) => {
+        if (!result?.ok) throw new Error("unsupported");
+      })
+      .catch(() => alert("Update the app to see the tour."));
+
   return (
     <>
+      <section className="panel help-tour">
+          <span className="help-tour-ico" aria-hidden="true">
+            <Icon name="school" />
+          </span>
+          <div>
+            <strong>New here? Take the menu tour</strong>
+            <small>What each item in the menu does, one step at a time.</small>
+          </div>
+          <div className="help-tour-actions">
+            <button type="button" className="help-tab active" onClick={() => window.dispatchEvent(new Event(MENU_TOUR_EVENT))}>
+              Menu tour
+            </button>
+            {isNativeApp() ? (
+              <button type="button" className="help-tab" onClick={openWelcome}>
+                Welcome screens
+              </button>
+            ) : null}
+          </div>
+        </section>
+
       <div className="help-tabs" role="tablist" aria-label="Help sections">
         {TABS.map((item) => (
           <button

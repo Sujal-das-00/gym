@@ -112,6 +112,16 @@ async function updateMember(gymId, id, payload) {
   if (!existing) return null;
   const member = await mergeMemberPayload(existing, payload);
   member.id = id;
+  // A plan only changes through changeMemberPlan (planChangeService), which
+  // moves the billing start and logs the change. Editing these here would
+  // re-bill the member's whole history under the new plan, unlogged.
+  Object.assign(member, {
+    membershipType: existing.membershipType,
+    packageMonths: existing.packageMonths,
+    fee: existing.fee,
+    collectionTiming: existing.collectionTiming,
+    planStartDate: existing.planStartDate,
+  });
   await assertUniqueMember(gymId, member);
   const saved = await repo().saveMember(gymId, member);
   // Re-sync so changing (or clearing) the admission fee, or moving the start

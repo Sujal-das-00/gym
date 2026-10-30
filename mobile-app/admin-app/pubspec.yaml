@@ -1,7 +1,7 @@
 name: gym_boo
 description: Simple Gym Manager - mobile wrapper for the Gym Boo admin web app (/admin).
 publish_to: "none"
-version: 1.0.3+5
+version: 1.0.3+6
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -17,6 +17,8 @@ dependencies:
   share_plus: ^13.3.1
   printing: ^5.15.1
   pdf: ^3.11.0
+  shared_preferences: ^2.5.6
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0

@@ -29,7 +29,7 @@ export function buildLedgerEntries({ members = [], expenses = [], domain }) {
         amount: Number(payment.amount || 0),
         title: member.name,
         category: domain.isAdmissionPayment(payment) ? "admission-fee" : "membership-fee",
-        detail: domain.getPaymentLabel(payment, member),
+        detail: [domain.getPaymentLabel(payment, member), ...domain.getPartPaymentNotes(member, payment)].join(" · "),
         mode: payment.mode || "",
       });
     });

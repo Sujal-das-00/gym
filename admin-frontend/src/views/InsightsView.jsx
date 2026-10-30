@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
-import { currency, dateFormatter, monthKey, parseDateKey, todayKey } from "../lib/dates.js";
+import { currency, dateFormatter, displayDate, monthKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { downloadCsv } from "../lib/csv.js";
 import {
   getLedgerEntries,
@@ -14,6 +14,16 @@ import { PERIOD_MODES, availableYears, describePeriod, resolvePeriod } from "../
 import { CATEGORY_ICONS } from "../lib/constants.js";
 import Icon from "../components/Icon.jsx";
 import Photo from "../components/Photo.jsx";
+import {
+  changeDateKey,
+  changeDirection,
+  changeMoneyNotes,
+  changeTime,
+  changedByLabel,
+  changedFields,
+  fetchPlanChanges,
+  planChangesCsvRows,
+} from "../lib/planChanges.js";
 
 /** A category row with a bar showing its share of that side's total. */
 function BreakdownRow({ row, tone }) {
@@ -42,9 +52,117 @@ function BreakdownRow({ row, tone }) {
 const weekdayOf = (key) => dateFormatter({ weekday: "long" }).format(parseDateKey(key));
 const monthShortOf = (key) => dateFormatter({ month: "short" }).format(parseDateKey(key));
 const signed = (amount) => (amount < 0 ? "−" : "+") + currency(Math.abs(amount));
+const dayTitleOf = (key) => dateFormatter({ weekday: "long", day: "numeric", month: "short" }).format(parseDateKey(key));
+
+const DIRECTION_COPY = {
+  upgrade: { label: "Upgrade", icon: "trending_up" },
+  downgrade: { label: "Downgrade", icon: "trending_down" },
+  same: { label: "Changed", icon: "swap_horiz" },
+};
+
+/**
+ * The plan-change log for the picked period: every time a member's plan was
+ * changed, with the date and time, who did it and from when it applies.
+ */
+function PlanChangesPanel({ changes, state, periodLabel, members, openDetail }) {
+  if (state === "loading" && !changes.length) return <p className="contact-empty">Loading plan changes…</p>;
+  if (state === "error") return <p className="contact-empty">Could not load plan changes. Check your connection and try again.</p>;
+
+  const counts = { upgrade: 0, downgrade: 0, same: 0 };
+  for (const change of changes) counts[changeDirection(change)] += 1;
+
+  const days = [];
+  for (const change of changes) {
+    const key = changeDateKey(change);
+    const last = days[days.length - 1];
+    if (last && last.date === key) last.rows.push(change);
+    else days.push({ date: key, rows: [change] });
+  }
+
+  return (
+    <>
+      <section className="money-card plan-log-card" aria-label={`Plan changes in ${periodLabel}`}>
+        <div className="plan-log-total">
+          <span className="money-card-label">Changes</span>
+          <strong>{changes.length}</strong>
+        </div>
+        <ul className="plan-log-stats">
+          {[
+            ["is-up", "trending_up", counts.upgrade, counts.upgrade === 1 ? "Upgrade" : "Upgrades"],
+            ["is-down", "trending_down", counts.downgrade, counts.downgrade === 1 ? "Downgrade" : "Downgrades"],
+          ].map(([tone, icon, value, label]) => (
+            <li key={icon} className={tone}>
+              <span className="money-card-ico" aria-hidden="true">
+                <Icon name={icon} />
+              </span>
+              <b>{value}</b>
+              <small>{label}</small>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {days.length ? (
+        <div className="plan-log-days">
+        {days.map((day) => (
+          <section className="contact-group" key={day.date} aria-label={dayTitleOf(day.date)}>
+            <h3 className="contact-group-title">
+              {dayTitleOf(day.date)}
+              <span>{day.rows.length}</span>
+            </h3>
+            <ul className="contact-list">
+              {day.rows.map((change) => {
+                const member = members.find((item) => item.id === change.memberId);
+                const direction = DIRECTION_COPY[changeDirection(change)];
+                return (
+                  <li key={change.id}>
+                    <button
+                      type="button"
+                      className="contact-row no-dot plan-log-row"
+                      disabled={!member}
+                      onClick={() => member && openDetail(member.id)}
+                    >
+                      <span className="contact-avatar">{member ? <Photo person={member} /> : null}</span>
+                      <span className="contact-copy">
+                        <strong>
+                          <span className="contact-name">{change.memberName}</span>
+                          <span className={"contact-tag plan-tag is-" + changeDirection(change)}>{direction.label}</span>
+                        </strong>
+                        <small className="plan-log-what">{changedFields(change).join(" · ")}</small>
+                        <small className="contact-meta">
+                          {["Starts " + displayDate(change.effectiveDate), ...changeMoneyNotes(change), changedByLabel(change), change.note]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </small>
+                      </span>
+                      <span className="contact-state">
+                        <strong>{changeTime(change)}</strong>
+                        <small>{member ? change.memberCode : "Deleted"}</small>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+        </div>
+      ) : (
+        <p className="contact-empty">
+          No plan changes in {periodLabel}. Change a plan from a member&apos;s profile (Plan button) and it shows up here
+          with the date and time.
+        </p>
+      )}
+    </>
+  );
+}
 
 export default function InsightsView() {
-  const { members, expenses, domain, openDayLedger, openDetail, showToast } = useApp();
+  const { members, expenses, domain, openDayLedger, openDetail, showToast, planChangeRevision } = useApp();
+
+  // "money" = earnings and expenses; "plans" = the member plan-change log.
+  const [tab, setTab] = useState("money");
+  const [planLog, setPlanLog] = useState({ rows: [], state: "idle" });
 
   const [mode, setMode] = useState("month");
   const [year, setYear] = useState(() => todayKey().slice(0, 4));
@@ -73,6 +191,24 @@ export default function InsightsView() {
   const topMembers = topPayingMembers(earnings);
   const days = groupEntriesByDay(entries);
 
+  // The log is fetched when its tab opens and again after any plan change.
+  useEffect(() => {
+    if (tab !== "plans") return undefined;
+    let cancelled = false;
+    setPlanLog((current) => ({ ...current, state: "loading" }));
+    fetchPlanChanges()
+      .then((rows) => !cancelled && setPlanLog({ rows, state: "ready" }))
+      .catch(() => !cancelled && setPlanLog((current) => ({ ...current, state: "error" })));
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, planChangeRevision]);
+
+  const planChanges = planLog.rows.filter((change) => {
+    const day = changeDateKey(change);
+    return (!period.start || day >= period.start) && (!period.end || day <= period.end);
+  });
+
   // ‹ October 2026 › / ‹ 2026 › stepping for the month and year modes.
   const step = (delta) => {
     if (mode === "year") {
@@ -91,6 +227,15 @@ export default function InsightsView() {
   const memberById = (id) => members.find((member) => member.id === id);
 
   const exportCsv = () => {
+    if (tab === "plans") {
+      if (!planChanges.length) {
+        showToast("No plan changes to export for this period");
+        return;
+      }
+      downloadCsv(planChangesCsvRows(planChanges), `plan-changes-${periodLabel.toLowerCase().replace(/\s+/g, "-")}.csv`);
+      showToast("CSV exported");
+      return;
+    }
     if (!entries.length) {
       showToast("Nothing to export for this period");
       return;
@@ -114,6 +259,25 @@ export default function InsightsView() {
 
   return (
     <section className="list-view insights-view" aria-label="Detailed insights">
+      <div className="insight-tabs" role="tablist" aria-label="Insights">
+        {[
+          ["money", "payments", "Money"],
+          ["plans", "history", "Plan changes"],
+        ].map(([key, icon, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={"insight-tab" + (tab === key ? " active" : "")}
+            onClick={() => setTab(key)}
+          >
+            <Icon name={icon} />
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="list-toolbar">
         <div className="segmented insight-modes" role="radiogroup" aria-label="Period type">
           {PERIOD_MODES.map((option) => (
@@ -158,7 +322,9 @@ export default function InsightsView() {
           <label className="day-pick">
             <strong>{periodLabel}</strong>
             <small>
-              {totals.count} {totals.count === 1 ? "entry" : "entries"}
+              {tab === "plans"
+                ? `${planChanges.length} plan change${planChanges.length === 1 ? "" : "s"}`
+                : `${totals.count} ${totals.count === 1 ? "entry" : "entries"}`}
             </small>
             {/* Invisible picker over the label, like the attendance day bar. */}
             {mode === "month" ? (
@@ -185,6 +351,16 @@ export default function InsightsView() {
         </div>
       )}
 
+      {tab === "plans" ? (
+        <PlanChangesPanel
+          changes={planChanges}
+          state={planLog.state}
+          periodLabel={periodLabel}
+          members={members}
+          openDetail={openDetail}
+        />
+      ) : (
+      <>
       <section className="money-card" aria-label={`Summary for ${periodLabel}`}>
         <span className="money-card-label">Net · {periodLabel}</span>
         <strong className={totals.net < 0 ? "is-negative" : ""}>
@@ -325,6 +501,8 @@ export default function InsightsView() {
         <p className="contact-empty">
           No earnings or expenses in {periodLabel}. Collect a fee or record an expense, then pick that period here.
         </p>
+      )}
+      </>
       )}
     </section>
   );

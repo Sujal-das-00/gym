@@ -28,3 +28,8 @@ const String kSplashImage = 'assets/splash.png';
 
 /// Main brand colour: progress bar, buttons, offline screen.
 const Color kBrandColor = Color(0xFF063A2B);
+
+/// Temporary: a floating "App tour" button over the panel that opens the
+/// onboarding and tutorial screens on demand (for reviewing them). Set to
+/// false to hide it; first-run onboarding still shows once either way.
+const bool kShowTourButton = true;

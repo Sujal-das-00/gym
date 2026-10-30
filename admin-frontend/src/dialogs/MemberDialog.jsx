@@ -4,7 +4,8 @@ import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
 import Icon from "../components/Icon.jsx";
-import { todayKey } from "../lib/dates.js";
+import { currency, displayDate, todayKey } from "../lib/dates.js";
+import { collectionTimingLabel, planLabel } from "../lib/billing.js";
 import { readPhoto } from "../lib/photo.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
 import { firstErrorField, toPhoneDigits, validateMember } from "../lib/validation.js";
@@ -49,7 +50,11 @@ function MemberForm({ member }) {
     saveMember,
     deleteMember,
     showToast,
+    openPlanDialog,
   } = useApp();
+  // While editing, the plan is read from the live list: a change made in the
+  // plan sheet on top of this form shows here straight away.
+  const liveMember = member ? members.find((item) => item.id === member.id) || member : null;
 
   const [gymId, setGymId] = useState(() => member?.gymId || member?.id || generateGymId());
   const [name, setName] = useState(member?.name || "");
@@ -81,6 +86,11 @@ function MemberForm({ member }) {
     { gymId, name, phone, address, fee, admissionFee, membershipType, packageMonths, startDate },
     otherMembers,
   );
+  // An existing member's plan isn't edited here (see the Change plan sheet).
+  if (member) {
+    delete errors.fee;
+    delete errors.packageMonths;
+  }
   const errorCount = Object.keys(errors).length;
 
   const markTouched = (field) => setTouched((current) => ({ ...current, [field]: true }));
@@ -129,12 +139,13 @@ function MemberForm({ member }) {
       name: String(name).trim(),
       phone: toPhoneDigits(phone),
       address: String(address).trim(),
-      fee: Number(fee),
+      fee: liveMember ? Number(liveMember.fee) : Number(fee),
       admissionFee: Math.max(0, Number(admissionFee) || 0),
       admissionMode: Math.max(0, Number(admissionFee) || 0) > 0 ? admissionMode : "",
-      membershipType: membershipType === "package" ? "package" : "monthly",
-      packageMonths: Math.max(1, Math.round(Number(packageMonths || 1))),
-      collectionTiming: collectionTiming === "fixed-day" ? "fixed-day" : "at-join",
+      // Ignored by the server for an existing member; sent as they stand.
+      membershipType: liveMember ? liveMember.membershipType : membershipType === "package" ? "package" : "monthly",
+      packageMonths: liveMember ? liveMember.packageMonths : Math.max(1, Math.round(Number(packageMonths || 1))),
+      collectionTiming: liveMember ? liveMember.collectionTiming : collectionTiming === "fixed-day" ? "fixed-day" : "at-join",
       startDate: String(startDate),
       trainerId: String(trainerId || ""),
       photo,
@@ -280,6 +291,31 @@ function MemberForm({ member }) {
               <h3>Plan</h3>
             </div>
             <div className="mf-grid">
+              {liveMember ? (
+                <div className="mf-field wide">
+                  <div className="plan-current">
+                    <span className="plan-current-ico" aria-hidden="true">
+                      <Icon name="card_membership" />
+                    </span>
+                    <div>
+                      <strong>
+                        {planLabel(liveMember)} · {currency(liveMember.fee)}
+                      </strong>
+                      <small>
+                        {collectionTimingLabel(domain.getCollectionTiming(liveMember))}
+                        {liveMember.planStartDate ? " · since " + displayDate(liveMember.planStartDate) : ""}
+                      </small>
+                    </div>
+                    <button type="button" className="plan-change-btn" onClick={() => openPlanDialog(liveMember.id)}>
+                      <Icon name="swap_horiz" />
+                      Change plan
+                    </button>
+                  </div>
+                  <small className="field-hint">Plan changes are dated, logged and keep past payments as they were.</small>
+                </div>
+              ) : null}
+              {liveMember ? null : (
+              <>
               <div className="mf-field wide">
                 <span className="mf-label" id="membershipTypeLabel">
                   Membership type
@@ -370,8 +406,10 @@ function MemberForm({ member }) {
                 </span>
                 <FieldError id="feeInput-error" message={feeError} />
               </label>
+              </>
+              )}
               <label className="mf-field">
-                Start date
+                {member ? "Joining date" : "Start date"}
                 <input
                   id="startDateInput"
                   name="startDate"
@@ -407,6 +445,7 @@ function MemberForm({ member }) {
               <h3>Payment</h3>
             </div>
             <div className="mf-grid">
+              {member ? null : (
               <div className="mf-field wide">
                 <span className="mf-label" id="collectionTimingLabel">
                   When is the fee collected?
@@ -439,6 +478,7 @@ function MemberForm({ member }) {
                     : "Mark the first term paid now. The next payment is due one cycle later."}
                 </small>
               </div>
+              )}
 
               <label className="mf-field wide">
                 <span className="mf-label-row">

@@ -4,6 +4,8 @@ import { displayDate } from "../lib/dates.js";
 import { getInitials } from "../lib/format.js";
 import { normalizeTheme } from "../lib/theme.js";
 import { readPhoto } from "../lib/photo.js";
+import { isValidPhone } from "../lib/validation.js";
+import PhoneField from "../components/PhoneField.jsx";
 
 const THEME_FIELDS = [
   { key: "primary", label: "Primary" },
@@ -31,6 +33,7 @@ export default function SettingsView() {
   // The form is a draft; nothing but the logo is persisted before "Save settings",
   // exactly as in the original.
   const [gymName, setGymName] = useState(settings.gymName || "Gym Admin");
+  const [gymPhone, setGymPhone] = useState(settings.gymPhone || "");
   const [billingCycleMode, setBillingCycleMode] = useState(() => domain.getBillingCycleMode());
   const [customBillingDays, setCustomBillingDays] = useState(() => String(domain.getBillingCycleDays()));
   const [defaultCollectionTiming, setDefaultCollectionTiming] = useState(() => domain.getDefaultCollectionTiming());
@@ -44,6 +47,7 @@ export default function SettingsView() {
   // switch, save) — not on in-place edits such as adding a holiday date.
   useEffect(() => {
     setGymName(settings.gymName || "Gym Admin");
+    setGymPhone(settings.gymPhone || "");
     setBillingCycleMode(["month-start", "30-days", "custom-days"].includes(settings.billingCycleMode) ? settings.billingCycleMode : "month-start");
     setCustomBillingDays(String(settings.billingCycleMode === "30-days" ? 30 : Math.round(Number(settings.customBillingDays || 25)) || 25));
     setDefaultCollectionTiming(settings.defaultCollectionTiming === "fixed-day" ? "fixed-day" : "at-join");
@@ -88,10 +92,15 @@ export default function SettingsView() {
   const onSubmit = async (event) => {
     event.preventDefault();
     if (busy) return;
+    if (gymPhone && !isValidPhone(gymPhone)) {
+      showToast("Enter a valid 10-digit gym phone number, or leave it empty");
+      return;
+    }
     setBusy(true);
     const next = {
       ...settings,
       gymName: gymName.trim() || "Gym Admin",
+      gymPhone,
       billingCycleMode,
       customBillingDays: Math.max(1, Math.round(Number(customBillingDays || 25))),
       defaultCollectionTiming: defaultCollectionTiming === "fixed-day" ? "fixed-day" : "at-join",
@@ -138,6 +147,13 @@ export default function SettingsView() {
           Gym name
           <input id="gymNameInput" name="gymName" required value={gymName} onChange={(event) => setGymName(event.target.value)} />
         </label>
+        <PhoneField
+          id="gymPhoneInput"
+          label="Gym phone"
+          value={gymPhone}
+          onChange={setGymPhone}
+          error={gymPhone && gymPhone.length === 10 && !isValidPhone(gymPhone) ? "Enter a valid mobile number." : ""}
+        />
         <fieldset className="theme-settings">
           <legend>App colours</legend>
           <div className="theme-grid">

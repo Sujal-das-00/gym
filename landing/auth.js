@@ -26,6 +26,14 @@
     return "";
   }
 
+  // Indian mobile number as bare 10 digits (the +91 sits outside the box).
+  var PHONE_PATTERN = /^[6-9]\d{9}$/;
+  function phoneError(value) {
+    if (!value) return "Enter the gym's phone number.";
+    if (!PHONE_PATTERN.test(value)) return "Enter a valid 10-digit mobile number.";
+    return "";
+  }
+
   function emailError(value) {
     if (!value) return "Enter your email address.";
     if (value.length > EMAIL_MAX) return "Email must be " + EMAIL_MAX + " characters or fewer.";
@@ -87,6 +95,10 @@
       input.addEventListener("blur", function () { touched[field] = true; paint(); });
       input.addEventListener(field === "terms" ? "change" : "input", function () {
         if (field === "terms") touched[field] = true;
+        if (field === "gymPhone") {
+          var digits = input.value.replace(/\D+/g, "").slice(0, 10);
+          if (digits !== input.value) input.value = digits;
+        }
         if (field === "gymName" || field === "ownerName") {
           var cleaned = sanitizeName(input.value);
           if (cleaned !== input.value) {
@@ -98,10 +110,12 @@
         if (touched[field] || touched.confirm) paint();
       });
     });
-    return function submitCheck() {
-      fields.forEach(function (field) { touched[field] = true; });
+    // `only` limits the check to some fields (one step of a multi-step form).
+    return function submitCheck(only) {
+      var checked = only || fields;
+      checked.forEach(function (field) { touched[field] = true; });
       var errors = paint();
-      var keys = fields.filter(function (field) { return errors[field]; });
+      var keys = checked.filter(function (field) { return errors[field]; });
       if (keys.length) {
         showFormError(keys.length === 1 ? "Fix the highlighted field to continue." : "Fix the " + keys.length + " highlighted fields to continue.");
         $(keys[0]).focus();
@@ -157,6 +171,7 @@
       return {
         gymName: $("gymName").value.trim(),
         ownerName: $("ownerName").value.trim(),
+        gymPhone: $("gymPhone").value.trim(),
         email: $("email").value.trim(),
         password: $("password").value,
         confirm: $("confirm").value,
@@ -198,11 +213,12 @@
     });
     if ($("referralCode").value) checkCode();
 
-    var checkSignup = wireForm(["gymName", "ownerName", "email", "referralCode", "password", "confirm", "terms"], function () {
+    var checkSignup = wireForm(["gymName", "ownerName", "gymPhone", "email", "referralCode", "password", "confirm", "terms"], function () {
       var v = values();
       var errors = {
         gymName: nameError(v.gymName, "Enter your gym's name.", "Gym name"),
         ownerName: nameError(v.ownerName, "Enter your name.", "Name"),
+        gymPhone: phoneError(v.gymPhone),
         email: emailError(v.email),
       };
       if (!v.password) errors.password = "Choose a password.";
@@ -215,6 +231,47 @@
       Object.keys(errors).forEach(function (k) { if (!errors[k]) delete errors[k]; });
       return errors;
     });
+
+    // The gym card in the side panel: the name is "engraved" as it's typed,
+    // with a light sweep across the card whenever it changes.
+    var card = $("gymCard");
+    function paintCard(field) {
+      var v = values();
+      var name = $("cardGymName");
+      var owner = $("cardOwner");
+      var phone = $("cardPhone");
+      name.textContent = v.gymName || "Your Gym Name";
+      name.classList.toggle("is-empty", !v.gymName);
+      owner.textContent = v.ownerName || "Owner name";
+      owner.classList.toggle("is-empty", !v.ownerName);
+      var d = v.gymPhone;
+      phone.textContent = d ? "+91 " + (d.length > 5 ? d.slice(0, 5) + " " + d.slice(5) : d) : "+91 ••••• •••••";
+      phone.classList.toggle("is-empty", !d);
+      if (field && card) {
+        card.classList.remove("is-shining");
+        void card.offsetWidth; // restart the sweep
+        card.classList.add("is-shining");
+      }
+    }
+    ["gymName", "ownerName", "gymPhone"].forEach(function (field) {
+      $(field).addEventListener("input", function () { paintCard(field); });
+    });
+    paintCard();
+
+    // A slight 3D tilt toward the pointer (mouse only; off with reduced motion).
+    if (card && window.matchMedia("(hover: hover) and (prefers-reduced-motion: no-preference)").matches) {
+      card.addEventListener("pointermove", function (e) {
+        var box = card.getBoundingClientRect();
+        var x = (e.clientX - box.left) / box.width - 0.5;
+        var y = (e.clientY - box.top) / box.height - 0.5;
+        card.style.setProperty("--ry", (x * 12).toFixed(2) + "deg");
+        card.style.setProperty("--rx", (-y * 10).toFixed(2) + "deg");
+      });
+      card.addEventListener("pointerleave", function () {
+        card.style.setProperty("--ry", "0deg");
+        card.style.setProperty("--rx", "0deg");
+      });
+    }
 
     // Password strength drives the meter only; the pass/fail rule is above.
     $("password").addEventListener("input", function () {
@@ -239,24 +296,53 @@
     $("termsClose").addEventListener("click", function () { dialog.close(); });
     dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
 
+    // Two steps, same as the phone app: the gym first, then the login.
+    var STEP1 = ["gymName", "ownerName", "gymPhone"];
+    var step = 1;
+    function setStep(next) {
+      step = next;
+      $("step1").hidden = step !== 1;
+      $("nextBtn").hidden = step !== 1;
+      $("step2").hidden = step !== 2;
+      $("step2Actions").hidden = step !== 2;
+      $("stepLabel").textContent = "Step " + step + " of 2";
+      $("stepTitle").textContent = step === 1 ? "Set up your gym" : "Create your login";
+      var dots = document.querySelectorAll(".signup-steps span");
+      dots[1].classList.toggle("on", step === 2);
+      dots[0].classList.toggle("current", step === 1);
+      dots[1].classList.toggle("current", step === 2);
+      showFormError("");
+      $(step === 1 ? "gymName" : "email").focus();
+    }
+    $("nextBtn").addEventListener("click", function () {
+      if (checkSignup(STEP1)) setStep(2);
+    });
+    $("backBtn").addEventListener("click", function () { setStep(1); });
+
     signupForm.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (step === 1) { // Enter on the first step moves on
+        if (checkSignup(STEP1)) setStep(2);
+        return;
+      }
       if (!checkSignup()) return;
       var v = values();
-      setBusy(true, "Register my gym");
-      post("/api/auth/signup", { gymName: v.gymName, ownerName: v.ownerName, email: v.email, password: v.password, referralCode: v.referralCode })
+      setBusy(true, "Create my gym");
+      post("/api/auth/signup", { gymName: v.gymName, ownerName: v.ownerName, gymPhone: v.gymPhone, email: v.email, password: v.password, referralCode: v.referralCode })
         .then(function (data) {
           saveToken(data.token);
           var gym = data.gym || {};
           $("successLede").textContent = "You're signed in as the owner of " + (gym.name || "your gym") + ". Open the dashboard to add your first member.";
           $("checkinLink").textContent = window.location.origin + "/checkin/" + (gym.slug || "");
+          var tag = document.querySelector(".gym-card-tag");
+          if (tag) tag.textContent = "Active";
           $("signupCard").hidden = true;
           $("successCard").hidden = false;
           window.scrollTo({ top: 0, behavior: "smooth" });
         })
         .catch(function (error) {
           showFormError(error.message);
-          setBusy(false, "Register my gym");
+          setBusy(false, "Create my gym");
         });
     });
   }

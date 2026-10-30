@@ -16,6 +16,9 @@ function mapPaymentRow(row) {
     billingMonth: row.billing_month || "",
     billingPeriod: row.billing_period,
     amount: Number(row.amount || 0),
+    // The period's full fee when this was taken; null on rows from before part
+    // payments, each of which paid its period in full (see getPeriodLedger).
+    periodFee: row.period_fee === null || row.period_fee === undefined ? null : Number(row.period_fee),
     kind: paymentKind(row),
     mode: normalizePaymentMode(row.payment_mode),
   };
@@ -25,8 +28,8 @@ async function addPayments(member, payments = []) {
   for (const payment of payments) {
     const billingPeriod = String(payment.billingPeriod || payment.billingMonth || payment.month || todayKey().slice(0, 7));
     await exec(
-      `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, kind, payment_mode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payment.id || crypto.randomUUID(),
         member.id,
@@ -34,7 +37,8 @@ async function addPayments(member, payments = []) {
         String(payment.month || todayKey().slice(0, 7)),
         String(payment.billingMonth || (billingPeriod.length === 7 ? billingPeriod : "")),
         billingPeriod,
-        Number(payment.amount || member.fee || 0),
+        Number(payment.amount ?? member.fee ?? 0),
+        Number(payment.periodFee ?? member.fee ?? 0),
         paymentKind(payment),
         normalizePaymentMode(payment.mode) || null,
       ],
@@ -69,8 +73,8 @@ async function syncAdmissionPayment(member) {
 async function importPayment(member, payment) {
   const billingPeriod = payment.billingPeriod || payment.month || todayKey().slice(0, 7);
   await exec(
-    `INSERT IGNORE INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, kind, payment_mode)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT IGNORE INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       payment.id || crypto.randomUUID(),
       member.id,
@@ -79,6 +83,7 @@ async function importPayment(member, payment) {
       payment.billingMonth || "",
       billingPeriod,
       Number(payment.amount || member.fee || 0),
+      payment.periodFee === null || payment.periodFee === undefined ? null : Number(payment.periodFee),
       paymentKind(payment),
       normalizePaymentMode(payment.mode) || null,
     ],

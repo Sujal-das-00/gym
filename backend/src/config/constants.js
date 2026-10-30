@@ -30,6 +30,7 @@ const PAYMENT_MODES = ["cash", "upi", "card", "bank", "cheque", "other"];
 
 const DEFAULT_SETTINGS = {
   gymName: "Gym Admin",
+  gymPhone: "",
   logo: "",
   billingCycleMode: "30-days",
   customBillingDays: 25,

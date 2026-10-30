@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { displayDate } from "../lib/format.js";
 import { rupees } from "../lib/memberStats.js";
+import { partPaymentNotes } from "../lib/receipt.js";
 import Icon from "./Icon.jsx";
 
 const PREVIEW_ROWS = 2;
 
 // Newest first. Payments are only ever written once collected, so every row here
-// is settled — there is no pending state to show.
+// is money received — a part payment is tagged "Part" with what is still due.
 const byNewest = (payments) => [...payments].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
 export default function InvoicesCard({ payments = [] }) {
@@ -32,7 +33,9 @@ export default function InvoicesCard({ payments = [] }) {
 
       <div className="rounded-2xl bg-surface-container-lowest p-space-md shadow-xs border border-surface-container-high flex flex-col gap-2.5">
         {rows.length ? (
-          rows.map((payment, index) => (
+          rows.map((payment, index) => {
+            const partNotes = partPaymentNotes(payment, payments);
+            return (
             <div key={`${payment.date}-${payment.billingPeriod || index}`}>
               {index > 0 && <div className="h-[1px] w-full bg-surface-container-low mb-2.5" />}
               <div className="flex items-center justify-between gap-2">
@@ -46,23 +49,29 @@ export default function InvoicesCard({ payments = [] }) {
                       {displayDate(payment.date)}
                     </span>
                     <span className="font-body-sm text-body-sm text-secondary truncate">
-                      {rupees(payment.amount)} •{" "}
-                      {payment.kind === "admission" ? "Admission fee" : "Membership"}
+                      {[
+                        rupees(payment.amount),
+                        payment.kind === "admission" ? "Admission fee" : "Membership",
+                        ...partNotes,
+                      ].join(" • ")}
                     </span>
                   </div>
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded-full font-label-sm font-semibold shrink-0 ${
-                    index === 0
-                      ? "bg-primary-fixed text-on-primary-fixed"
-                      : "bg-surface-container text-secondary"
+                    partNotes.length
+                      ? "bg-indigo-100 text-indigo-700"
+                      : index === 0
+                        ? "bg-primary-fixed text-on-primary-fixed"
+                        : "bg-surface-container text-secondary"
                   }`}
                 >
-                  Paid
+                  {partNotes.length ? "Part" : "Paid"}
                 </span>
               </div>
             </div>
-          ))
+            );
+          })
         ) : (
           <p className="flex items-center justify-center gap-1.5 py-2 text-body-sm text-secondary">
             <Icon className="text-[16px]" name="receipt_long" />
