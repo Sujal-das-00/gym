@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -60,7 +61,7 @@ class WebShell extends StatefulWidget {
   State<WebShell> createState() => _WebShellState();
 }
 
-class _WebShellState extends State<WebShell> {
+class _WebShellState extends State<WebShell> with WidgetsBindingObserver {
   late final WebViewController _controller;
   final Uri _home = Uri.parse(kAppUrl);
   late final Uri _start = _home.resolve(kStartPath);
@@ -68,10 +69,27 @@ class _WebShellState extends State<WebShell> {
   bool _failed = false;
   // Keeps the splash look until the first page has painted.
   bool _firstLoadDone = false;
+  // Keyboard height the WebView is shrunk by. It follows the keyboard only once the
+  // slide animation stops: resizing the page on every frame re-lays it out ~15 times
+  // and makes the keyboard stutter.
+  double _keyboard = 0;
+  Timer? _keyboardSettle;
+
+  @override
+  void didChangeMetrics() {
+    _keyboardSettle?.cancel();
+    _keyboardSettle = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      final view = View.of(context);
+      final inset = view.viewInsets.bottom / view.devicePixelRatio;
+      if (inset != _keyboard) setState(() => _keyboard = inset);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = WebViewController(onPermissionRequest: _onWebPermission)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(kPageBackground)
@@ -295,14 +313,25 @@ class _WebShellState extends State<WebShell> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _keyboardSettle?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _onBack,
       child: Scaffold(
         backgroundColor: kSplashColor,
+        resizeToAvoidBottomInset: false, // the keyboard inset is applied once, see _keyboard
         body: SafeArea(
-          child: Stack(
+          bottom: _keyboard == 0,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: _keyboard),
+            child: Stack(
             children: [
               WebViewWidget(controller: _controller),
               if (_loading && !_failed && _firstLoadDone)
@@ -332,6 +361,7 @@ class _WebShellState extends State<WebShell> {
                   ),
                 ),
             ],
+            ),
           ),
         ),
       ),

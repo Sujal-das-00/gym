@@ -32,6 +32,8 @@ html.app-shell {
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
+/* Phone app: smooth scrolling animates the jump to a focused input and fights the keyboard. */
+html.app-shell { scroll-behavior: auto; }
 
 body {
   margin: 0;
