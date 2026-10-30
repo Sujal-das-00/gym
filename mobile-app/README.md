@@ -235,18 +235,62 @@ If the bundle ID isn't in the list, open each project once in Xcode with your Te
 
 Review tips: Apple dislikes "just a website in a box" apps (guideline 4.2), so list the native features in the review notes: push notifications, QR camera check-in, receipt PDFs and CSV export via the share sheet, native photo picker. Gym memberships are paid offline (real-world service), so in-app purchase rules don't apply; say so in the notes.
 
-### 4.8 Every later iOS release
+### 4.8 Lean, compressed iOS build (use this for every store upload)
+
+Release builds are already AOT-compiled, tree-shaken and stripped by Xcode. Two extra flags make the app smaller and harder to reverse-engineer, with no change in behaviour:
+
+- `--obfuscate` shortens Dart symbol names.
+- `--split-debug-info=<dir>` moves debug symbols out of the binary (smaller app). **Keep that folder**: it is the only way to read crash stack traces for that build.
 
 ```bash
-cd ~/Desktop/gym && git pull
-cd mobile-app/member-app               # or admin-app
-# raise version: in pubspec.yaml (the +number must go up)
-flutter pub get
-flutter build ipa --release
-open build/ios/ipa                     # drag into Transporter
+cd ~/Desktop/gym/mobile-app/member-app          # or admin-app
+mkdir -p ~/gymboo-symbols/member-1.0.3+5        # one folder per release, OUTSIDE the repo (flutter clean would delete build/)
+flutter build ipa --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.3+5
 ```
 
-Then App Store Connect → the app → **+ Version** → choose the build → "What's New" → Submit.
+Output: `build/ios/ipa/*.ipa`. Upload it with Transporter (4.7). Apple re-thins the app per device (App Thinning), so the download users see is smaller than the `.ipa`.
+
+Keep it light:
+- Don't add plugins or fonts/images you don't use (every one is shipped). Run `flutter pub outdated` now and then and remove dead dependencies.
+- Compress big PNGs in `assets/` before committing. Icons already come from `flutter_launcher_icons`.
+- Never ship a debug or profile build.
+
+### 4.9 Upgrading to a new version (iOS) – the repeatable routine
+
+Do this every time the app changes (website-only changes need **no** release).
+
+```bash
+# 0. On the Linux PC: bump the version, commit, push
+#    edit <app>/pubspec.yaml   version: 1.0.3+5  →  1.0.4+6     (the +N MUST go up, never reuse)
+git add -A && git commit -m "member app 1.0.4+6" && git push
+
+# 1. On the Mac
+cd ~/Desktop/gym && git pull
+cd mobile-app/member-app                         # or admin-app
+flutter clean
+flutter pub get
+cd ios && pod install && cd ..                   # only needed if plugins changed or CocoaPods errors appear
+mkdir -p ~/gymboo-symbols/member-1.0.4+6
+flutter build ipa --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.4+6
+open build/ios/ipa                               # drag the .ipa into Transporter → Deliver
+```
+
+Then App Store Connect → the app → **+ Version** (or the existing "Prepare for Submission" version) → choose the new build → "What's New" → **Add for Review → Submit**.
+
+| Situation | What to run |
+|---|---|
+| Only Dart/app code changed | steps above (`pod install` can be skipped) |
+| You added/removed/upgraded a plugin in `pubspec.yaml` | `flutter pub get` **and** `cd ios && pod install && cd ..` |
+| Upgrading Flutter itself | `flutter upgrade`, then `flutter clean && flutter pub get && cd ios && pod install --repo-update && cd ..`; run `flutter doctor`; test on a real iPhone |
+| Upgrading plugin versions | `flutter pub upgrade` (or `flutter pub upgrade --major-versions`), review `pubspec.lock` diff, rebuild, test, commit `pubspec.yaml` + `pubspec.lock` |
+| Upgrading Xcode / Apple rejects the SDK version | Update Xcode from the App Store, `flutter clean`, rebuild |
+| "Build number already used" | Raise the `+N`, or pass `--build-number=7` |
+| Version set from the command line instead of the file | add `--build-name=1.0.4 --build-number=6` |
+| Changed icon/splash | `dart run flutter_launcher_icons && dart run flutter_native_splash:create`, then rebuild |
+
+Quick sanity check before uploading: `flutter analyze` must be clean.
 
 ---
 
@@ -254,15 +298,69 @@ Then App Store Connect → the app → **+ Version** → choose the build → "W
 
 Needs Flutter, Android SDK, `android/key.properties` in the app folder and `/home/suajldas/upload-keystore.jks`. The member app also needs `android/app/google-services.json`. Without `key.properties`, release builds silently fall back to the debug key, and Play rejects them.
 
+### 5.1 Lean, compressed release build (use this for every Play upload)
+
+R8 code shrinking and resource shrinking are **already on** for release builds (`isMinifyEnabled` / `isShrinkResources` in `android/app/build.gradle.kts`), and Flutter tree-shakes unused icons by default. Add these flags for the smallest, hardest-to-reverse build:
+
+- `--obfuscate` shortens Dart symbol names.
+- `--split-debug-info=<dir>` moves debug symbols out of the app. **Keep that folder** for each release; you need it to decode crash stack traces (`flutter symbolize`).
+
 ```bash
-cd ~/Desktop/gym/mobile-app/admin-app      # or member-app
+cd ~/Desktop/gym/mobile-app/admin-app            # or member-app
+mkdir -p ~/gymboo-symbols/admin-1.0.4+6          # one folder per release, OUTSIDE the repo
+flutter clean
 flutter pub get
-flutter build appbundle --release          # → build/app/outputs/bundle/release/app-release.aab  (upload to Play)
-flutter build apk --release                # → build/app/outputs/flutter-apk/app-release.apk     (install on a phone)
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+flutter analyze                                  # must be clean
+
+# → upload this to Play (Play splits it per device, so users download only their CPU/screen/language parts)
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6
+# file: build/app/outputs/bundle/release/app-release.aab
+
+# → optional: a small APK to install on your own phone (arm64 only, ~half the size of a fat APK)
+flutter build apk --release --split-per-abi \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 Because each app has its own folder, the two AABs never overwrite each other. Play Console details are in [PLAY_STORE_GUIDE.md](PLAY_STORE_GUIDE.md).
+
+Optional: after building, upload `build/app/intermediates/merged_native_libs/release/**/out/lib` as a zip of native debug symbols in Play Console → App bundle explorer → Downloads, to silence the "no native debug symbols" warning. Not required.
+
+### 5.2 Upgrading to a new version (Android) – the repeatable routine
+
+Do this every time the app changes (website-only changes need **no** release).
+
+```bash
+cd ~/Desktop/gym/mobile-app/admin-app            # or member-app
+
+# 1. Bump the version in pubspec.yaml (the +N MUST go up, never reuse or go down)
+#    version: 1.0.3+6  →  1.0.4+7
+#    (or skip editing and pass --build-name=1.0.4 --build-number=7 to the build command)
+
+# 2. Build
+mkdir -p ~/gymboo-symbols/admin-1.0.4+7
+flutter clean && flutter pub get && flutter analyze
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+7
+
+# 3. Keep a named copy, then commit the version bump
+cp build/app/outputs/bundle/release/app-release.aab ~/Desktop/gym-boo-admin-1.0.4+7.aab
+git add pubspec.yaml pubspec.lock && git commit -m "admin app 1.0.4+7" && git push
+```
+
+Then Play Console → the app → **Production** (or Internal testing first) → **Create new release** → upload the `.aab` → release notes → **Next → Save → Send for review**.
+
+| Situation | What to run |
+|---|---|
+| Only Dart/app code changed | steps above |
+| Added/removed/upgraded a plugin | `flutter pub get` (or `flutter pub upgrade`), rebuild, test on a real phone, commit `pubspec.yaml` + `pubspec.lock` |
+| Upgrading Flutter itself | `flutter upgrade && flutter doctor`, then `flutter clean && flutter pub get`, rebuild and test |
+| Gradle / Android build errors after an upgrade | `flutter clean`, then `cd android && ./gradlew --stop && cd ..`, rebuild |
+| Play says "version code already used" | Raise the `+N` above the highest one in App bundle explorer |
+| Play says target API level too low | Raise `targetSdk` via Flutter (`flutter upgrade`) or set it in `android/app/build.gradle.kts`, rebuild |
+| Changed icon/splash | `dart run flutter_launcher_icons && dart run flutter_native_splash:create`, then rebuild |
+| Release crashed and the stack trace is unreadable | `flutter symbolize -i crash.txt -d ~/gymboo-symbols/admin-1.0.4+7` |
 
 ---
 
@@ -291,6 +389,7 @@ If you change the splash colour, also change `kSplashColor` in `lib/config.dart`
 | Upload error "build number already used" | Raise the `+N` in that app's `pubspec.yaml` |
 | Upload error "invalid icon / alpha channel" | `remove_alpha_ios: true` in `flutter_launcher_icons.yaml`, rerun `dart run flutter_launcher_icons` |
 | CocoaPods errors (when Flutter falls back to it) | `cd ios && pod repo update && pod install && cd ..`, or `flutter clean && flutter pub get` |
+| Crash log is unreadable gibberish (obfuscated build) | `flutter symbolize -i crash.txt -d ~/gymboo-symbols/<app>-<version>` using the folder saved at build time |
 | Strange build errors after switching branches or Flutter versions | `flutter clean && flutter pub get` in that app's folder |
 | QR scanner doesn't open the camera | Real device only; check Settings → Gym Boo Member → Camera |
 | Play rejects the AAB: debug-signed / wrong key | `android/key.properties` missing in that app folder, or the wrong keystore |

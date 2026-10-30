@@ -1,27 +1,32 @@
-mobile-app/admin-app/build/app/outputs/bundle/release/app-release.aab   (51.8 MB)
+QUICK COMMANDS (details: README.md sections 4.8-4.9 and 5.1-5.2)
+Replace <app> with admin-app or member-app, and the version in the symbols folder name with the new one.
 
+=== ANDROID (Linux PC) ===
+cd ~/Desktop/gym/mobile-app/<app>
+# 1. Bump pubspec.yaml version: 1.0.3+6 -> 1.0.4+7   (+N must always go up)
+mkdir -p ~/gymboo-symbols/<app>-1.0.4+7
+flutter clean && flutter pub get && flutter analyze
+flutter build appbundle --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/<app>-1.0.4+7
+#   -> build/app/outputs/bundle/release/app-release.aab   (upload to Play)
+# optional small APK for your phone:
+flutter build apk --release --split-per-abi --obfuscate --split-debug-info=$HOME/gymboo-symbols/<app>-1.0.4+7
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# override version without editing pubspec: add --build-name=1.0.4 --build-number=7
 
-cd ~/Desktop/gym/mobile-app/admin-app
+=== iOS (Mac) ===
+cd ~/Desktop/gym && git pull            # commit + push the version bump on Linux first
+cd mobile-app/<app>
+flutter clean && flutter pub get
+cd ios && pod install && cd ..          # needed after plugin changes
+mkdir -p ~/gymboo-symbols/<app>-1.0.4+7
+flutter build ipa --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/<app>-1.0.4+7
+#   -> build/ios/ipa/*.ipa   (upload with Transporter)
 
-# 1. Bump the version in pubspec.yaml (the +N must always go up)
-#    version: 1.0.3+5   →   next time e.g. 1.0.4+6
+=== UPGRADES ===
+flutter upgrade                          # Flutter itself, then flutter doctor
+flutter pub upgrade                      # plugins (commit pubspec.lock)
+flutter clean && flutter pub get         # after any upgrade
+cd ios && pod install --repo-update && cd ..   # iOS after Flutter/plugin upgrade
 
-# 2. Build
-flutter clean
-flutter pub get
-flutter build appbundle --release   # → build/app/outputs/bundle/release/app-release.aab  (upload to Play)
-flutter build apk --release         # → build/app/outputs/flutter-apk/app-release.apk     (optional, to install on a phone)
-
-
-override the build no using command line 
-flutter build appbundle --release --build-name=1.0.4 --build-number=6
-
-IOS
-
-
-cd ~/Desktop/gym/mobile-app/admin-app
-git pull                      # get the version bump (commit and push it first, see below)
-flutter clean
-flutter pub get
-cd ios && pod install && cd ..
-flutter build ipa --release   # → build/ios/ipa/*.ipa
+=== CRASH TRACE FROM OBFUSCATED BUILD ===
+flutter symbolize -i crash.txt -d ~/gymboo-symbols/<app>-1.0.4+7

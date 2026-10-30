@@ -114,9 +114,13 @@ An **AAB** is the file you upload to Play. (An APK is only for installing on you
 
 ```bash
 cd /home/suajldas/Desktop/gym/mobile-app/member-app     # or admin-app
+mkdir -p ~/gymboo-symbols/member-1.0.2+4                # keep this folder: it decodes crash reports
 flutter pub get
-flutter build appbundle --release
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.2+4
 ```
+
+`--obfuscate --split-debug-info` makes the app smaller and harder to reverse-engineer. R8 code and resource shrinking are already on in `build.gradle.kts`, and Play delivers only the parts each phone needs, so the user download is much smaller than the AAB. Full details: [README.md section 5.1](README.md).
 
 When it finishes you will see `✓ Built build/app/outputs/bundle/release/app-release.aab`.
 
@@ -195,9 +199,15 @@ version: 1.0.1+2
 ### Step 2 – Build the AAB again
 ```bash
 cd /home/suajldas/Desktop/gym/mobile-app/member-app     # or admin-app
-flutter pub get
-flutter build appbundle --release
+mkdir -p ~/gymboo-symbols/member-1.0.3+5                # use the NEW version here
+flutter clean && flutter pub get && flutter analyze
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.3+5
+cp build/app/outputs/bundle/release/app-release.aab ~/Desktop/gym-boo-member-1.0.3+5.aab
+git add pubspec.yaml pubspec.lock && git commit -m "member app 1.0.3+5" && git push
 ```
+
+If you upgraded Flutter or a plugin first: `flutter upgrade` / `flutter pub upgrade`, then `flutter clean && flutter pub get`, and test on a real phone before uploading. More cases (Gradle errors, target API too low, etc.) are in [README.md section 5.2](README.md).
 
 The new file is in the **same place as before** (see Part 3), and it **overwrites the old one**. Copy it to a new name first if you want to keep the old one.
 
@@ -209,10 +219,12 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 
 | I want to… | Command |
 |---|---|
-| Upload to Play (member) | in `member-app/`: `flutter build appbundle --release` |
-| Upload to Play (admin) | in `admin-app/`: `flutter build appbundle --release` |
+| Upload to Play (member) | in `member-app/`: `flutter build appbundle --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-<ver>` |
+| Upload to Play (admin) | in `admin-app/`: `flutter build appbundle --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-<ver>` |
 | Test on my phone (APK) | `flutter build apk --release` |
-| Smaller APK for modern phones | `flutter build apk --release --split-per-abi` (use the `arm64-v8a` file) |
+| Smaller APK for modern phones | `flutter build apk --release --split-per-abi --obfuscate --split-debug-info=$HOME/gymboo-symbols/<app>-<ver>` (use the `arm64-v8a` file) |
+| Read an obfuscated crash trace | `flutter symbolize -i crash.txt -d ~/gymboo-symbols/<app>-<ver>` |
+| Upgrade Flutter / plugins | `flutter upgrade` / `flutter pub upgrade`, then `flutter clean && flutter pub get` |
 | Install APK on USB phone | `adb install -r build/app/outputs/flutter-apk/app-release.apk` |
 | Change the website URL the app opens | add `--dart-define=APP_URL=https://your-url/` |
 | Fresh start after errors | `flutter clean && flutter pub get` |
