@@ -12,6 +12,7 @@ const reviewController = require("../controllers/reviewController");
 const statsController = require("../controllers/statsController");
 const trainerController = require("../controllers/trainerController");
 const partnerController = require("../controllers/partnerController");
+const metaController = require("../controllers/metaController");
 const superRoutes = require("./superRoutes");
 const { authenticatePartner } = require("../middleware/partnerAuth");
 const { enforceAccess } = require("../middleware/access");
@@ -84,6 +85,7 @@ router.use(authenticate, resolveTenant);
 router.get("/licence", requireRole("gym_admin", "staff"), asyncHandler(partnerController.getLicence));
 router.get("/billing", requireRole("gym_admin"), asyncHandler(partnerController.getBilling));
 router.post("/licence/purchase", requireRole("gym_admin"), asyncHandler(partnerController.postLicence));
+router.post("/meta/device", requireRole("gym_admin"), asyncHandler(metaController.postDevice));
 router.post("/licence/claim", requireRole("gym_admin"), asyncHandler(partnerController.postClaim));
 
 // Everything below needs an active gym: suspended gyms and gyms whose free trial has run

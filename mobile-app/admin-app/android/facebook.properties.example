@@ -1,0 +1,5 @@
+# Copy to facebook.properties (gitignored) and fill in from
+# Meta for Developers -> App settings -> Basic (App ID) and Advanced (Client token).
+# Or set FACEBOOK_APP_ID / FACEBOOK_CLIENT_TOKEN environment variables instead.
+facebookAppId=
+facebookClientToken=

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { api } from "../lib/api.js";
+import { registerMetaDevice, trackApprovedPurchases } from "../lib/track.js";
 
 // The banner, the topbar badge and the mobile app-bar chip all read the plan
 // status. One request per signed-in user serves all of them.
@@ -15,7 +16,13 @@ export default function useLicence() {
     if (!cached || cached.user !== user) cached = { user, promise: api("/api/licence") };
     let alive = true;
     cached.promise
-      .then((data) => alive && setStatus(data))
+      .then((data) => {
+        if (user.role === "gym_admin") {
+          registerMetaDevice();
+          trackApprovedPurchases(data.purchases, data.metaSentPurchases);
+        }
+        if (alive) setStatus(data);
+      })
       .catch(() => {}); // plan status is a nicety; never block the dashboard on it
     return () => {
       alive = false;

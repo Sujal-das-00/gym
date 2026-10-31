@@ -389,3 +389,22 @@ CREATE TABLE IF NOT EXISTS maintenance_payments (
   INDEX idx_maint_gym (tenant_id, period_year),
   CONSTRAINT fk_maint_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
+
+-- Meta (Facebook) app events sent from the server. The phone app reports its anonymous
+-- Meta id once per gym, so an approved purchase can be sent to Meta the moment the
+-- super-admin approves it. No contact details are stored here.
+CREATE TABLE IF NOT EXISTS meta_devices (
+  tenant_id CHAR(36) NOT NULL PRIMARY KEY,
+  anon_id VARCHAR(64) NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_meta_device_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
+);
+
+-- One row per purchase already sent to Meta, so it is never sent twice and the app
+-- knows not to report the same purchase itself.
+CREATE TABLE IF NOT EXISTS meta_sent_purchases (
+  purchase_id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_meta_sent_gym (tenant_id)
+);

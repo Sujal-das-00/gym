@@ -305,23 +305,55 @@ R8 code shrinking and resource shrinking are **already on** for release builds (
 - `--obfuscate` shortens Dart symbol names.
 - `--split-debug-info=<dir>` moves debug symbols out of the app. **Keep that folder** for each release; you need it to decode crash stack traces (`flutter symbolize`).
 
-```bash
-cd ~/Desktop/gym/mobile-app/admin-app            # or member-app
-mkdir -p ~/gymboo-symbols/admin-1.0.4+6          # one folder per release, OUTSIDE the repo
-flutter clean
-flutter pub get
-flutter analyze                                  # must be clean
+Run the block for the app you are releasing. Replace the version in the symbols folder with the `version:` from that app's `pubspec.yaml`.
 
-# → upload this to Play (Play splits it per device, so users download only their CPU/screen/language parts)
+**Admin app (`app.gymboo.gym_boo`)**
+
+```bash
+cd ~/Desktop/gym/mobile-app/admin-app
+mkdir -p ~/gymboo-symbols/admin-1.0.4+6          # one folder per release, OUTSIDE the repo
+flutter clean && flutter pub get && flutter analyze   # analyze must be clean
+
+# AAB → upload this to Play (Play splits it per device, so users download only their parts)
 flutter build appbundle --release \
   --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6
 # file: build/app/outputs/bundle/release/app-release.aab
 
-# → optional: a small APK to install on your own phone (arm64 only, ~half the size of a fat APK)
+# APK (one universal file) → share/install anywhere, outside Play
+flutter build apk --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6
+# file: build/app/outputs/flutter-apk/app-release.apk
+
+# APK (per CPU, smallest) → for modern phones, use the arm64-v8a file
 flutter build apk --release --split-per-abi \
   --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6
 adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+**Member app (`app.gymboo.member`)**: needs `android/app/google-services.json`.
+
+```bash
+cd ~/Desktop/gym/mobile-app/member-app
+mkdir -p ~/gymboo-symbols/member-1.0.4+6
+flutter clean && flutter pub get && flutter analyze
+
+# AAB → upload to Play
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.4+6
+# file: build/app/outputs/bundle/release/app-release.aab
+
+# APK (one universal file)
+flutter build apk --release \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.4+6
+# file: build/app/outputs/flutter-apk/app-release.apk
+
+# APK (per CPU, smallest)
+flutter build apk --release --split-per-abi \
+  --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-1.0.4+6
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
+
+Both release outputs (AAB and APK) are signed with the upload keystore from `android/key.properties`.
 
 Because each app has its own folder, the two AABs never overwrite each other. Play Console details are in [PLAY_STORE_GUIDE.md](PLAY_STORE_GUIDE.md).
 

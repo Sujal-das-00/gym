@@ -221,7 +221,8 @@ The new file is in the **same place as before** (see Part 3), and it **overwrite
 |---|---|
 | Upload to Play (member) | in `member-app/`: `flutter build appbundle --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/member-<ver>` |
 | Upload to Play (admin) | in `admin-app/`: `flutter build appbundle --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-<ver>` |
-| Test on my phone (APK) | `flutter build apk --release` |
+| Release APK (admin) | in `admin-app/`: `flutter build apk --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-<ver>` → `build/app/outputs/flutter-apk/app-release.apk` |
+| Release APK (member) | in `member-app/`: `flutter build apk --release --obfuscate --split-debug-info=$HOME/gymboo-symbols/admin-1.0.4+6` |
 | Smaller APK for modern phones | `flutter build apk --release --split-per-abi --obfuscate --split-debug-info=$HOME/gymboo-symbols/<app>-<ver>` (use the `arm64-v8a` file) |
 | Read an obfuscated crash trace | `flutter symbolize -i crash.txt -d ~/gymboo-symbols/<app>-<ver>` |
 | Upgrade Flutter / plugins | `flutter upgrade` / `flutter pub upgrade`, then `flutter clean && flutter pub get` |

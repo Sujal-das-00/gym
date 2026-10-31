@@ -5,6 +5,7 @@ const gymModel = require("../models/gymModel");
 const model = require("../models/referralModel");
 const settings = require("../models/platformSettingsModel");
 const referralService = require("./referralService");
+const metaService = require("./metaService");
 
 // upi://pay with the amount baked in, so the owner scans, confirms and pays without typing it.
 function upiUri(upi, amount, note) {
@@ -29,13 +30,14 @@ async function getStatus(tenantId) {
   const gym = await gymModel.getGymById(tenantId);
   if (!gym) throw createHttpError(404, "Gym not found");
   const cfg = referralConfig();
-  const [lifetime, monthly, purchase, upi, history, referral] = await Promise.all([
+  const [lifetime, monthly, purchase, upi, history, referral, metaSent] = await Promise.all([
     referralService.quote(tenantId, "lifetime"),
     referralService.quote(tenantId, "monthly"),
     model.getPendingPurchase(tenantId),
     settings.getUpi(),
     model.listPurchases({ tenantId }),
     model.getReferralByTenant(tenantId),
+    metaService.sentPurchaseIds(tenantId),
   ]);
   let payment = null;
   if (purchase && upi.id) {
@@ -53,6 +55,8 @@ async function getStatus(tenantId) {
     payment,
     purchases: history,
     supportEmail: cfg.supportEmail,
+    // Purchases the server already sent to Meta; the app must not report them again.
+    metaSentPurchases: metaSent,
   };
 }
 

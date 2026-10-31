@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'analytics.dart';
 import 'config.dart';
 import 'onboarding_art.dart';
 
@@ -80,6 +81,10 @@ class SignupApi {
     final token = data['token'];
     if (response.statusCode >= 400 || token is! String || token.isEmpty) {
       throw SignupError('${data['error'] ?? 'Could not create your account. Please try again.'}');
+    }
+    final gym = data['gym'];
+    if (gym is Map && gym['id'] is String) {
+      unawaited(Analytics.registered(gymId: gym['id'] as String, method: 'app_onboarding'));
     }
     return token;
   }

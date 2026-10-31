@@ -17,6 +17,25 @@
     });
   }
   function rs(n) { return "₹" + Number(n || 0).toLocaleString("en-IN"); }
+  // Ad-measurement events for the phone app (Meta); a no-op in a browser. The app validates
+  // and de-duplicates them. Same helper as admin-frontend/src/lib/track.js. No personal data.
+  function track(event, params) {
+    try {
+      if (window.GymBooNative && typeof window.GymBooNative.postMessage === "function") {
+        window.GymBooNative.postMessage(JSON.stringify({ type: "track", event: event, params: params || {} }));
+      }
+    } catch (e) { /* never break the page */ }
+  }
+  function trackApproved(purchases, sentByServer) {
+    (purchases || []).forEach(function (p) {
+      if ((sentByServer || []).indexOf(p.id) !== -1) return; // the server already reported it
+      if (p.status !== "approved" || !(Number(p.amount) > 0) || !p.decidedAt) return;
+      if (Date.now() - new Date(p.decidedAt).getTime() > 7 * 24 * 3600 * 1000) return;
+      var params = { purchase_id: String(p.id), user_id: p.tenantId, plan: p.plan, amount: p.amount, currency: "INR" };
+      track("Purchase", params);
+      if (p.plan === "monthly") track("Subscribe", params);
+    });
+  }
   function token() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
 
   function api(path, body) {
@@ -159,13 +178,19 @@
   function showClaimError(msg) { var n = $("claimError"); n.textContent = msg || ""; n.hidden = !msg; }
 
   function load() {
-    return api("/licence").then(function (data) { S = data; render(); });
+    return api("/licence").then(function (data) {
+      S = data; render();
+      if (role !== "gym_admin") return;
+      track("ViewContent", { user_id: data.gym && data.gym.id, content_name: "Gymboo plans", content_category: "subscription_plans", currency: "INR" });
+      trackApproved(data.purchases, data.metaSentPurchases);
+    });
   }
 
   function claim(button) {
     button.disabled = true;
     return api("/licence/claim", { paymentRef: $("payRef").value.trim() }).then(function (r) {
       S = r.status; $("payRef").value = ""; render();
+      if (S.purchase) track("AddPaymentInfo", { purchase_id: String(S.purchase.id), user_id: S.gym && S.gym.id, plan: S.purchase.plan, amount: S.purchase.amount, currency: "INR" });
       window.scrollTo({ top: 0, behavior: "smooth" });
     }).catch(function (e) { showClaimError(e.message); alertInline(e.message); })
       .then(function () { button.disabled = false; });
@@ -173,10 +198,15 @@
   function alertInline(msg) { if ($("payPanel").hidden) window.alert(msg); }
 
   document.addEventListener("click", function (e) {
+    var mail = e.target.closest("a[href^='mailto:']");
+    if (mail) track("Contact", { user_id: S && S.gym && S.gym.id, content_name: "plans_support_email", lead_source: "plans_page" });
     var plan = e.target.closest("[data-plan]");
     if (plan) {
       plan.disabled = true;
-      api("/licence/purchase", { plan: plan.getAttribute("data-plan") }).then(function (data) { S = data; showPay = true; render(); window.scrollTo({ top: 0 }); })
+      api("/licence/purchase", { plan: plan.getAttribute("data-plan") }).then(function (data) {
+        S = data; showPay = true; render(); window.scrollTo({ top: 0 });
+        if (data.purchase) track("InitiateCheckout", { purchase_id: String(data.purchase.id), user_id: data.gym && data.gym.id, plan: data.purchase.plan, amount: data.purchase.amount, currency: "INR" });
+      })
         .catch(function (err) { window.alert(err.message); plan.disabled = false; });
     }
   });

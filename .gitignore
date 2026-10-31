@@ -42,3 +42,4 @@ service-account*.json
 *.iml
 *.swp
 Thumbs.db
+facebook_cred.txt

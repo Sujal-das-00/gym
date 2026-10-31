@@ -5,6 +5,7 @@ const { sign } = require("../utils/jwt");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const { createHttpError } = require("../utils/http");
 const model = require("../models/referralModel");
+const metaService = require("./metaService");
 const gymModel = require("../models/gymModel");
 
 const NAME_PATTERN = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
@@ -227,7 +228,9 @@ async function approvePurchase(id) {
       [final.listPrice, final.discount, final.adjustment, final.amount, final.referralId, id],
     );
   });
-  return model.getPurchase(id);
+  const approved = await model.getPurchase(id);
+  await metaService.sendApprovedPurchase(approved); // best effort; never throws
+  return approved;
 }
 
 async function rejectPurchase(id, note) {

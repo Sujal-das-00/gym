@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import 'analytics.dart';
 import 'config.dart';
 import 'onboarding.dart';
 import 'receipt_pdf.dart';
@@ -175,6 +176,8 @@ class _WebShellState extends State<WebShell> with WidgetsBindingObserver {
   ///   "savePdf"             {name, receipt, html}: build the PDF and save it to Downloads (receipts)
   ///   "printHtml"           {name, html}: print dialog, where "Save as PDF" makes the file
   ///   "showTour"            replay the first-run onboarding screens
+  ///   "metaIds"             the install's anonymous Meta id, for server-side purchase events
+  ///   "track"               {event, params}: a Meta ad-measurement event (analytics.dart validates it)
   Future<void> _onBridgeMessage(JavaScriptMessage message) async {
     int? id;
     String result;
@@ -188,6 +191,12 @@ class _WebShellState extends State<WebShell> with WidgetsBindingObserver {
         result = jsonEncode(await _savePdf(request));
       } else if (type == 'printHtml') {
         result = jsonEncode(await _printHtml(request));
+      } else if (type == 'track') {
+        // Fire and forget: no reply needed (the page sends no id).
+        unawaited(Analytics.handleBridge(request));
+        result = jsonEncode({'ok': true});
+      } else if (type == 'metaIds') {
+        result = jsonEncode({'ok': true, 'anonId': await Analytics.anonymousId()});
       } else if (type == 'showTour') {
         if (mounted) {
           showOnboarding(context);

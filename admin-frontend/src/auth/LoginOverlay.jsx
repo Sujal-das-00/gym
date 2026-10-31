@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { login, setToken, signup } from "../lib/api.js";
+import { track } from "../lib/track.js";
 import { isValidPhone, toPhoneDigits } from "../lib/validation.js";
 
 const NAME_PATTERN = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
@@ -112,6 +113,8 @@ export default function LoginOverlay() {
           })
         : await login(email.trim(), password);
       setToken(data.token);
+      if (isSignup) track("CompleteRegistration", { user_id: data.gym?.id, registration_method: "email_password" });
+      else if (data.user?.role === "gym_admin") track("Login", { user_id: data.user.tenantId });
       setPassword("");
       setConfirm("");
       await applyAuthedUser(data.user);
