@@ -1,7 +1,7 @@
 name: gym_boo
 description: Simple Gym Manager - mobile wrapper for the Gym Boo admin web app (/admin).
 publish_to: "none"
-version: 1.0.3+6
+version: 1.0.3+7
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

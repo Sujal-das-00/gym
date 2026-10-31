@@ -85,7 +85,10 @@ The app uses: login (name, phone/email), payment records, camera (photo upload),
 - **Government app:** No
 - **Financial features:** No (payments are recorded offline by the gym, not processed in-app)
 - **Health apps:** None / No
-- **Advertising ID:** No
+- **Advertising ID:**
+  - **Member app:** No
+  - **Admin app:** **Yes**: the Meta App Events SDK declares `com.google.android.gms.permission.AD_ID` and collects it for ad attribution. Purposes: **Analytics** and **Advertising or marketing**. Answering No here blocks the release with "Incomplete advertising ID declaration".
+  - Admin app Data safety must match: tick **Device or other IDs**, as both **Collected** and **Shared** (with Meta), for Analytics and Advertising or marketing.
 
 ### 2.8 Account deletion
 If asked for a "delete account" URL, give a page or contact email where users can request deletion.
