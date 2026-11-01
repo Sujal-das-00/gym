@@ -210,14 +210,22 @@
     var label = m.status === "overdue" ? (m.locked ? "ON HOLD, was due" : "overdue, was due") : m.status === "due" ? "expired, pay by" : "next due";
     return '<span class="sub">Maintenance ' + rs(m.amount) + (m.customPrice ? " (custom)" : "") + " · " + label + " " + date(m.status === "upcoming" ? m.windowStart : m.dueBy) + (m.customDate ? " (custom date)" : "") + "</span>";
   }
+  // Owner's name, the gym's phone (tap to call) and login email.
+  function ownerCell(g) {
+    if (!g.ownerName && !g.ownerEmail && !g.ownerPhone) return "—";
+    var phone = g.ownerPhone ? '<a href="tel:+91' + esc(g.ownerPhone) + '">' + esc(g.ownerPhone) + "</a>" : "No phone";
+    return "<strong>" + esc(g.ownerName || "—") + '</strong><span class="sub">' + phone + "</span>" +
+      (g.ownerEmail ? '<span class="sub">' + esc(g.ownerEmail) + "</span>" : "");
+  }
   function resultsGyms() {
     var f = filters.gyms;
     var rows = state.gyms.filter(function (g) {
       var ok = f.f === "all" || g.state === f.f;
-      return ok && matches(f.q, [g.name, g.slug, g.ownerEmail, g.referredBy, g.referralCode]);
+      return ok && matches(f.q, [g.name, g.slug, g.ownerName, g.ownerPhone, g.ownerEmail, g.referredBy, g.referralCode]);
     }).map(function (g) {
       var next = g.status === "suspended" ? "active" : "suspended";
-      return "<tr><td><strong>" + esc(g.name) + '</strong><span class="sub">' + esc(g.ownerEmail || "No owner") + "</span></td>" +
+      return "<tr><td><strong>" + esc(g.name) + "</strong></td>" +
+        "<td>" + ownerCell(g) + "</td>" +
         "<td>" + date(g.registeredOn) + '<span class="sub">' + (g.daysOnFree === 0 ? "today" : g.daysOnFree + " days ago") + "</span></td>" +
         "<td>" + trialCell(g) + "</td>" +
         '<td class="num">' + g.memberCount + "</td>" +
@@ -230,7 +238,7 @@
         '<button class="btn sm' + (next === "suspended" ? " danger" : "") + '" data-act="gym-status" data-id="' + esc(g.id) + '" data-status="' + next + '">' +
         (next === "suspended" ? "Suspend" : "Reactivate") + "</button></td></tr>";
     });
-    return table(["Gym", "Registered", "Free plan", ">Members", "Licence", "Promo code", "Status", ""], rows, "No gyms match.");
+    return table(["Gym", "Owner", "Registered", "Free plan", ">Members", "Licence", "Promo code", "Status", ""], rows, "No gyms match.");
   }
 
   function pageAdmins() {

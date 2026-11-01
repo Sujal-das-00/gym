@@ -33,8 +33,9 @@ function getMe(req, res) {
   res.json({ superAdmin: req.superUser });
 }
 
-// Gyms with the context a super-admin needs at a glance: size, who referred them, their
-// access state, and whether an owner is waiting on payment verification.
+// Gyms with the context a super-admin needs at a glance: who owns them and how to reach
+// them, size, who referred them, their access state, and whether an owner is waiting on
+// payment verification.
 async function listGyms(req, res) {
   const rows = await query(
     `SELECT ${gymModel.GYM_COLUMNS},
@@ -43,6 +44,8 @@ async function listGyms(req, res) {
             (SELECT r.code FROM gym_referrals r WHERE r.tenant_id = g.id LIMIT 1) AS referral_code,
             (SELECT r.status FROM gym_referrals r WHERE r.tenant_id = g.id LIMIT 1) AS referral_status,
             (SELECT u.email FROM users u WHERE u.tenant_id = g.id AND u.role = 'gym_admin' ORDER BY u.created_at LIMIT 1) AS owner_email,
+            (SELECT u.name FROM users u WHERE u.tenant_id = g.id AND u.role = 'gym_admin' ORDER BY u.created_at LIMIT 1) AS owner_name,
+            (SELECT s.gym_phone FROM gym_settings s WHERE s.tenant_id = g.id) AS owner_phone,
             EXISTS (SELECT 1 FROM licence_purchases p WHERE p.tenant_id = g.id AND p.status = 'pending' AND p.claimed_at IS NOT NULL) AS payment_claimed
        FROM gyms g ORDER BY g.created_at DESC`,
   );
@@ -61,6 +64,9 @@ async function listGyms(req, res) {
       referralCode: row.referral_code || "",
       referralStatus: row.referral_status || null,
       ownerEmail: row.owner_email || "",
+      ownerName: row.owner_name || "",
+      // The contact number given at signup (or later in Settings): bare 10 digits.
+      ownerPhone: row.owner_phone || "",
       paymentClaimed: Boolean(Number(row.payment_claimed)),
     };
   }));
