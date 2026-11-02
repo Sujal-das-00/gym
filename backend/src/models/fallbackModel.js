@@ -46,10 +46,26 @@ function saveMember(gymId, member) {
     throw error;
   }
   const index = rows.findIndex((item) => item.id === normalized.id);
-  if (index >= 0) rows[index] = normalized;
+  // Like the MySQL saveMember, payments are not written here: keep the stored
+  // rows, which may have changed (moveMemberStartDate) since `member` was read.
+  if (index >= 0) rows[index] = { ...normalized, payments: rows[index].payments || [] };
   else rows.push(normalized);
   store.persist();
   return publicMember(normalized);
+}
+
+// Mirrors memberModel.moveMemberStartDate; everything lands in one persist().
+function moveMemberStartDate(gymId, memberId, startDate, moves) {
+  const target = store.getState().members.find((item) => item.id === memberId);
+  if (!target) return;
+  target.startDate = startDate;
+  for (const payment of target.payments || []) {
+    const period = payment.kind === "admission" ? undefined : moves.get(payment.id);
+    if (!period) continue;
+    payment.billingPeriod = period;
+    payment.month = period.slice(0, 7);
+  }
+  store.persist();
 }
 
 // Archives like memberModel.deleteMember: the member (with their payments and
@@ -348,6 +364,7 @@ module.exports = {
   listPlanChanges,
   saveExpense,
   memberCheckinHistory,
+  moveMemberStartDate,
   saveMember,
   saveSettings,
   setMemberAttendance,

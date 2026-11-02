@@ -110,6 +110,29 @@ async function saveMember(gymId, member) {
   return getMemberById(gymId, member.id);
 }
 
+// Moves a member's joining date and re-keys their paid terms to the new
+// schedule (moves: Map<paymentId, periodKey> from shiftedPaymentPeriods) in one
+// transaction, so the date and the payments can never disagree.
+async function moveMemberStartDate(gymId, memberId, startDate, moves) {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute("UPDATE members SET start_date = ? WHERE tenant_id = ? AND id = ?", [startDate, gymId, memberId]);
+    for (const [paymentId, period] of moves) {
+      await connection.execute(
+        "UPDATE payments SET billing_period = ?, month_key = ? WHERE id = ? AND member_id = ? AND kind = 'membership'",
+        [period, period.slice(0, 7), paymentId, memberId],
+      );
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 // Archives rather than deletes: the member disappears from the panel, check-in and
 // login, but the row and their payment/attendance history stay in the database.
 async function deleteMember(gymId, id) {
@@ -275,5 +298,6 @@ module.exports = {
   getAllMembers,
   getMemberById,
   listPlanChanges,
+  moveMemberStartDate,
   saveMember,
 };

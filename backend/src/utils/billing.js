@@ -95,6 +95,58 @@ function getBillingPeriodKeys(member, settings) {
   return periods;
 }
 
+// Packages and day cycles name each period by its exact start date; only
+// month-start monthly billing names periods by calendar month.
+function isDateKeyedSchedule(member, settings) {
+  return membershipType(member) === "package" || billingCycleMode(settings) !== "month-start";
+}
+
+// Every period key of a date-keyed schedule from the billing start onwards,
+// stepped exactly as getBillingPeriodKeys steps it.
+function* datedPeriodKeys(member, settings) {
+  const cursor = parseDateKey(billingStartKey(member));
+  if (Number.isNaN(cursor.getTime())) return;
+  const months = packageMonths(member);
+  const cycleDays = billingCycleDays(settings);
+  while (true) {
+    yield localDateKey(cursor);
+    if (membershipType(member) === "package") cursor.setTime(addMonths(cursor, months).getTime());
+    else cursor.setDate(cursor.getDate() + cycleDays);
+  }
+}
+
+/**
+ * Membership payments to re-key when the billing start moves (a corrected
+ * joining date): Map<paymentId, newPeriodKey>.
+ *
+ * A date-keyed payment names its period by start date, so once the start
+ * moves nothing matches it any more: the money stops counting and the member
+ * shows overdue. Each paid term instead becomes the term with the same number
+ * on the new schedule (the 1st term stays the 1st). Month-keyed periods still
+ * mean the same calendar month and are left alone, as are rows that were not
+ * on the old schedule.
+ */
+function shiftedPaymentPeriods(previous, next, settings) {
+  const moves = new Map();
+  if (!isDateKeyedSchedule(next, settings) || billingStartKey(previous) === billingStartKey(next)) return moves;
+  const payments = (previous?.payments || []).filter((payment) => !isAdmissionPayment(payment));
+  const keys = payments.map(paymentPeriodKey).filter((key) => String(key || "").length === 10);
+  if (!keys.length) return moves;
+  const latest = keys.reduce((max, key) => (key > max ? key : max));
+
+  const renamed = new Map();
+  const nextKeys = datedPeriodKeys(next, settings);
+  for (const oldKey of datedPeriodKeys(previous, settings)) {
+    if (oldKey > latest) break;
+    renamed.set(oldKey, nextKeys.next().value);
+  }
+  for (const payment of payments) {
+    const target = renamed.get(paymentPeriodKey(payment));
+    if (target && target !== paymentPeriodKey(payment)) moves.set(payment.id, target);
+  }
+  return moves;
+}
+
 // Admission-fee rows are stored in payments with this literal as their billing
 // period; it is never a real period key, so they can't mark a period paid.
 const ADMISSION_PERIOD_KEY = "admission";
@@ -335,4 +387,5 @@ module.exports = {
   paymentPeriodKey,
   periodBalance,
   periodStartDate,
+  shiftedPaymentPeriods,
 };

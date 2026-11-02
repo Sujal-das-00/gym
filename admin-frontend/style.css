@@ -3677,6 +3677,8 @@ dialog.sheet[open] { animation: sheetPop 220ms ease; }
 .contact-row.is-static:hover, .contact-row.is-static:active { background: transparent; }
 .contact-row.no-dot .contact-avatar::after { display: none; }
 .contact-tag.warn { background: var(--gold-soft); color: var(--gold); }
+/* Outlined so it reads as a plan type, not as one of the filled fee statuses. */
+.contact-tag.package { background: transparent; color: var(--green); box-shadow: inset 0 0 0 1px currentColor; }
 @media (min-width: 901px) {
   .contact-row.is-static, .contact-row.is-static:hover, .contact-row.is-static:active { background: var(--panel); }
 }

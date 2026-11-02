@@ -112,6 +112,7 @@ function PlanForm({ member }) {
     };
     preview = {
       dueKey: domain.getDueDateKey(next),
+      packageEndKey: plan.membershipType === "package" ? domain.getPackageEndKey(next) : "",
       owes: domain.getOverdueAmount(next),
     };
   }
@@ -422,9 +423,9 @@ function PlanForm({ member }) {
               <dd>{displayDate(effectiveDate)}</dd>
             </div>
             <div>
-              <dt>{preview.owes > 0 ? "Overdue after change" : "Next due"}</dt>
+              <dt>{preview.owes > 0 ? "Overdue after change" : preview.packageEndKey ? "Package ends on" : "Next due"}</dt>
               <dd className={preview.owes > 0 ? "is-due" : ""}>
-                {preview.owes > 0 ? currency(preview.owes) : displayDate(preview.dueKey)}
+                {preview.owes > 0 ? currency(preview.owes) : displayDate(preview.packageEndKey || preview.dueKey)}
               </dd>
             </div>
             {collectNow > 0 ? (

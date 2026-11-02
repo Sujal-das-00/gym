@@ -71,6 +71,8 @@ export default function DetailDialog() {
   const overdue = domain.isOverdue(member);
   const status = domain.getFeeStatus(member);
   const balance = domain.getBalanceDue(member);
+  const isPackage = domain.getMembershipType(member) === "package";
+  const packageEnd = isPackage ? domain.getPackageEndKey(member) : "";
   const hasDues = domain.getUnpaidPeriods(member).length > 0;
   const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
   const payments = [...(member.payments || [])].reverse();
@@ -136,10 +138,17 @@ export default function DetailDialog() {
               <dt>Fee</dt>
               <dd id="detailFee">{currency(member.fee)}</dd>
             </div>
-            <div className={overdue ? "is-due" : ""}>
-              <dt>{overdue ? "Overdue since" : "Next due"}</dt>
-              <dd id="detailDueDate">{displayDate(domain.getDueDateKey(member))}</dd>
-            </div>
+            {!overdue && isPackage ? (
+              <div>
+                <dt>{packageEnd < today ? "Package ended on" : "Package ends on"}</dt>
+                <dd id="detailDueDate">{displayDate(packageEnd)}</dd>
+              </div>
+            ) : (
+              <div className={overdue ? "is-due" : ""}>
+                <dt>{overdue ? "Overdue since" : "Next due"}</dt>
+                <dd id="detailDueDate">{displayDate(domain.getDueDateKey(member))}</dd>
+              </div>
+            )}
             {balance > 0 ? (
               <div className="is-balance">
                 <dt>Balance due</dt>

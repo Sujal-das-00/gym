@@ -18,6 +18,8 @@ const FILTERS = [
 
 // Memoised: a check-in or payment for one member re-renders only that row.
 const MemberRow = memo(function MemberRow({ member, status, present, hasDues, trainer, domain, openDetail }) {
+  const isPackage = domain.getMembershipType(member) === "package";
+  const packageEnd = isPackage ? domain.getPackageEndKey(member) : "";
   return (
     <li className="member-item">
       <button type="button" className={"contact-row is-" + status} onClick={() => openDetail(member.id)}>
@@ -28,6 +30,7 @@ const MemberRow = memo(function MemberRow({ member, status, present, hasDues, tr
           <strong>
             <span className="contact-name">{member.name}</span>
             {present ? <em className="contact-tag">Present</em> : null}
+            {isPackage ? <em className="contact-tag package">Package</em> : null}
           </strong>
           <small>{[member.phone, domain.getMembershipLabel(member)].filter(Boolean).join(" · ")}</small>
           <small className="contact-meta">
@@ -43,7 +46,9 @@ const MemberRow = memo(function MemberRow({ member, status, present, hasDues, tr
         </span>
         <span className="contact-state">
           <span className={"status-pill " + status}>
-            {status === "pending"
+            {status === "pending" && isPackage
+              ? `${packageEnd < todayKey() ? "Ended" : "Ends"} ${displayDate(packageEnd).slice(0, 6)}`
+              : status === "pending"
               ? `Due ${displayDate(domain.getDueDateKey(member)).slice(0, 6)}`
               : status === "balance"
                 ? `${currency(domain.getBalanceDue(member))} balance`

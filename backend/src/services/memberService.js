@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { shiftedPaymentPeriods } = require("../utils/billing");
 const { todayKey } = require("../utils/date");
 const { normalizeMember, normalizePaymentMode, normalizePhone, publicMember } = require("../utils/member");
 const { saveImageData } = require("./imageService");
@@ -123,6 +124,14 @@ async function updateMember(gymId, id, payload) {
     planStartDate: existing.planStartDate,
   });
   await assertUniqueMember(gymId, member);
+  // A corrected joining date moves the billing schedule, so the terms already
+  // paid move with it; otherwise their payments match no period and the member
+  // shows overdue despite having paid.
+  if (member.startDate !== existing.startDate) {
+    const settings = await repo().getSettings(gymId);
+    const moves = shiftedPaymentPeriods(existing, member, settings);
+    await repo().moveMemberStartDate(gymId, id, member.startDate, moves);
+  }
   const saved = await repo().saveMember(gymId, member);
   // Re-sync so changing (or clearing) the admission fee, or moving the start
   // date, updates the recorded admission payment instead of leaving a stale one.

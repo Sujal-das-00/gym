@@ -327,6 +327,18 @@ export function getDueDateKey(settings, member) {
   return localDateKey(getDueDate(settings, member));
 }
 
+// A package's last day: the day before its due date, which is the "to" date
+// of its period range in the payment history (2 Nov to 1 Feb). A package that
+// hasn't started yet (plan change set for later) ends with its first term.
+export function getPackageEndKey(settings, member) {
+  const end = getBillingPeriodKeys(settings, member).length
+    ? getDueDate(settings, member)
+    : periodEndDate(settings, member, billingStartKey(member));
+  if (Number.isNaN(end.getTime())) return "";
+  end.setDate(end.getDate() - 1);
+  return localDateKey(end);
+}
+
 export function isPaidThisPeriod(settings, member) {
   // For "collect after the period" members the latest billable period is the
   // last one that has ended — the in-progress one is not owed yet.
@@ -541,6 +553,7 @@ export function createDomain(settings) {
     // A Date is mutable, so it is rebuilt each call; the key form is cached.
     getDueDate: (member) => getDueDate(settings, member),
     getDueDateKey: perMember(getDueDateKey),
+    getPackageEndKey: perMember(getPackageEndKey),
     isPaidThisPeriod: perMember(isPaidThisPeriod),
     getDueUnpaidPeriods: perMember(getDueUnpaidPeriods),
     getOverdueAmount: perMember(getOverdueAmount),
