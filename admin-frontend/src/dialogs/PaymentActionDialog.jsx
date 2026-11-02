@@ -71,7 +71,9 @@ function PaymentAction({ memberId, transactionId }) {
   const blocked = closedTermsProblem(member, tx);
   // Balances as if this payment had never been recorded: what the correction can pay.
   const without = withoutTransaction(member, tx.id);
-  const debts = outstandingDebts(domain, without);
+  // A payment that renewed the next term ahead can be corrected onto it again.
+  const paidAhead = tx.allocations.some((allocation) => allocation.billingPeriod === domain.nextTermKey(member));
+  const debts = outstandingDebts(domain, without, { renewAhead: paidAhead });
   const problem = view === "correct" ? paymentProblem({ debts, draft, startDate: member.startDate }) : "";
   const reasonOk = reason.trim().length >= 3;
 

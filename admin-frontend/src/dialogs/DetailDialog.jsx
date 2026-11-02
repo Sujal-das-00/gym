@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
@@ -8,8 +7,8 @@ import { memberCollections, paymentHistory } from "../lib/payments.js";
 import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
 import { currency, dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { sendFeeReminder, sendLoginDetails } from "../lib/whatsapp.js";
-import { DATE_NOT_RECORDED, FEE_STATUS_LABELS } from "../lib/billing.js";
-import { changeMoneyNotes, changeTimestamp, changedByLabel, changedFields, fetchPlanChanges } from "../lib/planChanges.js";
+import { DATE_NOT_RECORDED, FEE_STATUS_LABELS, MEMBERSHIP_STATUS_LABELS } from "../lib/billing.js";
+import MembershipHistory from "../components/MembershipHistory.jsx";
 
 /** Member profile sheet: status, quick actions, key numbers, attendance and payments. */
 export default function DetailDialog() {
@@ -30,19 +29,6 @@ export default function DetailDialog() {
     settings,
   } = useApp();
   const { detailMemberId } = useDialogs();
-  const [planHistory, setPlanHistory] = useState({ memberId: "", rows: [], failed: false });
-
-  // This member's plan-change log; refetched after a change made from here.
-  useEffect(() => {
-    if (!detailMemberId) return undefined;
-    let cancelled = false;
-    fetchPlanChanges(detailMemberId)
-      .then((rows) => !cancelled && setPlanHistory({ memberId: detailMemberId, rows, failed: false }))
-      .catch(() => !cancelled && setPlanHistory({ memberId: detailMemberId, rows: [], failed: true }));
-    return () => {
-      cancelled = true;
-    };
-  }, [detailMemberId, planChangeRevision]);
 
   const member = members.find((item) => item.id === detailMemberId);
   const open = Boolean(member);
@@ -75,7 +61,12 @@ export default function DetailDialog() {
   const isPackage = domain.getMembershipType(member) === "package";
   const packageEnd = isPackage ? domain.getPackageEndKey(member) : "";
   const openingDue = domain.getOpeningBalanceDue(member);
-  const hasDues = domain.getUnpaidPeriods(member).length > 0 || openingDue > 0;
+  const hasDues = domain.getUnpaidPeriods(member).length > 0 || openingDue > 0 || domain.getCarriedBalanceDue(member) > 0;
+  const membership = domain.getMembershipStatus(member);
+  const renewable = !hasDues && Boolean(domain.getAdvanceTerm(member));
+  // The history is rebuilt from plan changes and payments: refetch when either moves.
+  const historyRevision =
+    planChangeRevision + ":" + (member.transactions || []).map((tx) => tx.id + tx.status).join(",");
   const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
   // Every payment, reversed ones too (struck through), newest first.
   const payments = paymentHistory(member);
@@ -85,6 +76,13 @@ export default function DetailDialog() {
 
   const actions = [
     hasDues && { key: "collect", icon: "currency_rupee", label: "Collect", primary: true, run: () => openFeeDialog(member.id) },
+    renewable && { key: "renew", icon: "event_repeat", label: "Renew", run: () => openFeeDialog(member.id) },
+    membership === "expired" && {
+      key: "restart",
+      icon: "restart_alt",
+      label: "Restart",
+      run: () => openPlanDialog(member.id, "restart"),
+    },
     { key: "plan", icon: "swap_horiz", label: "Plan", run: () => openPlanDialog(member.id) },
     { key: "edit", icon: "edit", label: "Edit", run: () => openMemberDialog(member) },
     {
@@ -138,6 +136,13 @@ export default function DetailDialog() {
           </div>
 
           <dl className="member-stats">
+            <div className={membership === "expired" ? "is-due" : ""}>
+              <dt>Membership</dt>
+              <dd id="detailMembership">
+                {MEMBERSHIP_STATUS_LABELS[membership]}
+                {domain.isPlanChangeAhead(member) ? <small> · new plan from {displayDate(member.planStartDate)}</small> : null}
+              </dd>
+            </div>
             <div>
               <dt>Fee</dt>
               <dd id="detailFee">{currency(member.fee)}</dd>
@@ -233,35 +238,7 @@ export default function DetailDialog() {
             </div>
           </section>
 
-          {planHistory.memberId === member.id && (planHistory.rows.length || planHistory.failed) ? (
-            <details className="sheet-history plan-history">
-              <summary>
-                Plan changes · {planHistory.rows.length}
-                <Icon name="expand_more" />
-              </summary>
-              {planHistory.failed ? (
-                <p className="member-empty">Could not load the plan history. Check your connection.</p>
-              ) : (
-                <ul>
-                  {planHistory.rows.map((change) => (
-                    <li key={change.id}>
-                      <span>
-                        <strong>{changedFields(change).join(" · ")}</strong>
-                        <small>
-                          {[changeTimestamp(change), changedByLabel(change)].filter(Boolean).join(" ")}
-                        </small>
-                        <small>
-                          {["Starts " + displayDate(change.effectiveDate), ...changeMoneyNotes(change), change.note]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </small>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </details>
-          ) : null}
+          <MembershipHistory member={member} domain={domain} revision={historyRevision} />
 
           <details className="sheet-history" open>
             <summary>

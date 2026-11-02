@@ -281,15 +281,17 @@ test("T9c/T9d: terms closed by a plan change can't be reversed; opening-balance 
   );
   const join = member.transactions.find((tx) => tx.source === "join");
   assert.ok(join, "the at-join first term is a transaction");
+  // Phase 3 (L7): a change can't start before the current term (31 Oct), so
+  // both unpaid earlier terms are collected with it and closed.
   await svc.changeMemberPlan(
     gymId,
     member.id,
-    { membershipType: "monthly", packageMonths: 1, fee: 1200, collectionTiming: "at-join", effectiveDate: "2026-10-01", oldDues: "collect", mode: "cash" },
+    { membershipType: "monthly", packageMonths: 1, fee: 1200, collectionTiming: "at-join", effectiveDate: "2026-10-31", oldDues: "collect", mode: "cash" },
     OWNER,
   );
   const m = await fresh(member);
   const atChange = m.transactions.find((tx) => tx.source === "plan_change");
-  assert.deepEqual(atChange.allocations.map((a) => a.billingPeriod), ["2026-09-01"]);
+  assert.deepEqual(atChange.allocations.map((a) => a.billingPeriod), ["2026-09-01", "2026-10-01"]);
   for (const tx of [join, atChange]) {
     await rejects(svc.reversePayment(gymId, member.id, tx.id, { reason: "Test" }, OWNER), 409, /plan change/);
     await rejects(svc.correctPayment(gymId, member.id, tx.id, { reason: "Test", amount: 1 }, OWNER), 409, /plan change/);

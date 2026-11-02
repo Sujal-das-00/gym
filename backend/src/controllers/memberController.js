@@ -76,8 +76,14 @@ async function listPlanChanges(req, res) {
   res.json(await planChangeService.listPlanChanges(req.gymId, { memberId: req.query.memberId }));
 }
 
+// Joined, renewals, plan changes and restarts for one member, oldest first.
+async function getMembershipHistory(req, res) {
+  res.json(await planChangeService.getMembershipHistory(req.gymId, req.params.id));
+}
+
 module.exports = {
   addPayments,
+  getMembershipHistory,
   listPaymentCorrections,
   patchPayment,
   postPaymentCorrection,

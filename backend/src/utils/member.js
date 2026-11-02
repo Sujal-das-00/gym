@@ -92,6 +92,13 @@ function normalizeMember(member) {
     // Money received (see payment_transactions), reversed ones included, for
     // the admin history. `payments` above holds only what still counts.
     transactions: Array.isArray(member.transactions) ? member.transactions : [],
+    // Old-plan terms a plan change or restart kept as balance due (read from
+    // member_plan_changes.dues_detail, never written through a member save).
+    carriedTerms: Array.isArray(member.carriedTerms)
+      ? member.carriedTerms
+          .filter((term) => term && term.period)
+          .map((term) => ({ period: String(term.period), fee: Number(term.fee || 0), changeId: String(term.changeId || "") }))
+      : [],
     createdAt: String(member.createdAt || member.created_at || nowIso()),
   };
 }

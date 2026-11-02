@@ -19,22 +19,30 @@ const HISTORY_LIMIT = 6;
  *
  * Every open gets a fresh request id, so a double tap or a retry after a
  * dropped connection returns the first recording instead of a second one.
+ *
+ * "Renew next term in advance" adds the one term after the current one (for
+ * members who pay upfront). It is an explicit choice, never where a too-large
+ * amount spills, and the term keeps its place on the cycle.
  */
 export default function FeeDialog() {
   const { closeFeeDialog, members, domain, recordPayment, showToast } = useApp();
   const { feeDialog } = useDialogs();
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(() => blankPaymentDraft());
+  const [renewAhead, setRenewAhead] = useState(false);
   const requestId = useRef("");
 
   const member = members.find((item) => item.id === feeDialog.memberId);
-  const debts = outstandingDebts(domain, member);
+  const ahead = member ? domain.getAdvanceTerm(member) : null;
+  const debts = outstandingDebts(domain, member, { renewAhead: renewAhead && Boolean(ahead) });
   const owedTotal = debts.reduce((sum, debt) => sum + debt.balance, 0);
+  const dueTotal = debts.filter((debt) => !debt.advance).reduce((sum, debt) => sum + debt.balance, 0);
 
   useEffect(() => {
     if (!feeDialog.open) return;
     requestId.current = crypto.randomUUID();
-    setDraft(blankPaymentDraft(owedTotal || ""));
+    setRenewAhead(false);
+    setDraft(blankPaymentDraft(dueTotal || ""));
     // Only when the sheet opens for a member, not on every balance change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feeDialog.open, feeDialog.memberId]);
@@ -45,6 +53,13 @@ export default function FeeDialog() {
   const lines = allocationLines({ debts, draft });
   const received = lines.reduce((sum, line) => sum + line.pay, 0);
   const left = Math.max(0, Math.round((owedTotal - received) * 100) / 100);
+
+  // Ticking it adds the next term to the amount; unticking takes it off again.
+  const toggleAhead = (on) => {
+    setRenewAhead(on);
+    const total = Math.round((dueTotal + (on && ahead ? ahead.balance : 0)) * 100) / 100;
+    setDraft((current) => ({ ...current, amountText: total ? String(total) : "", method: "fifo", manual: {} }));
+  };
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -83,10 +98,23 @@ export default function FeeDialog() {
               <span className={"status-pill " + status}>{FEE_STATUS_LABELS[status]}</span>
             </div>
 
+            {ahead ? (
+              <label className="plan-check renew-ahead">
+                <input type="checkbox" checked={renewAhead} onChange={(event) => toggleAhead(event.target.checked)} />
+                <span>
+                  <strong>Renew next term in advance</strong>
+                  <small>
+                    {domain.getBillingPeriodLabel(ahead.period, member)} · {currency(ahead.balance)}. The cycle stays as it
+                    is; only one term can be paid ahead.
+                  </small>
+                </span>
+              </label>
+            ) : null}
+
             {debts.length ? (
               <>
                 <p className={"pay-owed" + (domain.isOverdue(member) ? " is-due" : "")}>
-                  <span>Total owed</span>
+                  <span>{renewAhead && ahead ? "Total owed + next term" : "Total owed"}</span>
                   <strong>{currency(owedTotal)}</strong>
                 </p>
                 <PaymentFields member={member} debts={debts} draft={draft} onChange={setDraft} domain={domain} />
@@ -114,7 +142,12 @@ export default function FeeDialog() {
             ) : (
               <p className="sheet-note">
                 <Icon name="check_circle" />
-                Nothing is owed right now. Advance payments can&apos;t be recorded.
+                Nothing is owed right now.
+                {domain.getPaidAheadEndKey(member)
+                  ? " The next term is already paid ahead."
+                  : domain.getCollectionTiming(member) === "fixed-day"
+                    ? " This member pays after each term ends."
+                    : ""}
               </p>
             )}
 

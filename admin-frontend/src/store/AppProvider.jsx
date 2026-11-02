@@ -12,7 +12,7 @@ const CLOSED_MEMBER_DIALOG = { open: false, member: null };
 const CLOSED_TRAINER_DIALOG = { open: false, trainer: null };
 const CLOSED_EXPENSE_DIALOG = { open: false, expense: null };
 const CLOSED_FEE_DIALOG = { open: false, memberId: "" };
-const CLOSED_PLAN_DIALOG = { open: false, memberId: "" };
+const CLOSED_PLAN_DIALOG = { open: false, memberId: "", mode: "change" };
 const CLOSED_PAYMENT_ACTION = { open: false, memberId: "", transactionId: "" };
 
 function generateGymId(members) {
@@ -175,7 +175,8 @@ export function AppProvider({ children }) {
   const closeTrainerDialog = useCallback(() => setTrainerDialog(CLOSED_TRAINER_DIALOG), []);
   const openExpenseDialog = useCallback((expense = null) => setExpenseDialog({ open: true, expense }), []);
   const closeExpenseDialog = useCallback(() => setExpenseDialog(CLOSED_EXPENSE_DIALOG), []);
-  const openPlanDialog = useCallback((memberId) => setPlanDialog({ open: true, memberId }), []);
+  // mode "restart": the same plan on a new cycle, for a member coming back after a lapse.
+  const openPlanDialog = useCallback((memberId, mode = "change") => setPlanDialog({ open: true, memberId, mode }), []);
   const closePlanDialog = useCallback(() => setPlanDialog(CLOSED_PLAN_DIALOG), []);
   const openDetail = useCallback((memberId) => setDetailMemberId(memberId), []);
   const closeDetail = useCallback(() => setDetailMemberId(""), []);
@@ -475,7 +476,7 @@ export function AppProvider({ children }) {
       );
       setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
       setPlanChangeRevision((revision) => revision + 1);
-      showToast("Plan updated for " + saved.name);
+      showToast((payload.restart ? "Membership restarted for " : "Plan updated for ") + saved.name);
       return change;
     },
     [showToast],

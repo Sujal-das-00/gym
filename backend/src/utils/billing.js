@@ -247,9 +247,35 @@ function partPaidPeriods(member, settings) {
 }
 
 // Rupees still owed on part-paid periods.
-function balanceDue(member, settings) {
-  const ledger = getPeriodLedger(member);
+function partPaidBalance(member, settings, ledger = getPeriodLedger(member)) {
   return partPaidPeriods(member, settings).reduce((sum, period) => sum + periodBalance(member, period, ledger), 0);
+}
+
+/**
+ * Old-plan terms a plan change or restart kept as balance due (members.carriedTerms,
+ * from member_plan_changes.dues_detail). Each is still owed at its own fee and
+ * is paid like any term, under its own key; like a part-paid term or an
+ * opening balance it never expires the membership or blocks check-in.
+ * Mirrors getCarriedDues() in admin-frontend/src/lib/billing.js.
+ */
+function carriedDues(member, ledger = getPeriodLedger(member)) {
+  return (member?.carriedTerms || []).map((term) => {
+    const entry = ledger.get(term.period);
+    const charge = entry && !entry.legacy ? entry.charge : Number(term.fee || 0);
+    const paid = entry ? entry.paid : 0;
+    const balance = entry?.settled ? 0 : Math.max(0, Math.round((charge - paid) * 100) / 100);
+    return { period: term.period, charge, paid, balance };
+  });
+}
+
+function carriedBalanceDue(member) {
+  return Math.round(carriedDues(member).reduce((sum, due) => sum + due.balance, 0) * 100) / 100;
+}
+
+// Rupees owed as balances: what is left on part-paid periods plus old-plan
+// terms kept as balance due. Neither makes the member overdue.
+function balanceDue(member, settings) {
+  return partPaidBalance(member, settings) + carriedBalanceDue(member);
 }
 
 // The date a period rolls over into the next one (its renewal / end-of-term date).
@@ -270,6 +296,149 @@ function nextPeriodStartKey(member, settings) {
   const periods = getBillingPeriodKeys(member, settings);
   const last = periods[periods.length - 1];
   return last ? localDateKey(periodEndDate(member, settings, last)) : billingStartKey(member);
+}
+
+/* ---- Membership lifecycle (Phase 3) -------------------------------------
+ * Renewals, plan changes and restarts all work on the member's existing term
+ * grid; nothing here invents its own date math. Mirrored in
+ * admin-frontend/src/lib/billing.js; the parity tests run both.
+ * ------------------------------------------------------------------------- */
+
+// "2026-10" (a calendar-month term) → "2026-10-01"; dated keys pass through.
+function termStartKey(period) {
+  const key = String(period || "");
+  return key.length === 7 ? `${key}-01` : key;
+}
+
+// The key of the term starting on `dateKey` on this plan's schedule.
+function termKeyFor(plan, settings, dateKey) {
+  return isDateKeyedSchedule(plan, settings) ? String(dateKey) : String(dateKey).slice(0, 7);
+}
+
+// The term after the one running now (the first one, while billing starts later).
+function nextTermKey(member, settings) {
+  const start = nextPeriodStartKey(member, settings);
+  return start ? termKeyFor(member, settings, start) : "";
+}
+
+/**
+ * The one term that may be paid ahead: the next term on the grid, for a
+ * member who pays upfront, unless it is already paid. Never further ahead,
+ * and its dates are the grid's own, so renewing early never moves the cycle
+ * (1–30 Nov is followed by 1–30 Dec however early December is paid).
+ */
+function advanceTerm(member, settings) {
+  if (collectionTiming(member, settings) === "fixed-day") return null;
+  const period = nextTermKey(member, settings);
+  if (!period) return null;
+  const entry = getPeriodLedger(member).get(period);
+  if (entry?.settled) return null;
+  const charge = entry ? entry.charge : Number(member?.fee || 0);
+  const paid = entry ? entry.paid : 0;
+  return { period, charge, paid, balance: Math.max(0, Math.round((charge - paid) * 100) / 100) };
+}
+
+// The day after the last paid day, when the next term is already paid ahead; "" otherwise.
+function paidAheadEndKey(member, settings) {
+  const period = nextTermKey(member, settings);
+  const entry = period ? getPeriodLedger(member).get(period) : null;
+  return entry?.settled ? localDateKey(periodEndDate(member, settings, period)) : "";
+}
+
+/**
+ * What one month of a plan costs, so plans of different lengths compare
+ * fairly: a package's fee over its months; a monthly fee is per billing
+ * cycle, so on a custom-day cycle it is scaled to 30 days.
+ */
+function monthlyEquivalent(plan, settings) {
+  const fee = Number(plan?.fee || 0);
+  if (membershipType(plan) === "package") return fee / packageMonths(plan);
+  if (billingCycleMode(settings) === "custom-days") return (fee * 30) / billingCycleDays(settings);
+  return fee;
+}
+
+// "upgrade" | "downgrade" | "change" (same monthly price), compared to the paisa.
+function classifyPlanChange(from, to, settings) {
+  const before = Math.round(monthlyEquivalent(from, settings) * 100);
+  const after = Math.round(monthlyEquivalent(to, settings) * 100);
+  if (after > before) return "upgrade";
+  if (after < before) return "downgrade";
+  return "change";
+}
+
+/**
+ * When a plan change may take effect.
+ *   earliest  – the start of the current term (never earlier: older terms
+ *               keep the plan they were billed on), and never before the
+ *               current plan itself started;
+ *   latest    – the next renewal, after a term paid ahead, or today;
+ *   paidStart – start of the newest term of the current plan with money on
+ *               it. The new plan's first term must start after it, so a paid
+ *               term is never moved to the new plan.
+ */
+function planChangeWindow(member, settings) {
+  const today = todayKey();
+  const periods = getBillingPeriodKeys(member, settings);
+  const current = periods[periods.length - 1] || "";
+  const planStart = billingStartKey(member);
+  const segmentStart = termStartKey(termKeyFor(member, settings, planStart));
+  let paid = "";
+  for (const period of getPeriodLedger(member).keys()) {
+    const start = termStartKey(period);
+    if (start >= segmentStart && start > termStartKey(paid)) paid = period;
+  }
+  const last = [current, paid].filter(Boolean).sort((a, b) => termStartKey(a).localeCompare(termStartKey(b))).pop();
+  const renewal = last ? localDateKey(periodEndDate(member, settings, last)) : planStart;
+  const currentStart = current ? termStartKey(current) : planStart;
+  return {
+    earliest: currentStart > planStart ? currentStart : planStart,
+    latest: renewal > today ? renewal : today,
+    paidStart: paid ? termStartKey(paid) : "",
+  };
+}
+
+/**
+ * Why a plan change (or restart) can't start on `effectiveDate`, or "".
+ * `plan` is the new plan; a restart keeps the current one and starts no
+ * later than today.
+ */
+function planChangeProblem(member, settings, { plan, effectiveDate, restart = false }) {
+  const window = planChangeWindow(member, settings);
+  const latest = restart ? todayKey() : window.latest;
+  if (effectiveDate < window.earliest) {
+    return `The new plan can't start before the current term (${window.earliest}). Earlier terms keep the plan they were billed on.`;
+  }
+  if (effectiveDate > latest) {
+    return restart ? "A restart can't be dated in the future." : `The new plan must start by the next renewal (${latest}).`;
+  }
+  if (!restart && classifyPlanChange(member, plan, settings) === "downgrade" && effectiveDate !== window.latest) {
+    return `A downgrade starts at the next renewal (${window.latest}), once the term already running has ended.`;
+  }
+  const first = termStartKey(termKeyFor(restart ? member : plan, settings, effectiveDate));
+  if (window.paidStart && first <= window.paidStart) {
+    return `The term from ${window.paidStart} is already paid on the current plan and can't move to a new one. Start after it, at the latest on ${window.latest}.`;
+  }
+  return "";
+}
+
+/**
+ * Unpaid terms of the current plan that start before `effectiveDate`: billing
+ * restarts there, so the change must collect, waive or keep each one. The
+ * new plan's own first term is never among them (on a calendar-month gym a
+ * mid-month change shares that month's key), so nothing is billed twice.
+ */
+function unsettledBeforeChange(member, settings, effectiveDate, firstKey = "") {
+  const paid = getPaidPeriodSet(member);
+  return getBillingPeriodKeys(member, settings).filter(
+    (period) => termStartKey(period) < effectiveDate && !paid.has(period) && period !== firstKey,
+  );
+}
+
+// "scheduled" (joining date still ahead), "expired" (renewal lapsed) or "active".
+// Dues held as balances (part payments, opening balance, kept terms) don't count.
+function membershipStatus(member, settings) {
+  if (String(member?.startDate || "") > todayKey()) return "scheduled";
+  return isMembershipExpired(member, settings) ? "expired" : "active";
 }
 
 // Unpaid periods that are already PAST their collection point — the ones a member
@@ -341,7 +510,11 @@ function memberBillingSummary(member, settings) {
   const paid = getPaidPeriodSet(member);
   const unpaid = periods.filter((period) => !paid.has(period));
   const ledger = getPeriodLedger(member);
-  const balance = balanceDue(member, settings);
+  const balance = partPaidBalance(member, settings, ledger);
+  const carried = carriedBalanceDue(member);
+  const status = membershipStatus(member, settings);
+  // A term paid ahead moves the renewal to that term's end (the grid itself never moves).
+  const paidAhead = paidAheadEndKey(member, settings);
   const today = parseDateKey(todayKey());
 
   // A member can be expired from an OLD unpaid period while the period in
@@ -366,7 +539,7 @@ function memberBillingSummary(member, settings) {
   // refused while that term is unpaid), or an opening balance covering every
   // term up to its cut-over. Count down to that start.
   if (!current && billingStartKey(member) > todayKey()) {
-    const due = periodDueDate(member, settings, billingStartKey(member));
+    const due = paidAhead ? parseDateKey(paidAhead) : periodDueDate(member, settings, billingStartKey(member));
     const left = Math.max(0, daysBetween(today, due));
     return {
       amount: Number(member?.fee || 0),
@@ -378,6 +551,8 @@ function memberBillingSummary(member, settings) {
       unpaidPeriods: 0,
       balanceDue: balance,
       openingBalanceDue: opening,
+      carriedBalanceDue: carried,
+      status,
       expired: false,
     };
   }
@@ -385,7 +560,7 @@ function memberBillingSummary(member, settings) {
   // as isMembershipExpired, so this should always agree with the check-in
   // gate; fall back to the gate's own answer if the two ever disagree.
   const expired = overdueDates.length > 0 || isMembershipExpired(member, settings);
-  const target = overdueDates.length ? overdueDates[0] : currentEnd;
+  const target = overdueDates.length ? overdueDates[0] : paidAhead ? parseDateKey(paidAhead) : currentEnd;
   const dated = current && !Number.isNaN(start.getTime()) && !Number.isNaN(target.getTime());
 
   // Signed once, then split into "days left" (future) and "days overdue" (past)
@@ -402,12 +577,16 @@ function memberBillingSummary(member, settings) {
     daysLeft: dated ? Math.max(0, diff) : 0,
     daysOverdue: dated ? Math.max(0, -diff) : 0,
     // Length of the current period, so the card can draw it as a progress ring.
-    cycleDays: dated ? Math.max(1, daysBetween(start, currentEnd)) : 0,
+    cycleDays: dated ? Math.max(1, daysBetween(start, paidAhead ? parseDateKey(paidAhead) : currentEnd)) : 0,
     unpaidPeriods: unpaid.length,
     // Left over from part payments, collected with the next payment.
     balanceDue: balance,
     // Owed from before the member was entered into GymBoo; never expires them.
     openingBalanceDue: opening,
+    // Old-plan terms kept as balance due at a plan change or restart; never expires them.
+    carriedBalanceDue: carried,
+    // "active" | "expired" | "scheduled" (membershipStatus).
+    status,
     expired,
   };
 }
@@ -415,7 +594,11 @@ function memberBillingSummary(member, settings) {
 module.exports = {
   ADMISSION_PERIOD_KEY,
   OPENING_PERIOD_KEY,
+  advanceTerm,
   balanceDue,
+  carriedBalanceDue,
+  carriedDues,
+  classifyPlanChange,
   billablePeriodKeys,
   billingStartKey,
   collectionTiming,
@@ -428,11 +611,21 @@ module.exports = {
   isOpeningBalancePayment,
   memberBillingSummary,
   memberOutstanding,
+  membershipStatus,
+  monthlyEquivalent,
   nextPeriodStartKey,
+  nextTermKey,
+  paidAheadEndKey,
+  periodEndDate,
+  planChangeProblem,
+  planChangeWindow,
   openingBalanceDue,
   partPaidPeriods,
   paymentPeriodKey,
   periodBalance,
   periodStartDate,
   shiftedPaymentPeriods,
+  termKeyFor,
+  termStartKey,
+  unsettledBeforeChange,
 };

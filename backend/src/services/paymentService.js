@@ -2,8 +2,12 @@ const crypto = require("crypto");
 const { normalizePaymentMode } = require("../utils/member");
 const {
   OPENING_PERIOD_KEY,
+  advanceTerm,
   billablePeriodKeys,
+  carriedDues,
+  collectionTiming,
   getPeriodLedger,
+  nextTermKey,
   openingBalanceDue,
   paymentPeriodKey,
 } = require("../utils/billing");
@@ -76,17 +80,25 @@ const termStartKey = (period) => (String(period).length === 7 ? `${period}-01` :
 
 /**
  * Everything a payment can go toward right now, oldest first and in paise:
- * the opening balance (owed from before GymBoo, so the oldest debt), then each
+ * the opening balance (owed from before GymBoo, so the oldest debt), then
+ * old-plan terms kept as balance due at a plan change or restart, then each
  * payable term with something left on it. Terms that haven't started, and a
- * pay-after-term member's running term, are not payable (no advance payments).
+ * pay-after-term member's running term, are not payable, with one exception:
+ * `renewAhead` adds the single next term (see advanceTerm), last of all.
  */
-function outstandingDebts(member, settings) {
+function outstandingDebts(member, settings, { renewAhead = false } = {}) {
   const debts = [];
   const opening = toPaise(openingBalanceDue(member));
   if (opening > 0) {
     debts.push({ period: OPENING_PERIOD_KEY, chargePaise: toPaise(member.openingBalance), balancePaise: opening });
   }
   const ledger = getPeriodLedger(member);
+  const carried = carriedDues(member, ledger)
+    .filter((due) => due.balance > 0)
+    .sort((a, b) => a.period.localeCompare(b.period));
+  for (const due of carried) {
+    debts.push({ period: due.period, chargePaise: toPaise(due.charge), balancePaise: toPaise(due.balance), carried: true });
+  }
   for (const period of billablePeriodKeys(member, settings)) {
     const entry = ledger.get(period);
     if (entry?.settled) continue;
@@ -96,7 +108,35 @@ function outstandingDebts(member, settings) {
     // ₹0 record, as it always has been.
     if (balancePaise > 0 || chargePaise === 0) debts.push({ period, chargePaise, balancePaise: Math.max(0, balancePaise) });
   }
+  if (renewAhead) {
+    const ahead = advanceTerm(member, settings);
+    if (!ahead) {
+      throw createHttpError(
+        400,
+        collectionTiming(member, settings) === "fixed-day"
+          ?"This member pays after each term ends, so a term can't be paid ahead."
+          : "The next term is already paid. Only one term can be paid ahead.",
+      );
+    }
+    debts.push({ period: ahead.period, chargePaise: toPaise(ahead.charge), balancePaise: toPaise(ahead.balance), advance: true });
+  }
   return debts;
+}
+
+/**
+ * A term paid ahead is a renewal: the terms already due come first. Under
+ * FIFO that is automatic; a manual split that pays ahead while leaving a due
+ * term unpaid is refused. (Balances from before, like the opening balance or
+ * kept old-plan dues, don't hold a renewal up.)
+ */
+function checkAheadOrder(debts, lines) {
+  const ahead = debts.find((debt) => debt.advance);
+  if (!ahead || !lines.some((line) => line.period === ahead.period && line.paise > 0)) return;
+  const paid = new Map(lines.map((line) => [line.period, line.paise]));
+  const left = debts.some(
+    (debt) => !debt.advance && !debt.carried && debt.period !== OPENING_PERIOD_KEY && debt.balancePaise > (paid.get(debt.period) || 0),
+  );
+  if (left) throw createHttpError(400, "Clear the terms already due before paying the next term ahead.");
 }
 
 const debtLabel = (period) => (period === OPENING_PERIOD_KEY ? "the opening balance" : period);
@@ -247,7 +287,7 @@ function buildTransaction({ lines, date, details, source, user, requestId = null
  * two devices can't both spend the same balance; a retried submit (same
  * requestId) returns the first result instead of recording twice.
  *
- * body: { requestId, amount, date, mode, reference, note, allocation, allocations }
+ * body: { requestId, amount, date, mode, reference, note, allocation, allocations, renewAhead }
  *   or the older { payments: [{ billingPeriod, amount, mode }] } (manual, today).
  */
 async function recordPayment(gymId, memberId, body, user) {
@@ -269,7 +309,7 @@ async function recordPayment(gymId, memberId, body, user) {
       }
     }
     if (date && date < member.startDate) throw createHttpError(400, "A payment can't be collected before the joining date.");
-    const debts = outstandingDebts(member, settings);
+    const debts = outstandingDebts(member, settings, { renewAhead: !legacy && body.renewAhead === true });
     let lines;
     if (legacy) {
       const rows = preparePeriodPayments(member, body.payments);
@@ -278,6 +318,7 @@ async function recordPayment(gymId, memberId, body, user) {
     } else {
       lines = allocate(debts, amountPaise, body.allocation, body.allocations);
     }
+    checkAheadOrder(debts, lines);
     const { tx, allocations } = buildTransaction({ lines, date, details, source: "desk", user, requestId });
     await repo().insertTransaction(conn, gymId, member.id, tx, allocations);
     return { transactionId: tx.id, repeated: false };
@@ -295,9 +336,11 @@ function closedTermsProblem(member, tx) {
   const closedBy = member.planStartDate ? "plan" : member.billingCutover ? "opening" : "";
   if (!closedBy) return "";
   const start = member.planStartDate || member.billingCutover;
+  // Old-plan terms kept as balance due are still billed: un-paying one leaves it owed.
+  const kept = new Set((member.carriedTerms || []).map((term) => term.period));
   const closed = tx.allocations.some((allocation) => {
     const period = allocation.billingPeriod;
-    if (period === OPENING_PERIOD_KEY) return false;
+    if (period === OPENING_PERIOD_KEY || kept.has(period)) return false;
     return period.length === 7 ? period < start.slice(0, 7) : period < start;
   });
   if (!closed) return "";
@@ -374,7 +417,11 @@ async function correctPayment(gymId, memberId, transactionId, body, user) {
     if (date && date < member.startDate) throw createHttpError(400, "A payment can't be collected before the joining date.");
     // Balances as if the original had never been recorded.
     const without = { ...member, payments: member.payments.filter((payment) => payment.transactionId !== tx.id) };
-    const lines = allocate(outstandingDebts(without, settings), amountPaise, body.allocation, body.allocations);
+    // A payment that renewed a term ahead can be corrected onto that term again.
+    const paidAhead = tx.allocations.some((allocation) => allocation.billingPeriod === nextTermKey(member, settings));
+    const debts = outstandingDebts(without, settings, { renewAhead: body.renewAhead === true || paidAhead });
+    const lines = allocate(debts, amountPaise, body.allocation, body.allocations);
+    checkAheadOrder(debts, lines);
     const { tx: replacement, allocations } = buildTransaction({
       lines,
       date,
@@ -394,6 +441,7 @@ async function correctPayment(gymId, memberId, transactionId, body, user) {
 
 module.exports = {
   allocate,
+  checkAheadOrder,
   closedTermsProblem,
   correctPayment,
   editPaymentDetails,

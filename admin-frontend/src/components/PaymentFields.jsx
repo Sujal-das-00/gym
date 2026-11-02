@@ -60,7 +60,10 @@ export default function PaymentFields({ member, debts, draft, onChange, domain }
               onChange={(event) => set({ amountText: event.target.value })}
             />
           </label>
-          <p className="pay-hint">Up to {currency(owed)} owed. Anything left stays as a balance.</p>
+          <p className="pay-hint">
+            Up to {currency(owed)}
+            {debts.some((debt) => debt.advance) ? " with the next term" : " owed"}. Anything left stays as a balance.
+          </p>
         </div>
       </section>
 
@@ -175,6 +178,8 @@ export default function PaymentFields({ member, debts, draft, onChange, domain }
                   <strong>
                     {label}
                     {debt.paid > 0 ? <em className="pay-tag">Balance</em> : null}
+                    {debt.carried ? <em className="pay-tag">Earlier plan</em> : null}
+                    {debt.advance ? <em className="pay-tag">In advance</em> : null}
                   </strong>
                   <small className={line?.pay > 0 ? "" : "is-muted"}>
                     {line?.pay > 0

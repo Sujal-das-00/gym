@@ -10,6 +10,10 @@ function errorHandler(error, req, res, next) {
   if (duplicateMemberError(error) && /payment_transactions|uniq_payment_transactions_request/.test(error.message || "")) {
     error.status = 409;
     error.message = "This payment was already recorded. Reload to see the latest.";
+  } else if (duplicateMemberError(error) && /uniq_plan_changes_request/.test(error.message || "")) {
+    // Same for a repeated Change plan request (planChangeService answers it first).
+    error.status = 409;
+    error.message = "This plan change was already saved. Reload to see the latest.";
   } else if (duplicateMemberError(error)) {
     error.status = 409;
     error.message = "Member with this Gym ID or phone already exists";

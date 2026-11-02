@@ -11,8 +11,13 @@ const store = require("../services/memoryStore");
 function hydrateStored(raw) {
   if (!raw) return publicMember(null);
   const rows = raw.payments || [];
+  // Old-plan terms kept as balance due, from the plan-change log (as in memberModel).
+  const carriedTerms = (store.getState().planChanges || [])
+    .filter((change) => change.memberId === raw.id)
+    .flatMap((change) => (change.duesDetail?.carried || []).map((term) => ({ period: term.period, fee: term.fee, changeId: change.id })));
   return publicMember({
     ...raw,
+    carriedTerms,
     payments: rows.filter((payment) => !payment.reversedAt),
     transactions: (raw.transactions || []).map((tx) => ({
       ...tx,
@@ -198,9 +203,9 @@ function withMemberLock(gymId, memberId, work) {
     if (!target) throw Object.assign(new Error("Member not found"), { status: 404 });
     const state = store.getState();
     const snapshot = JSON.stringify({
-      payments: target.payments || [],
-      transactions: target.transactions || [],
+      member: target,
       corrections: state.paymentCorrections || [],
+      planChanges: state.planChanges || [],
     });
     try {
       const result = await work(null, getMemberById(gymId, memberId));
@@ -208,9 +213,9 @@ function withMemberLock(gymId, memberId, work) {
       return result;
     } catch (error) {
       const saved = JSON.parse(snapshot);
-      target.payments = saved.payments;
-      target.transactions = saved.transactions;
+      Object.assign(target, saved.member);
       state.paymentCorrections = saved.corrections;
+      state.planChanges = saved.planChanges;
       throw error;
     }
   };
@@ -411,8 +416,8 @@ function syncAdmissionPayment(member) {
   store.persist();
 }
 
-// Mirrors memberModel.applyPlanChange; everything lands in one persist().
-function applyPlanChange(gymId, { member, previous, payments, change }) {
+// Mirrors memberModel.applyPlanChange, inside withMemberLock (which persists).
+function applyPlanChange(conn, gymId, { member, previous, payments, change }) {
   const state = store.getState();
   const target = state.members.find((item) => item.id === member.id);
   const current = target ? normalizeMember(target) : null;
@@ -457,9 +462,24 @@ function applyPlanChange(gymId, { member, previous, payments, change }) {
     );
   }
   state.planChanges ||= [];
-  state.planChanges.push({ ...change, memberId: member.id });
-  store.persist();
+  const carried = change.duesDetail?.carried || [];
+  state.planChanges.push({
+    ...change,
+    memberId: member.id,
+    changeType: change.changeType || "change",
+    duesDetail: change.duesDetail || null,
+    duesCarried: Math.round(carried.reduce((sum, term) => sum + Number(term.balance || 0), 0) * 100) / 100,
+  });
   return change;
+}
+
+function findPlanChangeByRequest(conn, gymId, requestId) {
+  const change = (store.getState().planChanges || []).find((item) => item.requestId && item.requestId === requestId);
+  return change ? { id: change.id, memberId: change.memberId } : null;
+}
+
+function getPlanChange(gymId, id) {
+  return (store.getState().planChanges || []).find((item) => item.id === id) || null;
 }
 
 function listPlanChanges(gymId, { memberId = "", limit = 2000 } = {}) {
@@ -564,7 +584,9 @@ module.exports = {
   addTransaction,
   createMemberWithHistory,
   findTransaction,
+  findPlanChangeByRequest,
   findTransactionByRequest,
+  getPlanChange,
   insertTransaction,
   listCorrections,
   reverseTransaction,

@@ -38,8 +38,15 @@ export function changeTime(change) {
 // What one month costs on a plan, so a package and a monthly plan compare fairly.
 const perMonth = (plan) => Number(plan.fee || 0) / (plan.membershipType === "package" ? Math.max(1, plan.packageMonths) : 1);
 
-/** "upgrade" | "downgrade" | "same" by monthly price. */
+/**
+ * "upgrade" | "downgrade" | "same" by monthly price, or "restart". The server
+ * stores the type when the change is saved (by the gym's own cycle); entries
+ * without one are worked out here.
+ */
 export function changeDirection(change) {
+  if (change.changeType === "restart") return "restart";
+  if (change.changeType === "upgrade" || change.changeType === "downgrade") return change.changeType;
+  if (change.changeType === "change") return "same";
   const before = perMonth(change.from);
   const after = perMonth(change.to);
   if (Math.abs(after - before) < 0.5) return "same";
@@ -49,6 +56,7 @@ export function changeDirection(change) {
 /** One line per field that actually changed. */
 export function changedFields(change) {
   const { from, to } = change;
+  if (change.changeType === "restart") return [`Restarted on ${planLabel(to)} · ${currency(to.fee)}`];
   const lines = [];
   if (planLabel(from) !== planLabel(to)) lines.push(`${planLabel(from)} → ${planLabel(to)}`);
   if (from.fee !== to.fee) lines.push(`Fee ${currency(from.fee)} → ${currency(to.fee)}`);
@@ -63,6 +71,7 @@ export function changeMoneyNotes(change) {
   const notes = [];
   const collected = Number(change.duesCollected || 0) + Number(change.firstTermCollected || 0);
   if (collected > 0) notes.push(`${currency(collected)} collected`);
+  if (Number(change.duesCarried || 0) > 0) notes.push(`${currency(change.duesCarried)} kept as due`);
   if (Number(change.duesWaived || 0) > 0) notes.push(`${currency(change.duesWaived)} dues waived`);
   return notes;
 }
@@ -76,16 +85,18 @@ export function changedByLabel(change) {
 
 export function planChangesCsvRows(changes) {
   return [
-    ["Changed on", "Time", "Member", "Member ID", "Old plan", "New plan", "Starts", "Collected", "Waived", "Changed by", "Note"],
+    ["Changed on", "Time", "Member", "Member ID", "Type", "Old plan", "New plan", "Starts", "Collected", "Kept as due", "Waived", "Changed by", "Note"],
     ...changes.map((change) => [
       changeDateKey(change),
       changeTime(change),
       change.memberName,
       change.memberCode,
+      { upgrade: "Upgrade", downgrade: "Downgrade", restart: "Restart" }[changeDirection(change)] || "Change",
       `${planSummary(change.from)} · ${collectionTimingLabel(change.from.collectionTiming)}`,
       `${planSummary(change.to)} · ${collectionTimingLabel(change.to.collectionTiming)}`,
       displayDate(change.effectiveDate),
       String(Number(change.duesCollected || 0) + Number(change.firstTermCollected || 0)),
+      String(Number(change.duesCarried || 0)),
       String(Number(change.duesWaived || 0)),
       change.changedBy?.name || "",
       change.note || "",

@@ -292,7 +292,44 @@ async function ensureFeatureColumns() {
     );
   }
   await backfillPaymentTransactions();
+  // Membership lifecycle (Phase 3): each plan change records its type, the
+  // request id of the sheet that sent it (a retried submit returns the first
+  // change) and its old-plan dues term by term. Existing rows keep NULLs,
+  // apart from the one-time classification of their type.
+  if (!(await columnExists("member_plan_changes", "change_type"))) {
+    await tryRaw(
+      "ALTER TABLE member_plan_changes ADD COLUMN change_type ENUM('change', 'upgrade', 'downgrade', 'restart') NOT NULL DEFAULT 'change' AFTER first_term_collected",
+      "member_plan_changes.change_type",
+    );
+    if (await columnExists("member_plan_changes", "change_type")) await tryRaw(PLAN_CHANGE_TYPE_BACKFILL, "plan change type backfill");
+  }
+  if (!(await columnExists("member_plan_changes", "request_id"))) {
+    await tryRaw("ALTER TABLE member_plan_changes ADD COLUMN request_id CHAR(36) NULL DEFAULT NULL AFTER change_type", "member_plan_changes.request_id");
+  }
+  if (!(await columnExists("member_plan_changes", "dues_detail"))) {
+    await tryRaw("ALTER TABLE member_plan_changes ADD COLUMN dues_detail JSON NULL AFTER request_id", "member_plan_changes.dues_detail");
+  }
+  if (!(await indexExists("member_plan_changes", "uniq_plan_changes_request"))) {
+    await tryRaw(
+      "ALTER TABLE member_plan_changes ADD UNIQUE KEY uniq_plan_changes_request (tenant_id, request_id)",
+      "plan change request key",
+    );
+  }
 }
+
+// Upgrade / downgrade for changes logged before change_type existed, by the
+// same monthly-equivalent rule as classifyPlanChange() in utils/billing.js: a
+// package's fee over its months; a monthly fee per cycle, scaled to 30 days on
+// a custom-day cycle. Runs once, when the column is added.
+const monthlyEquivalentSql = (side) =>
+  `IF(c.${side}_membership_type = 'package', c.${side}_fee / GREATEST(c.${side}_package_months, 1),
+      IF(s.billing_cycle_mode = 'custom-days', c.${side}_fee * 30 / GREATEST(s.custom_billing_days, 1), c.${side}_fee))`;
+const PLAN_CHANGE_TYPE_BACKFILL = `UPDATE member_plan_changes c LEFT JOIN gym_settings s ON s.tenant_id = c.tenant_id
+  SET c.change_type = CASE
+    WHEN ROUND(${monthlyEquivalentSql("new")} * 100) > ROUND(${monthlyEquivalentSql("old")} * 100) THEN 'upgrade'
+    WHEN ROUND(${monthlyEquivalentSql("new")} * 100) < ROUND(${monthlyEquivalentSql("old")} * 100) THEN 'downgrade'
+    ELSE 'change' END
+  WHERE c.change_type = 'change'`;
 
 /**
  * Gives every membership payment recorded before transactions existed a

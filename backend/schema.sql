@@ -157,6 +157,15 @@ CREATE TABLE IF NOT EXISTS member_plan_changes (
   dues_waived DECIMAL(10,2) NOT NULL DEFAULT 0,
   -- First term of the new plan, when it was collected with the change.
   first_term_collected DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- By monthly-equivalent price, classified when saved ('restart' = the same
+  -- plan on a new cycle after a lapse).
+  change_type ENUM('change', 'upgrade', 'downgrade', 'restart') NOT NULL DEFAULT 'change',
+  -- Sent by the Change plan sheet; a retried submit returns the first change.
+  request_id CHAR(36) NULL DEFAULT NULL,
+  -- The old-plan terms behind the dues totals, one entry per term:
+  -- {"collected":[{period,fee,amount}],"waived":[{period,fee,balance}],"carried":[{period,fee,balance}]}.
+  -- "carried" terms stay owed as balance due. NULL on changes logged before Phase 3.
+  dues_detail JSON NULL,
   note VARCHAR(200) NOT NULL DEFAULT '',
   changed_by_id VARCHAR(64) NOT NULL DEFAULT '',
   changed_by_name VARCHAR(160) NOT NULL DEFAULT '',
@@ -164,6 +173,7 @@ CREATE TABLE IF NOT EXISTS member_plan_changes (
   changed_at VARCHAR(32) NOT NULL,
   INDEX idx_plan_changes_tenant_time (tenant_id, changed_at),
   INDEX idx_plan_changes_member (member_id, changed_at),
+  UNIQUE KEY uniq_plan_changes_request (tenant_id, request_id),
   CONSTRAINT fk_plan_changes_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
 

@@ -96,7 +96,10 @@ export default function MembersView() {
           overdue,
           paid,
           present: domain.isPresentToday(member),
-          hasDues: domain.getUnpaidPeriods(member).length > 0 || domain.getOpeningBalanceDue(member) > 0,
+          hasDues:
+            domain.getUnpaidPeriods(member).length > 0 ||
+            domain.getOpeningBalanceDue(member) > 0 ||
+            domain.getCarriedBalanceDue(member) > 0,
           // One status per member: owing an older period outranks paying this one.
           status: domain.getFeeStatus(member),
         };

@@ -71,14 +71,26 @@ export function paymentHistory(member) {
 
 /**
  * What a payment can go toward now, oldest first: the opening balance, then
- * each payable term with something left (a ₹0-fee term too, so it can be
- * marked done). Shaped like getPeriodDue(): { period, charge, paid, balance }.
+ * old-plan terms kept as balance due, then each payable term with something
+ * left (a ₹0-fee term too, so it can be marked done). `renewAhead` adds the
+ * one next term, last (same rules as outstandingDebts() on the server).
+ * Shaped like getPeriodDue(): { period, charge, paid, balance }.
  */
-export function outstandingDebts(domain, member) {
+export function outstandingDebts(domain, member, { renewAhead = false } = {}) {
   if (!member) return [];
   const opening = domain.getOpeningBalanceLine(member);
+  const kept = domain
+    .getCarriedDues(member)
+    .filter((due) => due.balance > 0)
+    .sort((a, b) => a.period.localeCompare(b.period));
   const terms = domain.getUnpaidPeriods(member).map((period) => domain.getPeriodDue(member, period));
-  return [...(opening ? [opening] : []), ...terms.filter((due) => due.balance > 0 || due.charge === 0)];
+  const ahead = renewAhead ? domain.getAdvanceTerm(member) : null;
+  return [
+    ...(opening ? [opening] : []),
+    ...kept,
+    ...terms.filter((due) => due.balance > 0 || due.charge === 0),
+    ...(ahead ? [ahead] : []),
+  ];
 }
 
 // The member as if one transaction had never been recorded (for a correction).
@@ -112,6 +124,15 @@ export function paymentProblem({ debts, draft, startDate, today = todayKey() }) 
     if (!(owed > 0)) return "Nothing is owed right now.";
     if (amount > owed) return `${currency(amount / 100)} is more than the ${currency(owed / 100)} owed.`;
     if (draft.method === "manual") {
+      const ahead = debts.find((debt) => debt.advance);
+      const due = (period) => toPaise(draft.manual[period] || 0);
+      if (
+        ahead &&
+        due(ahead.period) > 0 &&
+        debts.some((debt) => !debt.advance && !debt.carried && debt.period !== OPENING_PERIOD_KEY && toPaise(debt.balance) > due(debt.period))
+      ) {
+        return "Clear the terms already due before paying the next term ahead.";
+      }
       let allocated = 0;
       for (const debt of debts) {
         const lineText = draft.manual[debt.period];
@@ -164,6 +185,7 @@ export function paymentBody({ debts, draft, requestId }) {
     note: draft.note.trim(),
     allocation: draft.method === "manual" && owed > 0 ? "manual" : "fifo",
   };
+  if (debts.some((debt) => debt.advance)) body.renewAhead = true;
   if (requestId) body.requestId = requestId;
   if (body.allocation === "manual") {
     body.allocations = allocationLines({ debts, draft }).map((line) => ({ billingPeriod: line.period, amount: line.pay }));
@@ -179,9 +201,11 @@ export function paymentBody({ debts, draft, requestId }) {
 export function closedTermsProblem(member, tx) {
   const start = member?.planStartDate || member?.billingCutover || "";
   if (!start || !tx) return "";
+  // Old-plan terms kept as balance due are still billed: un-paying one leaves it owed.
+  const kept = new Set((member.carriedTerms || []).map((term) => term.period));
   const closed = tx.allocations.some((allocation) => {
     const period = allocation.billingPeriod;
-    if (period === OPENING_PERIOD_KEY) return false;
+    if (period === OPENING_PERIOD_KEY || kept.has(period)) return false;
     return period.length === 7 ? period < start.slice(0, 7) : period < start;
   });
   if (!closed) return "";

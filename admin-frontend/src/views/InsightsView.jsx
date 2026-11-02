@@ -58,6 +58,7 @@ const DIRECTION_COPY = {
   upgrade: { label: "Upgrade", icon: "trending_up" },
   downgrade: { label: "Downgrade", icon: "trending_down" },
   same: { label: "Changed", icon: "swap_horiz" },
+  restart: { label: "Restarted", icon: "restart_alt" },
 };
 
 /**
@@ -68,7 +69,7 @@ function PlanChangesPanel({ changes, state, periodLabel, members, openDetail }) 
   if (state === "loading" && !changes.length) return <p className="contact-empty">Loading plan changes…</p>;
   if (state === "error") return <p className="contact-empty">Could not load plan changes. Check your connection and try again.</p>;
 
-  const counts = { upgrade: 0, downgrade: 0, same: 0 };
+  const counts = { upgrade: 0, downgrade: 0, same: 0, restart: 0 };
   for (const change of changes) counts[changeDirection(change)] += 1;
 
   const days = [];

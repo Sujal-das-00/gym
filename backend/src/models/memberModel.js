@@ -15,11 +15,12 @@ async function hydrateMembers(rows) {
     const slice = rows.slice(i, i + CHUNK);
     const ids = slice.map((row) => row.id);
     const marks = placeholders(ids.length);
-    const [attendanceRows, paymentRows, expiredRows, transactionRows] = await Promise.all([
+    const [attendanceRows, paymentRows, expiredRows, transactionRows, duesRows] = await Promise.all([
       query(`SELECT member_id, attendance_date FROM attendance WHERE member_id IN (${marks}) ORDER BY attendance_date`, ids),
       query(`SELECT * FROM payments WHERE member_id IN (${marks}) ORDER BY payment_date, created_at`, ids),
       query(`SELECT member_id, checkin_date FROM checkins WHERE member_id IN (${marks}) AND expired = 1 ORDER BY checkin_date`, ids),
       query(`SELECT * FROM payment_transactions WHERE member_id IN (${marks}) ORDER BY collected_on, created_at`, ids),
+      query(`SELECT id, member_id, dues_detail FROM member_plan_changes WHERE member_id IN (${marks}) AND dues_detail IS NOT NULL`, ids),
     ]);
     const group = (list, map) => {
       const byMember = new Map();
@@ -45,6 +46,14 @@ async function hydrateMembers(rows) {
       allocationsByTransaction.get(row.transaction_id).push(mapPaymentRow(row));
     }
     const transactions = group(transactionRows, (row) => mapTransactionRow(row, allocationsByTransaction.get(row.id) || []));
+    // Old-plan terms plan changes kept as balance due: still owed, so billing needs them.
+    const carriedTerms = new Map();
+    for (const row of duesRows) {
+      for (const term of readDuesDetail(row.dues_detail).carried) {
+        if (!carriedTerms.has(row.member_id)) carriedTerms.set(row.member_id, []);
+        carriedTerms.get(row.member_id).push({ period: term.period, fee: term.fee, changeId: row.id });
+      }
+    }
     for (const row of slice) {
       out.push(
         normalizeMember({
@@ -71,6 +80,7 @@ async function hydrateMembers(rows) {
           expiredCheckins: expired.get(row.id) || [],
           payments: payments.get(row.id) || [],
           transactions: transactions.get(row.id) || [],
+          carriedTerms: carriedTerms.get(row.id) || [],
         }),
       );
     }
@@ -301,6 +311,20 @@ async function countMembers(gymId) {
   return Number(rows[0]?.count || 0);
 }
 
+// dues_detail as stored (mysql2 returns JSON columns parsed; be tolerant of text).
+function readDuesDetail(value) {
+  let detail = value;
+  if (typeof detail === "string") {
+    try {
+      detail = JSON.parse(detail);
+    } catch {
+      detail = null;
+    }
+  }
+  const list = (key) => (Array.isArray(detail?.[key]) ? detail[key].filter((term) => term && term.period) : []);
+  return { collected: list("collected"), waived: list("waived"), carried: list("carried") };
+}
+
 function mapPlanChangeRow(row) {
   return {
     id: row.id,
@@ -323,6 +347,11 @@ function mapPlanChangeRow(row) {
     duesCollected: Number(row.dues_collected || 0),
     duesWaived: Number(row.dues_waived || 0),
     firstTermCollected: Number(row.first_term_collected || 0),
+    changeType: row.change_type || "change",
+    // Term by term (changes logged before Phase 3 have none: only the totals above).
+    duesDetail: row.dues_detail === null || row.dues_detail === undefined ? null : readDuesDetail(row.dues_detail),
+    duesCarried:
+      Math.round(readDuesDetail(row.dues_detail).carried.reduce((sum, term) => sum + Number(term.balance || 0), 0) * 100) / 100,
     note: row.note || "",
     changedBy: { id: row.changed_by_id, name: row.changed_by_name, role: row.changed_by_role },
     changedAt: row.changed_at,
@@ -330,103 +359,112 @@ function mapPlanChangeRow(row) {
 }
 
 /**
- * Applies a plan change in one transaction: the member's new plan and billing
- * anchor, any payments taken with it, and the log entry. The member UPDATE is
- * conditional on the plan read before the change, so two people changing the
- * same plan at once can't both win — the second gets a 409.
+ * Writes a plan change on `conn`, inside the caller's withMemberLock
+ * transaction: the member's new plan and billing anchor, any payments taken
+ * with it (one transaction), and the log entry with its term-by-term dues.
+ * The member UPDATE is still conditional on the plan read before the change,
+ * so a stale sheet gets a 409 rather than overwriting a newer plan.
  */
-async function applyPlanChange(gymId, { member, previous, payments, change }) {
-  const connection = await getPool().getConnection();
-  try {
-    await connection.beginTransaction();
-    const [updated] = await connection.execute(
-      `UPDATE members SET membership_type = ?, package_months = ?, fee = ?, collection_timing = ?, plan_start_date = ?
-       WHERE tenant_id = ? AND id = ? AND archived_at IS NULL
-         AND membership_type = ? AND package_months = ? AND fee = ? AND collection_timing = ? AND plan_start_date <=> ?`,
-      [
-        member.membershipType,
-        member.packageMonths,
-        member.fee,
-        member.collectionTiming,
-        member.planStartDate,
-        gymId,
-        member.id,
-        previous.membershipType,
-        previous.packageMonths,
-        previous.fee,
-        previous.collectionTiming || "",
-        previous.planStartDate || null,
-      ],
-    );
-    if (!updated.affectedRows) {
-      const error = new Error("This plan was just changed on another device. Reload and try again.");
-      error.status = 409;
-      throw error;
-    }
-    // Everything collected with the change was taken in one go: one transaction.
-    if (payments.length) {
-      const date = toDateKey(payments[0].date || todayKey());
-      await insertTransaction(
-        connection,
-        gymId,
-        member.id,
-        {
-          amount: payments.reduce((sum, payment) => sum + Math.round(Number(payment.amount || 0) * 100), 0) / 100,
-          date,
-          dateKnown: true,
-          mode: payments[0].mode,
-          source: "plan_change",
-          enteredBy: change.changedBy,
-        },
-        payments.map((payment) => ({
-          billingPeriod: payment.billingPeriod,
-          billingMonth: String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
-          amount: Number(payment.amount || 0),
-          periodFee: Number(payment.periodFee ?? payment.amount ?? 0),
-        })),
-      );
-    }
-    await connection.execute(
-      `INSERT INTO member_plan_changes
-         (id, tenant_id, member_id, member_name, member_code,
-          old_membership_type, old_package_months, old_fee, old_collection_timing,
-          new_membership_type, new_package_months, new_fee, new_collection_timing,
-          effective_date, dues_collected, dues_waived, first_term_collected, note,
-          changed_by_id, changed_by_name, changed_by_role, changed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        change.id,
-        gymId,
-        member.id,
-        change.memberName,
-        change.memberCode,
-        change.from.membershipType,
-        change.from.packageMonths,
-        change.from.fee,
-        change.from.collectionTiming,
-        change.to.membershipType,
-        change.to.packageMonths,
-        change.to.fee,
-        change.to.collectionTiming,
-        change.effectiveDate,
-        change.duesCollected,
-        change.duesWaived,
-        change.firstTermCollected,
-        change.note,
-        change.changedBy.id,
-        change.changedBy.name,
-        change.changedBy.role,
-        change.changedAt,
-      ],
-    );
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback().catch(() => {});
+async function applyPlanChange(conn, gymId, { member, previous, payments, change }) {
+  const [updated] = await conn.execute(
+    `UPDATE members SET membership_type = ?, package_months = ?, fee = ?, collection_timing = ?, plan_start_date = ?
+     WHERE tenant_id = ? AND id = ? AND archived_at IS NULL
+       AND membership_type = ? AND package_months = ? AND fee = ? AND collection_timing = ? AND plan_start_date <=> ?`,
+    [
+      member.membershipType,
+      member.packageMonths,
+      member.fee,
+      member.collectionTiming,
+      member.planStartDate,
+      gymId,
+      member.id,
+      previous.membershipType,
+      previous.packageMonths,
+      previous.fee,
+      previous.collectionTiming || "",
+      previous.planStartDate || null,
+    ],
+  );
+  if (!updated.affectedRows) {
+    const error = new Error("This plan was just changed on another device. Reload and try again.");
+    error.status = 409;
     throw error;
-  } finally {
-    connection.release();
   }
+  // Everything collected with the change was taken in one go: one transaction.
+  if (payments.length) {
+    const date = toDateKey(payments[0].date || todayKey());
+    await insertTransaction(
+      conn,
+      gymId,
+      member.id,
+      {
+        amount: payments.reduce((sum, payment) => sum + Math.round(Number(payment.amount || 0) * 100), 0) / 100,
+        date,
+        dateKnown: true,
+        mode: payments[0].mode,
+        source: "plan_change",
+        enteredBy: change.changedBy,
+      },
+      payments.map((payment) => ({
+        billingPeriod: payment.billingPeriod,
+        billingMonth: String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
+        amount: Number(payment.amount || 0),
+        periodFee: Number(payment.periodFee ?? payment.amount ?? 0),
+      })),
+    );
+  }
+  await conn.execute(
+    `INSERT INTO member_plan_changes
+       (id, tenant_id, member_id, member_name, member_code,
+        old_membership_type, old_package_months, old_fee, old_collection_timing,
+        new_membership_type, new_package_months, new_fee, new_collection_timing,
+        effective_date, dues_collected, dues_waived, first_term_collected,
+        change_type, request_id, dues_detail, note,
+        changed_by_id, changed_by_name, changed_by_role, changed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      change.id,
+      gymId,
+      member.id,
+      change.memberName,
+      change.memberCode,
+      change.from.membershipType,
+      change.from.packageMonths,
+      change.from.fee,
+      change.from.collectionTiming,
+      change.to.membershipType,
+      change.to.packageMonths,
+      change.to.fee,
+      change.to.collectionTiming,
+      change.effectiveDate,
+      change.duesCollected,
+      change.duesWaived,
+      change.firstTermCollected,
+      change.changeType || "change",
+      change.requestId || null,
+      change.duesDetail ? JSON.stringify(change.duesDetail) : null,
+      change.note,
+      change.changedBy.id,
+      change.changedBy.name,
+      change.changedBy.role,
+      change.changedAt,
+    ],
+  );
   return change;
+}
+
+// The change a Change plan sheet already sent (same request id), if any.
+async function findPlanChangeByRequest(conn, gymId, requestId) {
+  const [rows] = await conn.execute("SELECT id, member_id FROM member_plan_changes WHERE tenant_id = ? AND request_id = ?", [
+    gymId,
+    requestId,
+  ]);
+  return rows[0] ? { id: rows[0].id, memberId: rows[0].member_id } : null;
+}
+
+async function getPlanChange(gymId, id) {
+  const rows = await query("SELECT * FROM member_plan_changes WHERE tenant_id = ? AND id = ?", [gymId, id]);
+  return rows[0] ? mapPlanChangeRow(rows[0]) : null;
 }
 
 // Newest first. Archived members' changes stay in the log on purpose.
@@ -454,6 +492,8 @@ module.exports = {
   deleteMember,
   duplicateMemberError,
   findMember,
+  findPlanChangeByRequest,
+  getPlanChange,
   findMemberByCredentials,
   getAllMembers,
   getMemberById,

@@ -16,6 +16,7 @@ export default function NextDueCard({ billing }) {
     amount,
     balanceDue = 0,
     openingBalanceDue = 0,
+    carriedBalanceDue = 0,
     cycleDays,
     daysLeft,
     daysOverdue,
@@ -62,6 +63,12 @@ export default function NextDueCard({ billing }) {
         {openingBalanceDue > 0 && (
           <span className="font-label-sm text-label-sm text-indigo-700 font-semibold mt-0.5">
             + {rupees(openingBalanceDue)} opening balance
+          </span>
+        )}
+        {/* Unpaid terms of an earlier plan, kept as a balance when the plan changed; never expires them. */}
+        {carriedBalanceDue > 0 && (
+          <span className="font-label-sm text-label-sm text-indigo-700 font-semibold mt-0.5">
+            + {rupees(carriedBalanceDue)} from your earlier plan
           </span>
         )}
       </div>

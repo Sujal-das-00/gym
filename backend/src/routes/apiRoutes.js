@@ -113,6 +113,7 @@ router.post("/members/:id/payments/:transactionId/correct", paymentOwner, asyncH
 router.post("/members/:id/payments/:transactionId/reverse", paymentOwner, asyncHandler(memberController.postPaymentReversal));
 router.get("/members/:id/payments/:transactionId/corrections", paymentOwner, asyncHandler(memberController.listPaymentCorrections));
 router.post("/members/:id/plan", asyncHandler(memberController.postPlanChange));
+router.get("/members/:id/membership-history", asyncHandler(memberController.getMembershipHistory));
 router.get("/plan-changes", asyncHandler(memberController.listPlanChanges));
 
 router.get("/trainers", asyncHandler(trainerController.listTrainers));

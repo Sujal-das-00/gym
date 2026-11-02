@@ -314,8 +314,35 @@ export function getPartPaidPeriods(settings, member) {
 }
 
 // Rupees left on part-paid periods.
-export function getBalanceDue(settings, member) {
+export function getPartPaidBalance(settings, member) {
   return getPartPaidPeriods(settings, member).reduce((sum, period) => sum + getPeriodDue(member, period).balance, 0);
+}
+
+/**
+ * Old-plan terms a plan change or restart kept as balance due (member.carriedTerms):
+ * still owed at their own fee and paid like any term, but like a part payment
+ * or an opening balance they never make the member overdue. Shaped like
+ * getPeriodDue(). Keep in sync with carriedDues() in backend/src/utils/billing.js.
+ */
+export function getCarriedDues(member) {
+  const ledger = getPeriodLedger(member);
+  return (member?.carriedTerms || []).map((term) => {
+    const entry = ledger.get(term.period);
+    const charge = entry && !entry.legacy ? entry.charge : Number(term.fee || 0);
+    const paid = entry ? entry.paid : 0;
+    const balance = entry?.settled ? 0 : Math.max(0, Math.round((charge - paid) * 100) / 100);
+    return { period: term.period, charge, paid, balance, carried: true };
+  });
+}
+
+export function getCarriedBalanceDue(member) {
+  return Math.round(getCarriedDues(member).reduce((sum, due) => sum + due.balance, 0) * 100) / 100;
+}
+
+// Rupees owed as balances: left on part-paid periods plus old-plan terms kept
+// as balance due. Neither makes the member overdue.
+export function getBalanceDue(settings, member) {
+  return getPartPaidBalance(settings, member) + getCarriedBalanceDue(member);
 }
 
 export function periodStartDate(periodKey) {
@@ -364,7 +391,9 @@ export function getDueDate(settings, member) {
   }
   // at-join: payment is due at the start of each period.
   if (unpaid.length) return periodStartDate(unpaid[0]);
-  return nextPeriodStartDate(settings, member);
+  // The next term already paid ahead: due when that one ends.
+  const ahead = getPaidAheadEndKey(settings, member);
+  return ahead ? parseDateKey(ahead) : nextPeriodStartDate(settings, member);
 }
 
 export function getDueDateKey(settings, member) {
@@ -400,35 +429,150 @@ export function isPlanChangeAhead(member) {
   return Boolean(member?.planStartDate && member.planStartDate > todayKey());
 }
 
-/* ---- Plan changes ------------------------------------------------------- */
-// Same rules as backend/src/services/planChangeService.js — the dialog shows
-// what the server will enforce.
+/* ---- Membership lifecycle (Phase 3) -------------------------------------
+ * Renewals, plan changes and restarts on the member's own term grid. Same
+ * rules as backend/src/utils/billing.js: the sheets show what the server
+ * will enforce, and the parity tests run both copies.
+ * ------------------------------------------------------------------------- */
 
-const periodStartKey = (period) => (String(period).length === 7 ? period + "-01" : String(period));
-
-/**
- * Unpaid periods of the current plan that start before `effectiveDate`. Billing
- * restarts from that date, so the change must collect or waive these.
- */
-export function unsettledBeforeChange(settings, member, effectiveDate) {
-  const paid = getPaidPeriodSet(member);
-  return getBillingPeriodKeys(settings, member).filter(
-    (period) => periodStartKey(period) < effectiveDate && !paid.has(period),
-  );
+// "2026-10" (a calendar-month term) → "2026-10-01"; dated keys pass through.
+export function termStartKey(period) {
+  const key = String(period || "");
+  return key.length === 7 ? key + "-01" : key;
 }
 
-// The latest date a new plan may start: the current period's renewal (or today).
-export function latestPlanChangeDate(settings, member) {
-  const renewal = localDateKey(nextPeriodStartDate(settings, member));
-  const today = todayKey();
-  return renewal > today ? renewal : today;
+// The key of the term starting on `dateKey` on this plan's schedule.
+export function termKeyFor(settings, plan, dateKey) {
+  const dated = getMembershipType(plan) === "package" || getBillingCycleMode(settings) !== "month-start";
+  return dated ? String(dateKey) : String(dateKey).slice(0, 7);
 }
 
 // The key the new plan's first period will have (see getBillingPeriodKeys).
 export function firstPlanPeriodKey(settings, plan, effectiveDate) {
-  if (plan.membershipType !== "package" && getBillingCycleMode(settings) === "month-start") return effectiveDate.slice(0, 7);
-  return effectiveDate;
+  return termKeyFor(settings, plan, effectiveDate);
 }
+
+// The term after the one running now (the first one, while billing starts later).
+export function nextTermKey(settings, member) {
+  if (!billingStartKey(member)) return "";
+  return termKeyFor(settings, member, localDateKey(nextPeriodStartDate(settings, member)));
+}
+
+/**
+ * The one term that may be paid ahead: the next term, for a member who pays
+ * upfront, unless it is already paid. Never further ahead; its dates are the
+ * grid's own, so renewing early never moves the cycle. Shaped like getPeriodDue().
+ */
+export function getAdvanceTerm(settings, member) {
+  if (getCollectionTiming(settings, member) === "fixed-day") return null;
+  const period = nextTermKey(settings, member);
+  if (!period) return null;
+  const entry = getPeriodLedger(member).get(period);
+  if (entry?.settled) return null;
+  const due = getPeriodDue(member, period);
+  return { ...due, advance: true };
+}
+
+// The day after the last paid day, when the next term is already paid ahead; "" otherwise.
+export function getPaidAheadEndKey(settings, member) {
+  const period = nextTermKey(settings, member);
+  const entry = period ? getPeriodLedger(member).get(period) : null;
+  return entry?.settled ? localDateKey(periodEndDate(settings, member, period)) : "";
+}
+
+/**
+ * One month of a plan, so plans of different lengths compare fairly: a
+ * package's fee over its months; a monthly fee is per cycle, scaled to 30
+ * days on a custom-day cycle.
+ */
+export function monthlyEquivalent(settings, plan) {
+  const fee = Number(plan?.fee || 0);
+  if (getMembershipType(plan) === "package") return fee / getPackageMonths(plan);
+  if (getBillingCycleMode(settings) === "custom-days") return (fee * 30) / getBillingCycleDays(settings);
+  return fee;
+}
+
+// "upgrade" | "downgrade" | "change" (same monthly price), compared to the paisa.
+export function classifyPlanChange(settings, from, to) {
+  const before = Math.round(monthlyEquivalent(settings, from) * 100);
+  const after = Math.round(monthlyEquivalent(settings, to) * 100);
+  if (after > before) return "upgrade";
+  if (after < before) return "downgrade";
+  return "change";
+}
+
+/**
+ * When a plan change may take effect: from the start of the current term
+ * (never before the current plan began) to the next renewal (after a term
+ * paid ahead) or today; paidStart is the newest current-plan term with money
+ * on it, which the new plan's first term must start after.
+ */
+export function planChangeWindow(settings, member) {
+  const today = todayKey();
+  const periods = getBillingPeriodKeys(settings, member);
+  const current = periods[periods.length - 1] || "";
+  const planStart = billingStartKey(member);
+  const segmentStart = termStartKey(termKeyFor(settings, member, planStart));
+  let paid = "";
+  for (const period of getPeriodLedger(member).keys()) {
+    const start = termStartKey(period);
+    if (start >= segmentStart && start > termStartKey(paid)) paid = period;
+  }
+  const last = [current, paid].filter(Boolean).sort((a, b) => termStartKey(a).localeCompare(termStartKey(b))).pop();
+  const renewal = last ? localDateKey(periodEndDate(settings, member, last)) : planStart;
+  const currentStart = current ? termStartKey(current) : planStart;
+  return {
+    earliest: currentStart > planStart ? currentStart : planStart,
+    latest: renewal > today ? renewal : today,
+    paidStart: paid ? termStartKey(paid) : "",
+  };
+}
+
+// The latest date a new plan may start: the next renewal (or today).
+export function latestPlanChangeDate(settings, member) {
+  return planChangeWindow(settings, member).latest;
+}
+
+/** Why a plan change (or restart) can't start on `effectiveDate`, or "". */
+export function planChangeProblem(settings, member, { plan, effectiveDate, restart = false }) {
+  const window = planChangeWindow(settings, member);
+  const latest = restart ? todayKey() : window.latest;
+  if (effectiveDate < window.earliest) {
+    return `The new plan can't start before the current term (${displayDate(window.earliest)}). Earlier terms keep the plan they were billed on.`;
+  }
+  if (effectiveDate > latest) {
+    return restart ? "A restart can't be dated in the future." : `The new plan must start by the next renewal (${displayDate(latest)}).`;
+  }
+  if (!restart && classifyPlanChange(settings, { ...member, collectionTiming: getCollectionTiming(settings, member) }, plan) === "downgrade" && effectiveDate !== window.latest) {
+    return `A downgrade starts at the next renewal (${displayDate(window.latest)}), once the term already running has ended.`;
+  }
+  const first = termStartKey(termKeyFor(settings, restart ? member : plan, effectiveDate));
+  if (window.paidStart && first <= window.paidStart) {
+    return `The term from ${displayDate(window.paidStart)} is already paid on the current plan and can't move to a new one. Start after it, at the latest on ${displayDate(window.latest)}.`;
+  }
+  return "";
+}
+
+/**
+ * Unpaid periods of the current plan that start before `effectiveDate`.
+ * Billing restarts from that date, so the change must collect, waive or keep
+ * these. The new plan's own first term (firstKey) is never one of them.
+ */
+export function unsettledBeforeChange(settings, member, effectiveDate, firstKey = "") {
+  const paid = getPaidPeriodSet(member);
+  return getBillingPeriodKeys(settings, member).filter(
+    (period) => termStartKey(period) < effectiveDate && !paid.has(period) && period !== firstKey,
+  );
+}
+
+// "scheduled" (joining date ahead), "expired" (renewal lapsed) or "active".
+// Balances (part payments, opening balance, kept terms) don't count.
+export function getMembershipStatus(settings, member) {
+  if (String(member?.startDate || "") > todayKey()) return "scheduled";
+  return isOverdue(settings, member) ? "expired" : "active";
+}
+
+export const MEMBERSHIP_STATUS_LABELS = { active: "Active", expired: "Expired", scheduled: "Scheduled" };
 
 export function planLabel(plan) {
   return plan.membershipType === "package" ? `${getPackageMonths(plan)}-month package` : "Monthly";
@@ -593,6 +737,17 @@ export function createDomain(settings) {
     getPartPaymentNotes,
     getPartPaidPeriods: perMember(getPartPaidPeriods),
     getBalanceDue: perMember(getBalanceDue),
+    getPartPaidBalance: perMember(getPartPaidBalance),
+    getCarriedDues: perMember((unused, member) => getCarriedDues(member)),
+    getCarriedBalanceDue: perMember((unused, member) => getCarriedBalanceDue(member)),
+    getAdvanceTerm: perMember(getAdvanceTerm),
+    getPaidAheadEndKey: perMember(getPaidAheadEndKey),
+    nextTermKey: perMember(nextTermKey),
+    getMembershipStatus: perMember(getMembershipStatus),
+    planChangeWindow: perMember(planChangeWindow),
+    planChangeProblem: (member, options) => planChangeProblem(settings, member, options),
+    classifyPlanChange: (from, to) => classifyPlanChange(settings, from, to),
+    monthlyEquivalent: (plan) => monthlyEquivalent(settings, plan),
     getOutstandingAmount: perMember(getOutstandingAmount),
     getFeeStatus: perMember(getFeeStatus),
     getBillablePeriodKeys: perMember(getBillablePeriodKeys),
