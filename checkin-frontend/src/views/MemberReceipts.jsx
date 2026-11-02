@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon.jsx";
-import { displayDate } from "../lib/format.js";
 import { rupees } from "../lib/memberStats.js";
-import { downloadInvoice, partPaymentNotes, paymentMode, paymentTitle } from "../lib/receipt.js";
+import { downloadInvoice, partPaymentNotes, paymentDateText, paymentMode, paymentTitle } from "../lib/receipt.js";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -104,7 +103,7 @@ export default function MemberReceipts({ gymName, member }) {
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                     <span className="font-body-sm text-body-sm text-on-surface-variant whitespace-nowrap">
-                      Paid {displayDate(payment.date)}
+                      {payment.dateKnown === false ? paymentDateText(payment) : `Paid ${paymentDateText(payment)}`}
                     </span>
                     {paymentMode(payment) && (
                       <>

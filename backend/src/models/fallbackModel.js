@@ -54,6 +54,36 @@ function saveMember(gymId, member) {
   return publicMember(normalized);
 }
 
+// Mirrors memberModel.createMemberWithHistory; everything lands in one persist().
+function createMemberWithHistory(gymId, member, payments) {
+  const rows = store.getState().members;
+  if (rows.some((item) => item.gymId === member.gymId || normalizePhone(item.phone) === member.phone)) {
+    const error = new Error("Member with this Gym ID or phone already exists");
+    error.status = 409;
+    throw error;
+  }
+  const normalized = normalizeMember({
+    ...member,
+    onboardingType: "existing",
+    planStartDate: "",
+    payments: payments.map((payment) => ({
+      id: crypto.randomUUID(),
+      date: payment.date,
+      month: payment.date.slice(0, 7),
+      billingMonth: payment.billingMonth || "",
+      billingPeriod: payment.billingPeriod,
+      amount: payment.amount,
+      periodFee: payment.kind === "admission" ? null : payment.periodFee,
+      kind: payment.kind === "admission" ? "admission" : "membership",
+      mode: normalizePaymentMode(payment.mode),
+      dateKnown: Boolean(payment.dateKnown),
+    })),
+  });
+  rows.push(normalized);
+  store.persist();
+  return publicMember(normalized);
+}
+
 // Mirrors memberModel.moveMemberStartDate; everything lands in one persist().
 function moveMemberStartDate(gymId, memberId, startDate, moves) {
   const target = store.getState().members.find((item) => item.id === memberId);
@@ -64,6 +94,8 @@ function moveMemberStartDate(gymId, memberId, startDate, moves) {
     if (!period) continue;
     payment.billingPeriod = period;
     payment.month = period.slice(0, 7);
+    // An unrecorded collection date is filed under the term start, so it moves too.
+    if (payment.dateKnown === false) payment.date = period;
   }
   store.persist();
 }
@@ -182,8 +214,17 @@ function addPayments(member, payments = []) {
 function syncAdmissionPayment(member) {
   const target = store.getState().members.find((item) => item.id === member.id);
   if (!target) return;
-  target.payments = (target.payments || []).filter((payment) => payment.kind !== "admission");
   const amount = Number(member.admissionFee || 0);
+  // Mirrors paymentModel.syncRecordedAdmission: an existing member's admission
+  // row keeps the date it was really collected on (or "not recorded").
+  const recorded = (target.payments || []).find((payment) => payment.kind === "admission");
+  if (member.onboardingType === "existing" && recorded && amount > 0) {
+    recorded.amount = amount;
+    recorded.mode = normalizePaymentMode(member.admissionMode) || recorded.mode;
+    store.persist();
+    return;
+  }
+  target.payments = (target.payments || []).filter((payment) => payment.kind !== "admission");
   if (amount > 0) {
     const date = toDateKey(member.startDate || todayKey());
     target.payments.push({
@@ -195,6 +236,8 @@ function syncAdmissionPayment(member) {
       amount,
       kind: "admission",
       mode: normalizePaymentMode(member.admissionMode),
+      // An existing member's fee added after onboarding has no known date.
+      dateKnown: member.onboardingType !== "existing",
     });
   }
   store.persist();
@@ -344,6 +387,7 @@ module.exports = {
   applyPlanChange,
   attendanceStatusRows,
   createCheckin,
+  createMemberWithHistory,
   deleteExpense,
   clearTrainerFromMembers,
   deleteMember,

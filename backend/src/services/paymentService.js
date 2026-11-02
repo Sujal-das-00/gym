@@ -1,5 +1,5 @@
 const { normalizePaymentMode } = require("../utils/member");
-const { getPeriodLedger, paymentPeriodKey } = require("../utils/billing");
+const { OPENING_PERIOD_KEY, getPeriodLedger, openingBalanceDue, paymentPeriodKey } = require("../utils/billing");
 const { createHttpError } = require("../utils/http");
 
 const rupees = (amount) => `₹${Number(amount || 0).toLocaleString("en-IN")}`;
@@ -12,6 +12,8 @@ const roundRupees = (amount) => Math.round(Number(amount) * 100) / 100;
  *
  * A payment without an amount pays whatever is left on its period. Several
  * rows for the same period in one request are checked against each other.
+ * An existing member's opening balance is paid the same way, with the
+ * "opening-balance" key and whatever is left of that balance as its charge.
  */
 function preparePeriodPayments(member, payments) {
   if (!payments.length) throw createHttpError(400, "Choose what this payment is for.");
@@ -21,16 +23,22 @@ function preparePeriodPayments(member, payments) {
     if (payment?.kind === "admission") throw createHttpError(400, "The admission fee is set on the member's profile.");
     const period = String(paymentPeriodKey(payment || {}) || "");
     if (!period) throw createHttpError(400, "Choose what this payment is for.");
-    const entry = ledger.get(period);
+    const opening = period === OPENING_PERIOD_KEY;
+    if (opening && !left.has(period) && !(openingBalanceDue(member) > 0)) {
+      throw createHttpError(409, "The opening balance is already cleared. Reload to see the latest.");
+    }
+    const entry = opening ? null : ledger.get(period);
     if (entry?.settled) throw createHttpError(409, `${period} is already paid in full. Reload to see the latest.`);
 
-    const charge = entry ? entry.charge : Number(member.fee || 0);
-    const remaining = left.has(period) ? left.get(period) : roundRupees(charge - (entry?.paid || 0));
+    const charge = opening ? Number(member.openingBalance || 0) : entry ? entry.charge : Number(member.fee || 0);
+    const owed = opening ? openingBalanceDue(member) : roundRupees(charge - (entry?.paid || 0));
+    const remaining = left.has(period) ? left.get(period) : owed;
     const amount = payment.amount === undefined || payment.amount === null || payment.amount === "" ? remaining : roundRupees(payment.amount);
     if (!Number.isFinite(amount) || amount < 0) throw createHttpError(400, "Enter the amount received.");
     if (amount === 0 && remaining > 0) throw createHttpError(400, "Enter the amount received.");
     if (amount > remaining) {
-      throw createHttpError(400, `${rupees(amount)} is more than the ${rupees(remaining)} left on ${period}.`);
+      const what = opening ? "the opening balance" : period;
+      throw createHttpError(400, `${rupees(amount)} is more than the ${rupees(remaining)} left on ${what}.`);
     }
     left.set(period, roundRupees(remaining - amount));
 
@@ -38,6 +46,7 @@ function preparePeriodPayments(member, payments) {
       ...payment,
       kind: "membership",
       billingPeriod: period,
+      billingMonth: opening ? "" : payment.billingMonth,
       amount,
       periodFee: charge,
       mode: normalizePaymentMode(payment.mode) || "cash",

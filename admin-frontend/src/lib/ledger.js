@@ -7,6 +7,7 @@
  * and by category. Both the Expense Tracker and the Insights screen read from
  * here so their totals can never disagree.
  * ------------------------------------------------------------------------- */
+import { DATE_NOT_RECORDED } from "./billing.js";
 import { toDateKey } from "./dates.js";
 
 /**
@@ -29,7 +30,14 @@ export function buildLedgerEntries({ members = [], expenses = [], domain }) {
         amount: Number(payment.amount || 0),
         title: member.name,
         category: domain.isAdmissionPayment(payment) ? "admission-fee" : "membership-fee",
-        detail: [domain.getPaymentLabel(payment, member), ...domain.getPartPaymentNotes(member, payment)].join(" · "),
+        detail: [
+          domain.getPaymentLabel(payment, member),
+          ...domain.getPartPaymentNotes(member, payment),
+          // Counted on its term's start date, which is not when it was collected.
+          payment.dateKnown === false ? DATE_NOT_RECORDED : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
         mode: payment.mode || "",
       });
     });

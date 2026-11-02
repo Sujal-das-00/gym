@@ -3600,6 +3600,7 @@ dialog.sheet[open] { animation: sheetPop 220ms ease; }
 .member-stats > div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
 .member-stats dt { color: var(--muted); font-size: 0.74rem; font-weight: 700; }
 .member-stats dd { margin: 4px 0 0; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.member-stats dd small { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 600; }
 .member-stats .is-due dd { color: var(--red); }
 .member-stats .is-balance dd { color: var(--blue); }
 
@@ -4305,4 +4306,78 @@ dialog.qr-present { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 
 @keyframes menuTourIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
 @media (prefers-reduced-motion: reduce) {
   .menu-tour-spot, .menu-tour-tip { transition: none; animation: none; }
+}
+
+/* ---- Add member: new vs existing, and an existing member's past payments ---- */
+.sheet-back {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
+}
+.sheet-back .material-symbols-outlined { font-size: 20px; vertical-align: 0; }
+
+.member-kind { display: grid; gap: 10px; }
+.member-kind-option {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.member-kind-option:hover { border-color: var(--green); background: var(--green-soft); }
+.member-kind-option:active { transform: scale(0.99); }
+.member-kind-option:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.member-kind-option > .material-symbols-outlined:first-child {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 22px;
+}
+.member-kind-option span { display: grid; gap: 2px; min-width: 0; }
+.member-kind-option strong { font-size: 0.94rem; }
+.member-kind-option small { color: var(--muted); font-size: 0.78rem; font-weight: 600; line-height: 1.35; }
+.member-kind-go { color: var(--muted); font-size: 20px; }
+
+.history-bulk { display: flex; flex-wrap: wrap; gap: 8px; }
+.history-terms { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.history-term { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.history-term.is-paid { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.history-term.is-unpaid { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+.history-term-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.history-term-head strong { font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.history-term-head .segmented { min-width: 180px; }
+.history-term-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.history-term-body .history-full { grid-column: 1 / -1; }
+.history-term-body select,
+.history-term-body input[type="date"] { min-height: 44px; }
+.history-paid-on { gap: 4px; }
+.history-paid-on input:disabled { opacity: 0.5; }
+.history-unknown { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.74rem; font-weight: 700; cursor: pointer; }
+.history-unknown input { width: 16px; height: 16px; margin: 0; accent-color: var(--green-dark); }
+.history-owed { color: var(--red); }
+.history-warning { margin: 0; }
+.field-hint.wide { grid-column: 1 / -1; }
+@media (max-width: 480px) {
+  .history-term-body { grid-template-columns: minmax(0, 1fr); }
+  .history-term-head .segmented { min-width: 0; width: 100%; }
 }

@@ -1,5 +1,5 @@
 const { createHttpError } = require("../utils/http");
-const { balanceDue, dueUnpaidPeriods, memberOutstanding } = require("../utils/billing");
+const { balanceDue, dueUnpaidPeriods, memberOutstanding, openingBalanceDue } = require("../utils/billing");
 const { repo } = require("../models");
 const gymModel = require("../models/gymModel");
 const { pushAvailable, pushDisabledReason, sendToSubscriptions } = require("./pushService");
@@ -92,10 +92,10 @@ function membersWithPendingFees(members, settings) {
       member,
       outstanding: memberOutstanding(member, settings),
       unpaidPeriods: dueUnpaidPeriods(member, settings).length,
-      balance: balanceDue(member, settings),
+      balance: balanceDue(member, settings) + openingBalanceDue(member),
     }))
-    // A balance left from a part payment is owed too, even though it doesn't
-    // make the member overdue.
+    // A balance left from a part payment or an opening balance is owed too,
+    // even though it doesn't make the member overdue.
     .filter((entry) => entry.unpaidPeriods > 0 || entry.balance > 0)
     .sort((a, b) => b.outstanding - a.outstanding || b.unpaidPeriods - a.unpaidPeriods);
 }
@@ -179,10 +179,26 @@ async function feeReminderPreview(gymId) {
  * to every device that member has registered. Members with no subscription are
  * skipped rather than counted as failures — there is nothing to attempt for them.
  */
-async function sendFeeReminders(gymId) {
+// Existing members entered into GymBoo get this long to have their history
+// checked before the daily automatic reminder starts quoting it back to them.
+const NEW_EXISTING_MEMBER_HOLD_MS = 3 * 24 * 60 * 60 * 1000;
+
+function inExistingMemberHold(member, now = Date.now()) {
+  if (member.onboardingType !== "existing") return false;
+  const registered = Date.parse(member.createdAt);
+  return Number.isFinite(registered) && now - registered < NEW_EXISTING_MEMBER_HOLD_MS;
+}
+
+// Who a fee reminder goes to. `scheduled` is set only by the daily automatic
+// run; an admin sending reminders by hand reaches everyone with dues at once.
+function feeReminderRecipients(members, settings, { scheduled = false, now = Date.now() } = {}) {
+  return membersWithPendingFees(members, settings).filter((entry) => !scheduled || !inExistingMemberHold(entry.member, now));
+}
+
+async function sendFeeReminders(gymId, { scheduled = false } = {}) {
   assertPushAvailable();
   const { gym, settings, members } = await gymContext(gymId);
-  const pending = membersWithPendingFees(members, settings);
+  const pending = feeReminderRecipients(members, settings, { scheduled });
 
   const subscriptions = await repo().listPushSubscriptionsForMembers(
     gymId,
@@ -292,5 +308,7 @@ module.exports = {
   membersWithPendingFees,
   safeClickUrl,
   sendCustomNotification,
+  feeReminderRecipients,
+  inExistingMemberHold,
   sendFeeReminders,
 };

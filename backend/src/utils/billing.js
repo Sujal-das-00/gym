@@ -53,10 +53,11 @@ function collectionTiming(member, settings) {
 }
 
 // Where billing periods count from: the start of the current plan when it has
-// been changed (planStartDate), otherwise the joining date. Mirrors
-// billingStartKey() in admin-frontend/src/lib/billing.js.
+// been changed (planStartDate), else the first term after an opening balance
+// (billingCutover: every term before it is covered by that balance), else the
+// joining date. Mirrors billingStartKey() in admin-frontend/src/lib/billing.js.
 function billingStartKey(member) {
-  return member?.planStartDate || member?.startDate || "";
+  return member?.planStartDate || member?.billingCutover || member?.startDate || "";
 }
 
 function getBillingPeriodKeys(member, settings) {
@@ -129,7 +130,7 @@ function* datedPeriodKeys(member, settings) {
 function shiftedPaymentPeriods(previous, next, settings) {
   const moves = new Map();
   if (!isDateKeyedSchedule(next, settings) || billingStartKey(previous) === billingStartKey(next)) return moves;
-  const payments = (previous?.payments || []).filter((payment) => !isAdmissionPayment(payment));
+  const payments = (previous?.payments || []).filter((payment) => !isAdmissionPayment(payment) && !isOpeningBalancePayment(payment));
   const keys = payments.map(paymentPeriodKey).filter((key) => String(key || "").length === 10);
   if (!keys.length) return moves;
   const latest = keys.reduce((max, key) => (key > max ? key : max));
@@ -155,6 +156,27 @@ function isAdmissionPayment(payment) {
   return payment?.kind === "admission" || payment?.billingPeriod === ADMISSION_PERIOD_KEY;
 }
 
+// Payments toward an existing member's opening balance carry this literal as
+// their billing period. Like admission, it is never a real period key, so they
+// can't mark a term paid; they only reduce openingBalanceDue().
+const OPENING_PERIOD_KEY = "opening-balance";
+
+function isOpeningBalancePayment(payment) {
+  return payment?.billingPeriod === OPENING_PERIOD_KEY;
+}
+
+// What is still owed on the opening balance (0 for every member without one).
+// Kept apart from overdue terms: it never expires the membership or blocks
+// check-in. Mirrors getOpeningBalanceDue() in admin-frontend/src/lib/billing.js.
+function openingBalanceDue(member) {
+  const owed = Number(member?.openingBalance || 0);
+  if (!(owed > 0)) return 0;
+  const paid = (member?.payments || [])
+    .filter(isOpeningBalancePayment)
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  return Math.max(0, Math.round((owed - paid) * 100) / 100);
+}
+
 function paymentPeriodKey(payment) {
   return payment.billingPeriod || payment.billingMonth || payment.month;
 }
@@ -171,7 +193,7 @@ function paymentPeriodKey(payment) {
 function getPeriodLedger(member) {
   const ledger = new Map();
   for (const payment of member?.payments || []) {
-    if (isAdmissionPayment(payment)) continue;
+    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) continue;
     const period = paymentPeriodKey(payment);
     if (!period) continue;
     const entry = ledger.get(period) || { paid: 0, charge: null, legacy: false };
@@ -263,11 +285,15 @@ function isMembershipExpired(member, settings) {
 }
 
 // Rupees the member owes today: one fee per already-due unpaid period, plus
-// what is left on part-paid periods. The one-off admission charge is
-// deliberately excluded, matching the "Outstanding" amount the admin panel
-// shows (getOutstandingAmount).
+// what is left on part-paid periods and on an opening balance. The one-off
+// admission charge is deliberately excluded, matching the "Outstanding" amount
+// the admin panel shows (getOutstandingAmount).
 function memberOutstanding(member, settings) {
-  return dueUnpaidPeriods(member, settings).length * Number(member?.fee || 0) + balanceDue(member, settings);
+  return (
+    dueUnpaidPeriods(member, settings).length * Number(member?.fee || 0) +
+    balanceDue(member, settings) +
+    openingBalanceDue(member)
+  );
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -322,11 +348,14 @@ function memberBillingSummary(member, settings) {
   const start = periodStartDate(current);
   const currentEnd = current ? periodEndDate(member, settings, current) : new Date(NaN);
 
-  // A plan change set to start at the next renewal leaves no period of the new
-  // plan yet: the old plan's paid term is still running until then (the change
-  // is refused while that term is unpaid), so count down to the new plan's start.
-  if (!current && member?.planStartDate && member.planStartDate > todayKey()) {
-    const due = periodDueDate(member, settings, member.planStartDate);
+  const opening = openingBalanceDue(member);
+
+  // Billing that starts later leaves no period yet: a plan change set for the
+  // next renewal (the old plan's paid term runs until then, and the change is
+  // refused while that term is unpaid), or an opening balance covering every
+  // term up to its cut-over. Count down to that start.
+  if (!current && billingStartKey(member) > todayKey()) {
+    const due = periodDueDate(member, settings, billingStartKey(member));
     const left = Math.max(0, daysBetween(today, due));
     return {
       amount: Number(member?.fee || 0),
@@ -337,6 +366,7 @@ function memberBillingSummary(member, settings) {
       cycleDays: Math.max(1, left),
       unpaidPeriods: 0,
       balanceDue: balance,
+      openingBalanceDue: opening,
       expired: false,
     };
   }
@@ -365,12 +395,15 @@ function memberBillingSummary(member, settings) {
     unpaidPeriods: unpaid.length,
     // Left over from part payments, collected with the next payment.
     balanceDue: balance,
+    // Owed from before the member was entered into GymBoo; never expires them.
+    openingBalanceDue: opening,
     expired,
   };
 }
 
 module.exports = {
   ADMISSION_PERIOD_KEY,
+  OPENING_PERIOD_KEY,
   balanceDue,
   billingStartKey,
   collectionTiming,
@@ -380,9 +413,11 @@ module.exports = {
   getPeriodLedger,
   isAdmissionPayment,
   isMembershipExpired,
+  isOpeningBalancePayment,
   memberBillingSummary,
   memberOutstanding,
   nextPeriodStartKey,
+  openingBalanceDue,
   partPaidPeriods,
   paymentPeriodKey,
   periodBalance,

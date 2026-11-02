@@ -335,13 +335,16 @@ export function AppProvider({ children }) {
   const saveMember = useCallback(
     async (payload) => {
       const wasEditing = Boolean(payload.id);
-      const saved = await saveMemberRecord(payload);
+      // An existing member can come back with warnings (a long history): they
+      // are shown once, not kept on the member.
+      const { warnings = [], ...saved } = await saveMemberRecord(payload);
       setMembers((rows) => (wasEditing ? rows.map((m) => (m.id === saved.id ? saved : m)) : [...rows, saved]));
       if (!wasEditing) {
         setSelectedHistoryMemberId((id) => id || saved.id);
         setSelectedPaymentMemberId((id) => id || saved.id);
       }
-      showToast(wasEditing ? "Member updated" : "Member added");
+      const added = payload.onboarding ? "Existing member added" : "Member added";
+      showToast(wasEditing ? "Member updated" : [added, ...warnings].join(" · "));
       return saved;
     },
     [saveMemberRecord, showToast],
@@ -401,7 +404,9 @@ export function AppProvider({ children }) {
       // A balance left from a part payment is collected with the next payment,
       // so it comes pre-selected alongside the current period.
       const balances = currentDomain.getPartPaidPeriods(member);
-      selectedPeriods = [...new Set([...balances, ...selectedPeriods])].sort();
+      // So is what is left of an existing member's opening balance.
+      const opening = currentDomain.getOpeningBalanceLine(member);
+      selectedPeriods = [...new Set([...(opening ? [opening.period] : []), ...balances, ...selectedPeriods])].sort();
       setFeeDialog({ open: true, memberId: member.id, selectedPeriods });
     },
     [],

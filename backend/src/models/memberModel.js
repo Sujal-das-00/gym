@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { exec, getPool, query } = require("../config/database");
 const { toDateKey, todayKey } = require("../utils/date");
-const { normalizeMember, normalizePhone } = require("../utils/member");
+const { normalizeMember, normalizePaymentMode, normalizePhone } = require("../utils/member");
 const { mapPaymentRow } = require("./paymentModel");
 
 const CHUNK = 500;
@@ -46,6 +46,10 @@ async function hydrateMembers(rows) {
           collectionTiming: row.collection_timing,
           startDate: row.start_date,
           planStartDate: row.plan_start_date || "",
+          onboardingType: row.onboarding_type,
+          openingBalance: row.opening_balance,
+          openingBalanceAdmission: row.opening_balance_admission,
+          billingCutover: row.billing_cutover || "",
           photo: row.photo,
           trainerId: row.trainer_id || "",
           createdAt: row.created_at,
@@ -110,6 +114,71 @@ async function saveMember(gymId, member) {
   return getMemberById(gymId, member.id);
 }
 
+/**
+ * Adds an existing member together with their reconciled history (past term
+ * payments and an optional admission row) in one transaction. A duplicate
+ * phone or gym code fails the member INSERT and rolls everything back, so a
+ * double submit can never leave a second member or extra payments behind.
+ */
+async function createMemberWithHistory(gymId, member, payments) {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      `INSERT INTO members (id, tenant_id, gym_id, name, phone, address, fee, admission_fee, membership_type, package_months,
+         collection_timing, start_date, plan_start_date, onboarding_type, opening_balance, opening_balance_admission,
+         billing_cutover, photo, trainer_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'existing', ?, ?, ?, ?, ?, ?)`,
+      [
+        member.id,
+        gymId,
+        member.gymId,
+        member.name,
+        member.phone,
+        member.address,
+        member.fee,
+        member.admissionFee,
+        member.membershipType,
+        member.packageMonths,
+        member.collectionTiming || "",
+        member.startDate,
+        member.openingBalance,
+        member.openingBalanceAdmission,
+        member.billingCutover || null,
+        member.photo,
+        member.trainerId || "",
+        member.createdAt,
+      ],
+    );
+    for (const payment of payments) {
+      await connection.execute(
+        `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode, date_known)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          member.id,
+          payment.date,
+          payment.date.slice(0, 7),
+          payment.billingMonth || "",
+          payment.billingPeriod,
+          payment.amount,
+          payment.kind === "admission" ? null : payment.periodFee,
+          payment.kind === "admission" ? "admission" : "membership",
+          normalizePaymentMode(payment.mode) || null,
+          payment.dateKnown ? 1 : 0,
+        ],
+      );
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+  return getMemberById(gymId, member.id);
+}
+
 // Moves a member's joining date and re-keys their paid terms to the new
 // schedule (moves: Map<paymentId, periodKey> from shiftedPaymentPeriods) in one
 // transaction, so the date and the payments can never disagree.
@@ -118,10 +187,14 @@ async function moveMemberStartDate(gymId, memberId, startDate, moves) {
   try {
     await connection.beginTransaction();
     await connection.execute("UPDATE members SET start_date = ? WHERE tenant_id = ? AND id = ?", [startDate, gymId, memberId]);
+    // A payment whose collection date was never recorded is filed under its
+    // term's start (date_known = 0), so that date moves with the term. A
+    // recorded collection date never changes.
     for (const [paymentId, period] of moves) {
       await connection.execute(
-        "UPDATE payments SET billing_period = ?, month_key = ? WHERE id = ? AND member_id = ? AND kind = 'membership'",
-        [period, period.slice(0, 7), paymentId, memberId],
+        `UPDATE payments SET billing_period = ?, month_key = ?, payment_date = IF(date_known = 0, ?, payment_date)
+         WHERE id = ? AND member_id = ? AND kind = 'membership'`,
+        [period, period.slice(0, 7), period, paymentId, memberId],
       );
     }
     await connection.commit();
@@ -291,6 +364,7 @@ module.exports = {
   applyPlanChange,
   clearTrainerFromMembers,
   countMembers,
+  createMemberWithHistory,
   deleteMember,
   duplicateMemberError,
   findMember,

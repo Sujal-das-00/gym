@@ -11,6 +11,7 @@
     "start": "node app.js",
     "dev": "node backend/server.js",
     "check": "find backend -name '*.js' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check",
+    "test": "node --test backend/test/*.test.js",
     "build": "npm run build:admin && npm run build:checkin",
     "build:admin": "npm --prefix admin-frontend install && npm --prefix admin-frontend run build",
     "build:checkin": "npm --prefix checkin-frontend install && npm --prefix checkin-frontend run build",

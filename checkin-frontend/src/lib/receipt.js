@@ -22,10 +22,19 @@ const MODE_LABELS = {
 // rather than shown as an empty or invented value.
 export const paymentMode = (payment) => MODE_LABELS[payment?.mode] || "";
 
+// Payments toward an opening balance (what the member owed when added to
+// GymBoo). Keep in sync with OPENING_PERIOD_KEY in backend/src/utils/billing.js.
+export const isOpeningBalancePayment = (payment) => payment?.billingPeriod === "opening-balance";
+
+// When the payment was received. A past payment entered later without its
+// date is never shown as paid on the day it is filed under.
+export const paymentDateText = (payment) => (payment?.dateKnown === false ? "Date not recorded" : displayDate(payment?.date));
+
 // A membership payment that covered only part of its period's fee. Rows from
 // before part payments have no periodFee and were always full payments.
 export const isPartPayment = (payment) =>
   payment?.kind !== "admission" &&
+  !isOpeningBalancePayment(payment) &&
   payment?.periodFee !== null &&
   payment?.periodFee !== undefined &&
   Number(payment.amount || 0) < Number(payment.periodFee);
@@ -65,7 +74,9 @@ export const partPaymentNotes = (payment, payments = []) => {
 export const paymentTitle = (payment) =>
   payment.kind === "admission"
     ? "One-time admission fee"
-    : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}${
+    : isOpeningBalancePayment(payment)
+      ? "Opening balance"
+      : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}${
         isPartPayment(payment) ? " • Part payment" : ""
       }`;
 
@@ -77,7 +88,7 @@ export const paymentTitle = (payment) =>
  * page itself, with no on-screen chrome: it is never shown, only printed.
  */
 export function invoiceHtml({ gymName, member, payment, title }) {
-  const paidOn = displayDate(payment.date);
+  const paidOn = paymentDateText(payment);
   const left = isPartPayment(payment) ? balanceAfter(payment, member.payments) : 0;
 
   const mode = paymentMode(payment);
@@ -184,7 +195,7 @@ export const receiptData = ({ gymName, member, payment, title }) => ({
   gymName: String(gymName ?? ""),
   memberName: String(member.name ?? ""),
   gymId: String(member.gymId ?? ""),
-  paidOn: displayDate(payment.date),
+  paidOn: paymentDateText(payment),
   paidFor: paymentTitle(payment),
   mode: paymentMode(payment),
   amount: rupees(payment.amount),

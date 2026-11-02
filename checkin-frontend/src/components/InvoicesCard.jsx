@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { displayDate } from "../lib/format.js";
 import { rupees } from "../lib/memberStats.js";
-import { partPaymentNotes } from "../lib/receipt.js";
+import { isOpeningBalancePayment, partPaymentNotes, paymentDateText } from "../lib/receipt.js";
 import Icon from "./Icon.jsx";
 
 const PREVIEW_ROWS = 2;
@@ -46,12 +45,16 @@ export default function InvoicesCard({ payments = [] }) {
                   />
                   <div className="flex flex-col min-w-0">
                     <span className="font-label-md text-label-md text-on-surface font-semibold truncate">
-                      {displayDate(payment.date)}
+                      {paymentDateText(payment)}
                     </span>
                     <span className="font-body-sm text-body-sm text-secondary truncate">
                       {[
                         rupees(payment.amount),
-                        payment.kind === "admission" ? "Admission fee" : "Membership",
+                        payment.kind === "admission"
+                          ? "Admission fee"
+                          : isOpeningBalancePayment(payment)
+                            ? "Opening balance"
+                            : "Membership",
                         ...partNotes,
                       ].join(" • ")}
                     </span>

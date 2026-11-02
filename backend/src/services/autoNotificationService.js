@@ -144,7 +144,7 @@ async function runDailyNotifications() {
   for (const gym of gyms) {
     // One gym failing (bad data, push outage) must not skip the gyms after it.
     try {
-      const fees = await sendFeeReminders(gym.id);
+      const fees = await sendFeeReminders(gym.id, { scheduled: true });
       const expiring = await sendExpiringSoon(gym.id);
       results.push({ gym: gym.slug, fees, expiring });
     } catch (error) {

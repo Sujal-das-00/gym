@@ -1,4 +1,4 @@
-import { currency, displayDate } from "../lib/dates.js";
+import { currency } from "../lib/dates.js";
 
 /**
  * One row of a member's payment history: what it paid for, when and how, and
@@ -15,7 +15,7 @@ export default function PaymentHistoryItem({ payment, member, domain }) {
           {partNotes.length ? <em className="pay-tag">Part</em> : null}
         </strong>
         <small>
-          {[displayDate(String(payment.date || "").slice(0, 10)), domain.paymentModeLabel(payment.mode), ...partNotes]
+          {[domain.getPaymentDateLabel(payment), domain.paymentModeLabel(payment.mode), ...partNotes]
             .filter(Boolean)
             .join(" · ")}
         </small>

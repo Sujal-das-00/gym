@@ -231,6 +231,30 @@ async function ensureFeatureColumns() {
   if (!(await columnExists("members", "plan_start_date"))) {
     await tryRaw("ALTER TABLE members ADD COLUMN plan_start_date DATE NULL DEFAULT NULL AFTER start_date", "members.plan_start_date");
   }
+  // Existing-member onboarding. Every member already stored is a 'new' member
+  // with no opening balance and no cut-over, which is exactly today's billing.
+  if (!(await columnExists("members", "onboarding_type"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD COLUMN onboarding_type ENUM('new', 'existing') NOT NULL DEFAULT 'new' AFTER plan_start_date",
+      "members.onboarding_type",
+    );
+  }
+  if (!(await columnExists("members", "opening_balance"))) {
+    await tryRaw("ALTER TABLE members ADD COLUMN opening_balance DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER onboarding_type", "members.opening_balance");
+  }
+  if (!(await columnExists("members", "opening_balance_admission"))) {
+    await tryRaw(
+      "ALTER TABLE members ADD COLUMN opening_balance_admission DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER opening_balance",
+      "members.opening_balance_admission",
+    );
+  }
+  if (!(await columnExists("members", "billing_cutover"))) {
+    await tryRaw("ALTER TABLE members ADD COLUMN billing_cutover DATE NULL DEFAULT NULL AFTER opening_balance_admission", "members.billing_cutover");
+  }
+  // Existing payment rows all have a real collection date.
+  if (!(await columnExists("payments", "date_known"))) {
+    await tryRaw("ALTER TABLE payments ADD COLUMN date_known TINYINT(1) NOT NULL DEFAULT 1 AFTER payment_mode", "payments.date_known");
+  }
   // Assigned trainer. Existing members have none ('').
   if (!(await columnExists("members", "trainer_id"))) {
     await tryRaw("ALTER TABLE members ADD COLUMN trainer_id VARCHAR(64) NOT NULL DEFAULT '' AFTER photo", "members.trainer_id");

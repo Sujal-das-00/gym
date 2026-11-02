@@ -1,6 +1,7 @@
 const { publicMember } = require("../utils/member");
 const { repo } = require("../models");
 const { createMember, updateMember } = require("../services/memberService");
+const { createExistingMember } = require("../services/onboardingService");
 const { notifyPayment } = require("../services/autoNotificationService");
 const planChangeService = require("../services/planChangeService");
 const { preparePeriodPayments } = require("../services/paymentService");
@@ -10,7 +11,13 @@ async function listMembers(req, res) {
 }
 
 async function postMember(req, res) {
-  res.status(201).json(await createMember(req.gymId, req.body || {}));
+  const body = req.body || {};
+  // A member who joined before being entered into GymBoo, with their history.
+  if (body.onboarding?.type === "existing") {
+    const { member, warnings } = await createExistingMember(req.gymId, body);
+    return res.status(201).json(warnings.length ? { ...member, warnings } : member);
+  }
+  return res.status(201).json(await createMember(req.gymId, body));
 }
 
 async function putMember(req, res) {

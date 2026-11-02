@@ -101,6 +101,17 @@ CREATE TABLE IF NOT EXISTS members (
   -- member_plan_changes). NULL = never changed: billing counts from start_date,
   -- which stays the joining date either way.
   plan_start_date DATE NULL DEFAULT NULL,
+  -- 'existing' = entered with history: joined before being added to GymBoo
+  -- (start_date is the original joining date, created_at the registration).
+  onboarding_type ENUM('new', 'existing') NOT NULL DEFAULT 'new',
+  -- What an existing member owed when entered, if the gym chose an opening
+  -- balance over term-by-term history. opening_balance_admission is the part
+  -- of it that is an unpaid admission fee (display only, never a payment row).
+  opening_balance DECIMAL(10,2) NOT NULL DEFAULT 0,
+  opening_balance_admission DECIMAL(10,2) NOT NULL DEFAULT 0,
+  -- With an opening balance: the first term billed normally. Every term before
+  -- it is covered by the opening balance. NULL = billing counts as usual.
+  billing_cutover DATE NULL DEFAULT NULL,
   photo VARCHAR(512) NOT NULL DEFAULT '',
   -- trainers.id of the assigned trainer; '' when none.
   trainer_id VARCHAR(64) NOT NULL DEFAULT '',
@@ -237,6 +248,10 @@ CREATE TABLE IF NOT EXISTS payments (
   -- How the money was collected. NULL means it was never recorded (every row
   -- saved before this column existed), which is not the same as cash.
   payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
+  -- 0 = the collection date was not recorded (a past payment entered later);
+  -- payment_date then holds the start of the term it paid, so it is reported
+  -- in that term's month and never on the day it was typed in.
+  date_known TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_payments_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
   INDEX idx_payments_member_date (member_id, payment_date),

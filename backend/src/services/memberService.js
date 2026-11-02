@@ -141,6 +141,7 @@ async function updateMember(gymId, id, payload) {
 }
 
 module.exports = {
+  assertUniqueMember,
   createMember,
   mergeMemberPayload,
   updateMember,

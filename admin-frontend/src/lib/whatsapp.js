@@ -14,9 +14,11 @@ function openChat(phone, text) {
 }
 
 export function sendFeeReminder(member, domain) {
-  if (!domain.getUnpaidPeriods(member).length) return;
-  const balance = domain.getBalanceDue(member);
-  // Only a part-payment balance is owed: there is no new fee to quote yet.
+  const opening = domain.getOpeningBalanceDue(member);
+  if (!domain.getUnpaidPeriods(member).length && !(opening > 0)) return;
+  const balance = domain.getBalanceDue(member) + opening;
+  // Only a balance is owed (part payment or opening balance): there is no new
+  // fee to quote yet.
   if (balance > 0 && !domain.isOverdue(member)) {
     openChat(
       member.phone,

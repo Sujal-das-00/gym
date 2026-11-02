@@ -39,7 +39,9 @@ export default function FeeDialog() {
   }, [feeDialog.open, feeDialog.memberId]);
 
   const member = members.find((item) => item.id === feeDialog.memberId);
-  const unpaidPeriods = member ? domain.getUnpaidPeriods(member) : [];
+  // An existing member's opening balance is listed first: it is the oldest debt.
+  const openingLine = member ? domain.getOpeningBalanceLine(member) : null;
+  const unpaidPeriods = member ? [...(openingLine ? [openingLine.period] : []), ...domain.getUnpaidPeriods(member)] : [];
   const duePeriods = new Set(member ? domain.getDueUnpaidPeriods(member) : []);
   const selected = new Set(feeDialog.selectedPeriods);
   const periodUnit = member ? domain.getPeriodUnitLabel(member) : "month";
@@ -48,7 +50,9 @@ export default function FeeDialog() {
   const history = member ? [...(member.payments || [])].reverse().slice(0, HISTORY_LIMIT) : [];
   const modeLabel = PAYMENT_MODES.find((option) => option.value === mode)?.label || mode;
 
-  const dues = member ? unpaidPeriods.map((period) => domain.getPeriodDue(member, period)) : [];
+  const dues = member
+    ? unpaidPeriods.map((period) => (period === openingLine?.period ? openingLine : domain.getPeriodDue(member, period)))
+    : [];
   const chosen = dues.filter((due) => selected.has(due.period));
   const total = chosen.reduce((sum, due) => sum + due.balance, 0);
   const owedTotal = dues.reduce((sum, due) => sum + due.balance, 0);
@@ -93,6 +97,13 @@ export default function FeeDialog() {
   };
 
   const dueNote = (due) => {
+    if (due === openingLine) {
+      const admission = Number(member.openingBalanceAdmission || 0);
+      return {
+        text: ["From before GymBoo", admission > 0 ? `includes ${currency(admission)} admission fee` : ""].filter(Boolean).join(" · "),
+        className: due.paid > 0 ? "is-part" : "",
+      };
+    }
     if (due.paid > 0) return { text: `${currency(due.paid)} of ${currency(due.charge)} paid`, className: "is-part" };
     if (duePeriods.has(due.period)) return { text: "Overdue", className: "is-due" };
     return { text: "Current", className: "" };

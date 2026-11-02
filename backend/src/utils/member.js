@@ -50,6 +50,15 @@ function normalizeMember(member) {
     // Set by a plan change: billing periods count from here instead of startDate
     // (which stays the joining date). "" = the plan was never changed.
     planStartDate: member.planStartDate || member.plan_start_date ? toDateKey(member.planStartDate || member.plan_start_date) : "",
+    // "existing" = joined before being entered into GymBoo; startDate is then
+    // the original joining date and createdAt the registration.
+    onboardingType: (member.onboardingType || member.onboarding_type) === "existing" ? "existing" : "new",
+    // Owed at registration when the gym entered one balance instead of each
+    // past term; openingBalanceAdmission is the admission-fee part of it.
+    openingBalance: Math.max(0, Number(member.openingBalance ?? member.opening_balance ?? 0) || 0),
+    openingBalanceAdmission: Math.max(0, Number(member.openingBalanceAdmission ?? member.opening_balance_admission ?? 0) || 0),
+    // With an opening balance: the first term billed normally ("" = none).
+    billingCutover: member.billingCutover || member.billing_cutover ? toDateKey(member.billingCutover || member.billing_cutover) : "",
     photo: String(member.photo || ""),
     // trainers.id of the assigned trainer; "" when none.
     trainerId: String(member.trainerId ?? member.trainer_id ?? "").trim().slice(0, 64),
@@ -74,10 +83,31 @@ function normalizeMember(member) {
           periodFee: (payment.periodFee ?? payment.period_fee ?? null) === null ? null : Number(payment.periodFee ?? payment.period_fee),
           kind: payment.kind === "admission" ? "admission" : "membership",
           mode: normalizePaymentMode(payment.mode || payment.payment_mode),
+          // false: entered later without its collection date; `date` is then the
+          // start of the term it paid (see payments.date_known).
+          dateKnown: ![false, 0, "0"].includes(payment.dateKnown ?? payment.date_known ?? true),
         }))
       : [],
     createdAt: String(member.createdAt || member.created_at || nowIso()),
   };
+}
+
+// "2 Aug 2026" from a date key, independent of the server's locale.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function displayDateKey(key) {
+  const [year, month, day] = String(key || "").slice(0, 10).split("-").map(Number);
+  return year && month && day ? `${day} ${MONTHS[month - 1]} ${year}` : "";
+}
+
+// One line describing how a member came into GymBoo, for the activity log
+// (Phase 2). Registration is read from createdAt, the joining date from
+// startDate, so an existing member's two dates never get mixed up.
+function describeOnboarding(member) {
+  // createdAt is a UTC ISO time; name the local day it was registered on.
+  const createdAt = Date.parse(member?.createdAt || "");
+  const registered = Number.isFinite(createdAt) ? displayDateKey(toDateKey(new Date(createdAt))) : "";
+  if (member?.onboardingType !== "existing") return `New member added — Joined: ${displayDateKey(member?.startDate)}.`;
+  return `Existing member added — Original joining date: ${displayDateKey(member.startDate)}. Registered in GymBoo: ${registered}.`;
 }
 
 function publicMember(member) {
@@ -88,6 +118,7 @@ function publicMember(member) {
 }
 
 module.exports = {
+  describeOnboarding,
   normalizeMember,
   normalizePaymentMode,
   normalizePhone,

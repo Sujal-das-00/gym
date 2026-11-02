@@ -12,7 +12,18 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export default function NextDueCard({ billing }) {
   if (!billing) return null;
 
-  const { amount, balanceDue = 0, cycleDays, daysLeft, daysOverdue, expired, nextDueDate, planLabel, unpaidPeriods } = billing;
+  const {
+    amount,
+    balanceDue = 0,
+    openingBalanceDue = 0,
+    cycleDays,
+    daysLeft,
+    daysOverdue,
+    expired,
+    nextDueDate,
+    planLabel,
+    unpaidPeriods,
+  } = billing;
   // Not overdue: ring drains as the period runs out. Overdue: ring is always
   // full (red) — how overdue it is shows as text, not as more fill.
   const remaining = cycleDays > 0 ? Math.min(1, Math.max(0, daysLeft / cycleDays)) : 0;
@@ -45,6 +56,12 @@ export default function NextDueCard({ billing }) {
         {balanceDue > 0 && (
           <span className="font-label-sm text-label-sm text-indigo-700 font-semibold mt-0.5">
             + {rupees(balanceDue)} balance from your last payment
+          </span>
+        )}
+        {/* Owed from before the member was added to GymBoo; never expires them. */}
+        {openingBalanceDue > 0 && (
+          <span className="font-label-sm text-label-sm text-indigo-700 font-semibold mt-0.5">
+            + {rupees(openingBalanceDue)} opening balance
           </span>
         )}
       </div>

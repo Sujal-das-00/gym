@@ -73,7 +73,8 @@ export default function DetailDialog() {
   const balance = domain.getBalanceDue(member);
   const isPackage = domain.getMembershipType(member) === "package";
   const packageEnd = isPackage ? domain.getPackageEndKey(member) : "";
-  const hasDues = domain.getUnpaidPeriods(member).length > 0;
+  const openingDue = domain.getOpeningBalanceDue(member);
+  const hasDues = domain.getUnpaidPeriods(member).length > 0 || openingDue > 0;
   const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
   const payments = [...(member.payments || [])].reverse();
   const lastPayment = payments[0];
@@ -155,6 +156,17 @@ export default function DetailDialog() {
                 <dd id="detailBalance">{currency(balance)}</dd>
               </div>
             ) : null}
+            {openingDue > 0 ? (
+              <div className="is-balance">
+                <dt>Opening balance</dt>
+                <dd id="detailOpeningBalance">
+                  {currency(openingDue)}
+                  {Number(member.openingBalanceAdmission) > 0 ? (
+                    <small> incl. {currency(member.openingBalanceAdmission)} admission</small>
+                  ) : null}
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt>Visits this month</dt>
               <dd id="detailAttendance">{domain.getMonthlyAttendance(member)}</dd>
@@ -163,6 +175,12 @@ export default function DetailDialog() {
               <dt>Joined</dt>
               <dd id="detailJoined">{displayDate(member.startDate)}</dd>
             </div>
+            {member.onboardingType === "existing" ? (
+              <div>
+                <dt>Registered in GymBoo</dt>
+                <dd id="detailRegistered">{displayDate(localDateKey(new Date(member.createdAt)))}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Trainer</dt>
               <dd id="detailTrainer">{trainer || "Not assigned"}</dd>

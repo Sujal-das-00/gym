@@ -104,6 +104,7 @@ export function formatBillingPeriodRange(startKey, months) {
 }
 
 export function getBillingPeriodLabel(settings, periodKey, member = null) {
+  if (periodKey === OPENING_PERIOD_KEY) return "Opening balance";
   if (member && getMembershipType(member) === "package") {
     return formatBillingPeriodRange(periodKey, getPackageMonths(member));
   }
@@ -118,10 +119,12 @@ export function getBillingPeriodLabel(settings, periodKey, member = null) {
 }
 
 // Where billing periods count from: the start of the current plan once it has
-// been changed (planStartDate), otherwise the joining date. startDate itself
-// stays the joining date. Keep in sync with backend/src/utils/billing.js.
+// been changed (planStartDate), else the first term after an opening balance
+// (billingCutover: every term before it is covered by that balance), else the
+// joining date. startDate itself stays the joining date. Keep in sync with
+// backend/src/utils/billing.js.
 export function billingStartKey(member) {
-  return member?.planStartDate || member?.startDate || "";
+  return member?.planStartDate || member?.billingCutover || member?.startDate || "";
 }
 
 export function getBillingPeriodKeys(settings, member) {
@@ -175,9 +178,49 @@ export function isAdmissionPayment(payment) {
   return payment?.kind === "admission" || payment?.billingPeriod === ADMISSION_PERIOD_KEY;
 }
 
+// Payments toward an existing member's opening balance carry this literal as
+// their billing period; like admission, it never marks a term paid. Keep in
+// sync with OPENING_PERIOD_KEY in backend/src/utils/billing.js.
+export const OPENING_PERIOD_KEY = "opening-balance";
+
+export function isOpeningBalancePayment(payment) {
+  return payment?.billingPeriod === OPENING_PERIOD_KEY;
+}
+
+// What is still owed on the opening balance (0 for members without one). Kept
+// apart from overdue terms: it never makes the member overdue. Keep in sync
+// with openingBalanceDue() in backend/src/utils/billing.js.
+export function getOpeningBalanceDue(member) {
+  const owed = Number(member?.openingBalance || 0);
+  if (!(owed > 0)) return 0;
+  const paid = (member?.payments || [])
+    .filter(isOpeningBalancePayment)
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  return Math.max(0, Math.round((owed - paid) * 100) / 100);
+}
+
+// A past payment entered without its collection date keeps the start of the
+// term it paid as `date` (so reports put it in that term's month), but is
+// never shown as if it had been collected on that day.
+export const DATE_NOT_RECORDED = "Date not recorded";
+
+export function getPaymentDateLabel(payment) {
+  return payment?.dateKnown === false ? DATE_NOT_RECORDED : displayDate(String(payment?.date || "").slice(0, 10));
+}
+
+// The opening balance as one more line on the fee sheet, shaped like
+// getPeriodDue() so it is picked, part-paid and summarised the same way.
+export function getOpeningBalanceLine(member) {
+  const balance = getOpeningBalanceDue(member);
+  if (!(balance > 0)) return null;
+  const charge = Number(member.openingBalance || 0);
+  return { period: OPENING_PERIOD_KEY, charge, paid: Math.max(0, charge - balance), balance };
+}
+
 // What a payment row is for: "Admission fee", or the billing period it settles.
 export function getPaymentLabel(settings, payment, member = null) {
   if (isAdmissionPayment(payment)) return "Admission fee";
+  if (isOpeningBalancePayment(payment)) return "Opening balance";
   return getBillingPeriodLabel(settings, getPaymentPeriodKey(payment), member);
 }
 
@@ -192,7 +235,7 @@ export function getPaymentLabel(settings, payment, member = null) {
 export function getPeriodLedger(member) {
   const ledger = new Map();
   for (const payment of member?.payments || []) {
-    if (isAdmissionPayment(payment)) continue;
+    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) continue;
     const period = getPaymentPeriodKey(payment);
     if (!period) continue;
     const entry = ledger.get(period) || { paid: 0, charge: null, legacy: false };
@@ -210,7 +253,8 @@ export function getPeriodLedger(member) {
 
 // A membership payment that covered only part of its period's fee.
 export function isPartPayment(payment) {
-  if (isAdmissionPayment(payment) || payment?.periodFee === null || payment?.periodFee === undefined) return false;
+  if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) return false;
+  if (payment?.periodFee === null || payment?.periodFee === undefined) return false;
   return Number(payment.amount || 0) < Number(payment.periodFee);
 }
 
@@ -344,9 +388,10 @@ export function isPaidThisPeriod(settings, member) {
   // last one that has ended — the in-progress one is not owed yet.
   const periods = getBillablePeriodKeys(settings, member);
   const currentPeriod = periods[periods.length - 1];
-  // A plan change set for the next renewal: the old plan's term runs until then,
-  // and a change is only saved once that term is paid (or waived).
-  if (!currentPeriod && isPlanChangeAhead(member)) return true;
+  // Billing that starts later: a plan change set for the next renewal (the old
+  // plan's term runs until then, and a change is only saved once that term is
+  // paid or waived), or an opening balance covering every term until its cut-over.
+  if (!currentPeriod && billingStartKey(member) > todayKey()) return true;
   return Boolean(currentPeriod && getPaidPeriodSet(member).has(currentPeriod));
 }
 
@@ -411,9 +456,10 @@ export function getOverdueAmount(settings, member) {
   return getDueUnpaidPeriods(settings, member).length * Number(member.fee || 0);
 }
 
-// Everything owed right now: overdue periods plus balances from part payments.
+// Everything owed right now: overdue periods, balances from part payments and
+// what is left of an opening balance.
 export function getOutstandingAmount(settings, member) {
-  return getOverdueAmount(settings, member) + getBalanceDue(settings, member);
+  return getOverdueAmount(settings, member) + getBalanceDue(settings, member) + getOpeningBalanceDue(member);
 }
 
 export const FEE_STATUS_LABELS = { overdue: "Overdue", balance: "Balance due", paid: "Paid", pending: "Pending" };
@@ -421,11 +467,11 @@ export const FEE_STATUS_LABELS = { overdue: "Overdue", balance: "Balance due", p
 /**
  * One word for where a member stands on fees, shared by every list:
  * "overdue" (a period is due with nothing paid), "balance" (part paid, the
- * rest carried forward), "paid" (this period paid in full) or "pending".
+ * rest carried forward, or an opening balance still owed), "paid" (this period paid in full) or "pending".
  */
 export function getFeeStatus(settings, member) {
   if (isOverdue(settings, member)) return "overdue";
-  if (getBalanceDue(settings, member) > 0) return "balance";
+  if (getBalanceDue(settings, member) > 0 || getOpeningBalanceDue(member) > 0) return "balance";
   if (isPaidThisPeriod(settings, member)) return "paid";
   return "pending";
 }
@@ -536,6 +582,10 @@ export function createDomain(settings) {
     getBillingPeriodKeys: perMember(getBillingPeriodKeys),
     getPaymentPeriodKey,
     isAdmissionPayment,
+    isOpeningBalancePayment,
+    getOpeningBalanceDue,
+    getOpeningBalanceLine,
+    getPaymentDateLabel,
     getPaymentLabel: (payment, member = null) => getPaymentLabel(settings, payment, member),
     getPaidPeriodSet: perMember((unused, member) => getPaidPeriodSet(member)),
     getPeriodDue,

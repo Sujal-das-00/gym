@@ -94,7 +94,10 @@ export default function NotificationsView() {
   // backend. An amount test silently drops members whose fee is 0. Members
   // carrying a part-payment balance are reminded too.
   const pendingCount = useMemo(
-    () => members.filter((member) => domain.isOverdue(member) || domain.getBalanceDue(member) > 0).length,
+    () =>
+      members.filter(
+        (member) => domain.isOverdue(member) || domain.getBalanceDue(member) > 0 || domain.getOpeningBalanceDue(member) > 0,
+      ).length,
     [members, domain],
   );
 

@@ -6,6 +6,8 @@ import PhoneField from "../components/PhoneField.jsx";
 import Icon from "../components/Icon.jsx";
 import { currency, displayDate, todayKey } from "../lib/dates.js";
 import { collectionTimingLabel, planLabel } from "../lib/billing.js";
+import { blankHistory, historyProblem, joiningDateProblem, onboardingPayload } from "../lib/onboarding.js";
+import ExistingMemberHistory from "../components/ExistingMemberHistory.jsx";
 import { readPhoto } from "../lib/photo.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
 import { firstErrorField, toPhoneDigits, validateMember } from "../lib/validation.js";
@@ -35,12 +37,56 @@ export default function MemberDialog() {
   // first render — no empty frame followed by a second render to fill it in.
   return (
     <Dialog className="sheet member-form-sheet" id="memberDialog" open={memberDialog.open} onClose={closeMemberDialog}>
-      <MemberForm key={memberDialog.member?.id || "new"} member={memberDialog.member} />
+      {memberDialog.member ? (
+        <MemberForm key={memberDialog.member.id} member={memberDialog.member} />
+      ) : (
+        <AddMemberFlow />
+      )}
     </Dialog>
   );
 }
 
-function MemberForm({ member }) {
+// Adding starts by asking who this is: someone joining now, or a member who
+// joined before being entered into GymBoo (who comes with past payments).
+// The dialog unmounts its content when closed, so every Add starts here.
+function AddMemberFlow() {
+  const { closeMemberDialog } = useApp();
+  const [kind, setKind] = useState("");
+  if (kind) return <MemberForm member={null} kind={kind} onBack={() => setKind("")} />;
+  return (
+    <div className="sheet-panel">
+      <header className="sheet-head">
+        <span className="sheet-grabber" aria-hidden="true" />
+        <h2 id="dialogTitle">Who are you adding?</h2>
+        <button className="sheet-close" id="closeDialog" aria-label="Close" type="button" onClick={closeMemberDialog}>
+          <Icon name="close" />
+        </button>
+      </header>
+      <div className="sheet-body">
+        <div className="member-kind">
+          <button type="button" className="member-kind-option" id="addNewMember" onClick={() => setKind("new")}>
+            <Icon name="person_add" />
+            <span>
+              <strong>New member</strong>
+              <small>Someone joining the gym now.</small>
+            </span>
+            <Icon name="chevron_right" className="member-kind-go" />
+          </button>
+          <button type="button" className="member-kind-option" id="addExistingMember" onClick={() => setKind("existing")}>
+            <Icon name="history" />
+            <span>
+              <strong>Existing member</strong>
+              <small>Already a member before being added to GymBoo. You&apos;ll enter their past payments.</small>
+            </span>
+            <Icon name="chevron_right" className="member-kind-go" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemberForm({ member, kind = "new", onBack }) {
   const {
     closeMemberDialog,
     members,
@@ -68,7 +114,11 @@ function MemberForm({ member }) {
   const [membershipType, setMembershipType] = useState(() => domain.getMembershipType(member));
   const [packageMonths, setPackageMonths] = useState(() => String(domain.getPackageMonths(member)));
   const [collectionTiming, setCollectionTiming] = useState(() => domain.getCollectionTiming(member));
-  const [startDate, setStartDate] = useState(member?.startDate || todayKey());
+  const isExisting = !member && kind === "existing";
+  // An existing member's original joining date has to be typed: defaulting it
+  // to today would make them a new member.
+  const [startDate, setStartDate] = useState(member?.startDate || (isExisting ? "" : todayKey()));
+  const [history, setHistory] = useState(blankHistory);
   const [trainerId, setTrainerId] = useState(member?.trainerId || "");
   const [photo, setPhoto] = useState(member?.photo || "");
   const [busy, setBusy] = useState(false);
@@ -91,7 +141,31 @@ function MemberForm({ member }) {
     delete errors.fee;
     delete errors.packageMonths;
   }
+  if (isExisting) {
+    // Their admission fee is entered with the past payments instead.
+    delete errors.admissionFee;
+    const joining = joiningDateProblem(startDate);
+    if (joining) errors.startDate = joining;
+  }
   const errorCount = Object.keys(errors).length;
+
+  // The member-to-be, so the past terms come from the gym's own billing engine
+  // (30-day terms, calendar months or packages, whatever this plan uses).
+  const draft = useMemo(
+    () => ({
+      startDate,
+      fee: Number(fee) || 0,
+      membershipType: membershipType === "package" ? "package" : "monthly",
+      packageMonths: Math.max(1, Math.round(Number(packageMonths || 1))),
+      collectionTiming: collectionTiming === "fixed-day" ? "fixed-day" : "at-join",
+      planStartDate: "",
+      billingCutover: "",
+      payments: [],
+    }),
+    [startDate, fee, membershipType, packageMonths, collectionTiming],
+  );
+  const terms = isExisting && !joiningDateProblem(startDate) ? domain.getBillingPeriodKeys(draft) : [];
+  const historyError = isExisting ? historyProblem({ startDate, terms, history, domain, member: draft }) : "";
 
   const markTouched = (field) => setTouched((current) => ({ ...current, [field]: true }));
   const errorFor = (field) => (touched[field] ? errors[field] || "" : "");
@@ -130,6 +204,10 @@ function MemberForm({ member }) {
       formRef.current?.querySelector("#" + FIELD_IDS[field])?.focus();
       return;
     }
+    if (historyError) {
+      setFormError(historyError);
+      return;
+    }
 
     setFormError("");
     setBusy(true);
@@ -150,6 +228,11 @@ function MemberForm({ member }) {
       trainerId: String(trainerId || ""),
       photo,
     };
+    if (isExisting) {
+      payload.admissionFee = history.admission.paid ? Number(history.admission.amount) || 0 : 0;
+      payload.admissionMode = history.admission.paid ? history.admission.mode : "";
+      payload.onboarding = onboardingPayload({ terms, history });
+    }
     try {
       await saveMember(payload);
       closeMemberDialog();
@@ -195,7 +278,12 @@ function MemberForm({ member }) {
       <form className="sheet-panel" id="memberForm" method="dialog" noValidate ref={formRef} onSubmit={onSubmit}>
         <header className="sheet-head">
           <span className="sheet-grabber" aria-hidden="true" />
-          <h2 id="dialogTitle">{member ? "Edit member" : "Add member"}</h2>
+          {onBack ? (
+            <button className="sheet-back" type="button" aria-label="Back to member type" onClick={onBack}>
+              <Icon name="arrow_back" />
+            </button>
+          ) : null}
+          <h2 id="dialogTitle">{member ? "Edit member" : isExisting ? "Add existing member" : "Add member"}</h2>
           <button className="sheet-close" id="closeDialog" aria-label="Close" type="button" onClick={closeMemberDialog}>
             <Icon name="close" />
           </button>
@@ -409,16 +497,20 @@ function MemberForm({ member }) {
               </>
               )}
               <label className="mf-field">
-                {member ? "Joining date" : "Start date"}
+                {member ? "Joining date" : isExisting ? "Original joining date" : "Start date"}
                 <input
                   id="startDateInput"
                   name="startDate"
                   type="date"
+                  max={isExisting ? todayKey() : undefined}
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
                   {...fieldProps("startDate")}
                 />
                 <FieldError id="startDateInput-error" message={errorFor("startDate")} />
+                {isExisting ? (
+                  <small className="field-hint">When they first joined the gym, not today.</small>
+                ) : null}
               </label>
               <label className="mf-field wide">
                 Trainer
@@ -474,12 +566,18 @@ function MemberForm({ member }) {
                 </div>
                 <small className="field-hint">
                   {collectionTiming === "fixed-day"
-                    ? "No payment at join. The fee is due at the end of each period."
-                    : "Mark the first term paid now. The next payment is due one cycle later."}
+                    ? isExisting
+                      ? "Each term's fee is due when that term ends."
+                      : "No payment at join. The fee is due at the end of each period."
+                    : isExisting
+                      ? "Each term's fee is due when that term starts."
+                      : "Mark the first term paid now. The next payment is due one cycle later."}
                 </small>
               </div>
               )}
 
+              {isExisting ? null : (
+              <>
               <label className="mf-field wide">
                 <span className="mf-label-row">
                   Admission fee
@@ -527,8 +625,14 @@ function MemberForm({ member }) {
                   </div>
                 </div>
               ) : null}
+              </>
+              )}
             </div>
           </section>
+
+          {isExisting ? (
+            <ExistingMemberHistory member={draft} terms={terms} history={history} onChange={setHistory} domain={domain} />
+          ) : null}
 
           {formError ? (
             <p className="form-error" role="alert">
@@ -551,7 +655,7 @@ function MemberForm({ member }) {
             </button>
           ) : null}
           <button className={"sheet-confirm" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
-            {busy ? "Saving..." : member ? "Save changes" : "Add member"}
+            {busy ? "Saving..." : member ? "Save changes" : isExisting ? "Add existing member" : "Add member"}
           </button>
         </footer>
       </form>
