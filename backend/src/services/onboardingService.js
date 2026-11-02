@@ -99,7 +99,7 @@ function termPayments(member, terms, answers, today) {
  * Joining date (startDate) and registration (createdAt) stay separate. Nothing
  * is dated on the day of entry unless the admin says it was collected that day.
  */
-async function createExistingMember(gymId, payload) {
+async function createExistingMember(gymId, payload, user = null) {
   const onboarding = payload.onboarding || {};
   const settings = await repo().getSettings(gymId);
   const today = todayKey();
@@ -172,7 +172,8 @@ async function createExistingMember(gymId, payload) {
     });
   }
 
-  const saved = await repo().createMemberWithHistory(gymId, member, payments);
+  const enteredBy = user ? { id: user.id, name: user.name || user.email || "", role: user.role } : null;
+  const saved = await repo().createMemberWithHistory(gymId, member, payments, enteredBy);
   const warnings =
     terms.length > TERM_WARNING_THRESHOLD
       ? [`${terms.length} terms have passed since ${startDate}. Check the joining date is right.`]

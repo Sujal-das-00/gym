@@ -24,6 +24,7 @@ import MemberDialog from "./dialogs/MemberDialog.jsx";
 import TrainerDialog from "./dialogs/TrainerDialog.jsx";
 import ExpenseDialog from "./dialogs/ExpenseDialog.jsx";
 import FeeDialog from "./dialogs/FeeDialog.jsx";
+import PaymentActionDialog from "./dialogs/PaymentActionDialog.jsx";
 import PlanDialog from "./dialogs/PlanDialog.jsx";
 import DetailDialog from "./dialogs/DetailDialog.jsx";
 import DayLedgerDialog from "./dialogs/DayLedgerDialog.jsx";
@@ -117,6 +118,7 @@ export default function App() {
       <TrainerDialog />
       <ExpenseDialog />
       <FeeDialog />
+      <PaymentActionDialog />
       <PlanDialog />
       <DetailDialog />
       <DayLedgerDialog />

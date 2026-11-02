@@ -24,7 +24,40 @@ export const paymentMode = (payment) => MODE_LABELS[payment?.mode] || "";
 
 // Payments toward an opening balance (what the member owed when added to
 // GymBoo). Keep in sync with OPENING_PERIOD_KEY in backend/src/utils/billing.js.
-export const isOpeningBalancePayment = (payment) => payment?.billingPeriod === "opening-balance";
+export const isOpeningBalancePayment = (payment) =>
+  (payment?.billingPeriods || [payment?.billingPeriod]).every((period) => period === "opening-balance");
+
+/**
+ * A member's receipts: one per payment actually received (a payment that
+ * covered three terms is one receipt naming all three), plus the admission
+ * fee. The server only sends payments that still count, so nothing reversed
+ * ever appears. Each item keeps the shape of a payment row, so the invoice
+ * and the phone apps' PDF read it unchanged.
+ */
+export function receiptsOf(member) {
+  const rows = member?.payments || [];
+  const transactions = member?.transactions || [];
+  const linked = new Set(transactions.map((tx) => tx.id));
+  const receipts = transactions.map((tx) => {
+    const single = tx.allocations.length === 1 ? tx.allocations[0] : null;
+    return {
+      id: tx.id,
+      // The row this receipt's single term was paid with, for "balance after".
+      rowId: single ? rows.find((row) => row.transactionId === tx.id)?.id || "" : "",
+      kind: "membership",
+      date: tx.date,
+      dateKnown: tx.dateKnown,
+      amount: tx.amount,
+      mode: tx.mode,
+      reference: tx.reference || "",
+      billingPeriod: tx.allocations[0]?.billingPeriod || "",
+      billingPeriods: tx.allocations.map((allocation) => allocation.billingPeriod),
+      periodFee: single ? single.periodFee : null,
+    };
+  });
+  for (const row of rows) if (!row.transactionId || !linked.has(row.transactionId)) receipts.push(row);
+  return receipts;
+}
 
 // When the payment was received. A past payment entered later without its
 // date is never shown as paid on the day it is filed under.
@@ -55,7 +88,8 @@ export function periodBalance(payment, payments = []) {
 // What was left on the period right after this payment — fixed, for the invoice.
 export function balanceAfter(payment, payments = []) {
   const rows = payments.filter(samePeriod(payment));
-  const upTo = rows.slice(0, rows.findIndex((row) => row.id === payment.id) + 1 || rows.length);
+  const id = payment.rowId || payment.id;
+  const upTo = rows.slice(0, rows.findIndex((row) => row.id === id) + 1 || rows.length);
   const paid = upTo.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   return Math.max(0, Number(payment.periodFee) - paid);
 }
@@ -71,12 +105,19 @@ export const partPaymentNotes = (payment, payments = []) => {
   return [`of ${rupees(payment.periodFee)}`, left > 0 ? `${rupees(left)} due` : "balance cleared"];
 };
 
+// The terms a receipt paid: "Aug 2026, Sep 2026" ("Opening balance" for that).
+const periodsText = (payment) =>
+  (payment.billingPeriods || [payment.billingPeriod])
+    .map((period) => (period === "opening-balance" ? "Opening balance" : displayPeriod(period)))
+    .filter(Boolean)
+    .join(", ");
+
 export const paymentTitle = (payment) =>
   payment.kind === "admission"
     ? "One-time admission fee"
     : isOpeningBalancePayment(payment)
       ? "Opening balance"
-      : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}${
+      : `Membership${periodsText(payment) ? ` • ${periodsText(payment)}` : ""}${
         isPartPayment(payment) ? " • Part payment" : ""
       }`;
 

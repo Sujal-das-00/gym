@@ -86,8 +86,12 @@ function normalizeMember(member) {
           // false: entered later without its collection date; `date` is then the
           // start of the term it paid (see payments.date_known).
           dateKnown: ![false, 0, "0"].includes(payment.dateKnown ?? payment.date_known ?? true),
+          transactionId: String(payment.transactionId || payment.transaction_id || ""),
         }))
       : [],
+    // Money received (see payment_transactions), reversed ones included, for
+    // the admin history. `payments` above holds only what still counts.
+    transactions: Array.isArray(member.transactions) ? member.transactions : [],
     createdAt: String(member.createdAt || member.created_at || nowIso()),
   };
 }
@@ -117,8 +121,21 @@ function publicMember(member) {
   return normalizeMember(member);
 }
 
+// What a member (member app, kiosk) sees of their own record: only payments
+// that count, as paid receipts. Reversals, who entered a payment and internal
+// notes stay with the gym.
+function memberFacing(member) {
+  const view = publicMember(member);
+  if (!view) return view;
+  view.transactions = view.transactions
+    .filter((tx) => tx.status === "active")
+    .map(({ id, amount, date, dateKnown, mode, reference, allocations }) => ({ id, amount, date, dateKnown, mode, reference, allocations }));
+  return view;
+}
+
 module.exports = {
   describeOnboarding,
+  memberFacing,
   normalizeMember,
   normalizePaymentMode,
   normalizePhone,

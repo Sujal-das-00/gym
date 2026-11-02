@@ -273,6 +273,57 @@ async function ensureFeatureColumns() {
       "expenses.payment_mode",
     );
   }
+  // Payment transactions (Phase 2). payment_transactions / payment_corrections
+  // come from schema.sql; existing payments rows gain the link and the
+  // reversal stamp, both NULL, which is how they are billed today.
+  if (!(await columnExists("payments", "transaction_id"))) {
+    await tryRaw("ALTER TABLE payments ADD COLUMN transaction_id CHAR(36) NULL DEFAULT NULL AFTER date_known", "payments.transaction_id");
+  }
+  if (!(await columnExists("payments", "reversed_at"))) {
+    await tryRaw("ALTER TABLE payments ADD COLUMN reversed_at DATETIME NULL DEFAULT NULL AFTER transaction_id", "payments.reversed_at");
+  }
+  if (!(await indexExists("payments", "idx_payments_transaction"))) {
+    await tryRaw("ALTER TABLE payments ADD INDEX idx_payments_transaction (transaction_id)", "payments transaction index");
+  }
+  if (!(await constraintExists("payments", "fk_payments_transaction"))) {
+    await tryRaw(
+      "ALTER TABLE payments ADD CONSTRAINT fk_payments_transaction FOREIGN KEY (transaction_id) REFERENCES payment_transactions(id) ON DELETE CASCADE",
+      "payments transaction foreign key",
+    );
+  }
+  await backfillPaymentTransactions();
+}
+
+/**
+ * Gives every membership payment recorded before transactions existed a
+ * transaction of its own, with the row's own id, amount, date, date_known,
+ * mode and entry time. Nothing on the row changes except the new link, so
+ * every balance and report reads exactly as before. Admission rows stay
+ * unlinked: they follow the member profile.
+ *
+ * Re-runnable: rows already linked are skipped, and reusing the row's id as
+ * the transaction's means a half-finished run simply completes next boot.
+ */
+async function backfillPaymentTransactions() {
+  if (!(await columnExists("payments", "transaction_id"))) return;
+  try {
+    await exec(
+      `INSERT INTO payment_transactions (id, tenant_id, member_id, amount, collected_on, date_known, payment_mode, source, created_at)
+       SELECT p.id, m.tenant_id, p.member_id, p.amount, p.payment_date, p.date_known, p.payment_mode, 'legacy', p.created_at
+       FROM payments p JOIN members m ON m.id = p.member_id
+       WHERE p.kind = 'membership' AND p.transaction_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM payment_transactions t WHERE t.id = p.id)`,
+    );
+    await exec(
+      `UPDATE payments p JOIN payment_transactions t ON t.id = p.id
+       SET p.transaction_id = t.id
+       WHERE p.kind = 'membership' AND p.transaction_id IS NULL`,
+    );
+  } catch (error) {
+    // Unlinked rows still bill and report correctly (each counts as its own
+    // payment); they just can't be reversed until this succeeds on a later boot.
+    console.warn(`Payment transaction backfill skipped: ${error.message}`);
+  }
 }
 
 // Re-write stored phone numbers in the canonical form (no +91/91/0 prefix) so

@@ -106,6 +106,12 @@ router.post("/members", asyncHandler(memberController.postMember));
 router.put("/members/:id", asyncHandler(memberController.putMember));
 router.delete("/members/:id", asyncHandler(memberController.deleteMember));
 router.post("/members/:id/payments", asyncHandler(memberController.addPayments));
+// Correcting and reversing payments is for the gym owner; staff can record them.
+const paymentOwner = requireRole("gym_admin", "super_admin");
+router.patch("/members/:id/payments/:transactionId", paymentOwner, asyncHandler(memberController.patchPayment));
+router.post("/members/:id/payments/:transactionId/correct", paymentOwner, asyncHandler(memberController.postPaymentCorrection));
+router.post("/members/:id/payments/:transactionId/reverse", paymentOwner, asyncHandler(memberController.postPaymentReversal));
+router.get("/members/:id/payments/:transactionId/corrections", paymentOwner, asyncHandler(memberController.listPaymentCorrections));
 router.post("/members/:id/plan", asyncHandler(memberController.postPlanChange));
 router.get("/plan-changes", asyncHandler(memberController.listPlanChanges));
 

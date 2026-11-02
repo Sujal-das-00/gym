@@ -2,7 +2,7 @@ const { authConfig } = require("../config/env");
 const { sign } = require("../utils/jwt");
 const { createHttpError } = require("../utils/http");
 const { memberBillingSummary } = require("../utils/billing");
-const { publicMember } = require("../utils/member");
+const { memberFacing } = require("../utils/member");
 const { repo } = require("../models");
 
 async function login(gym, gymCode, phone, trustDevice) {
@@ -19,7 +19,7 @@ async function login(gym, gymCode, phone, trustDevice) {
   return {
     token,
     ttlSeconds,
-    member: publicMember(member),
+    member: memberFacing(member),
     billing: memberBillingSummary(member, settings),
     history: await repo().memberCheckinHistory(member),
   };
@@ -30,7 +30,7 @@ async function sessionData(gym, memberId) {
   if (!member) return null;
   const settings = await repo().getSettings(gym.id);
   return {
-    member: publicMember(member),
+    member: memberFacing(member),
     billing: memberBillingSummary(member, settings),
     history: await repo().memberCheckinHistory(member),
   };

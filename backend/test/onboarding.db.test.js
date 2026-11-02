@@ -323,7 +323,8 @@ test("T13: existing members and payments are unchanged by the migration", opts, 
   const pick = (row, keys) => Object.fromEntries(keys.map((key) => [key, row[key]]));
   const memberKeys = Object.keys(before.memberRow).filter((key) => key !== "updated_at");
   assert.deepEqual(pick(after.memberRow, memberKeys), pick(before.memberRow, memberKeys));
-  assert.deepEqual(after.payment, { ...before.payment, date_known: 1 });
+  // Phase 2's backfill links it to a transaction of its own (same id); nothing else changes.
+  assert.deepEqual(after.payment, { ...before.payment, date_known: 1, transaction_id: before.payment.id });
   assert.equal(after.memberRow.onboarding_type, "new");
   assert.equal(Number(after.memberRow.opening_balance), 0);
   assert.equal(after.memberRow.billing_cutover, null);

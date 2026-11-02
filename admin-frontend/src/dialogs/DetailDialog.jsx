@@ -4,10 +4,11 @@ import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 import PaymentHistoryItem from "../components/PaymentHistoryItem.jsx";
+import { memberCollections, paymentHistory } from "../lib/payments.js";
 import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
 import { currency, dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
 import { sendFeeReminder, sendLoginDetails } from "../lib/whatsapp.js";
-import { FEE_STATUS_LABELS } from "../lib/billing.js";
+import { DATE_NOT_RECORDED, FEE_STATUS_LABELS } from "../lib/billing.js";
 import { changeMoneyNotes, changeTimestamp, changedByLabel, changedFields, fetchPlanChanges } from "../lib/planChanges.js";
 
 /** Member profile sheet: status, quick actions, key numbers, attendance and payments. */
@@ -76,8 +77,10 @@ export default function DetailDialog() {
   const openingDue = domain.getOpeningBalanceDue(member);
   const hasDues = domain.getUnpaidPeriods(member).length > 0 || openingDue > 0;
   const trainer = trainers.find((item) => item.id === member.trainerId)?.name || "";
-  const payments = [...(member.payments || [])].reverse();
-  const lastPayment = payments[0];
+  // Every payment, reversed ones too (struck through), newest first.
+  const payments = paymentHistory(member);
+  // The last money that still counts, by when it was received.
+  const lastPayment = memberCollections(member).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
   const gymSlug = user?.gym?.slug || gyms.find((gym) => gym.id === gymId)?.slug || "";
 
   const actions = [
@@ -187,7 +190,9 @@ export default function DetailDialog() {
             </div>
             <div>
               <dt>Last payment</dt>
-              <dd id="detailLastPayment">{lastPayment ? displayDate(String(lastPayment.date).slice(0, 10)) : "None yet"}</dd>
+              <dd id="detailLastPayment">
+                {!lastPayment ? "None yet" : lastPayment.dateKnown ? displayDate(String(lastPayment.date).slice(0, 10)) : DATE_NOT_RECORDED}
+              </dd>
             </div>
             {/* Only shown when the gym actually charged a joining fee. */}
             {Number(member.admissionFee || 0) > 0 ? (
@@ -265,8 +270,8 @@ export default function DetailDialog() {
             </summary>
             {payments.length ? (
               <ul id="paymentHistory">
-                {payments.map((payment) => (
-                  <PaymentHistoryItem key={payment.id} payment={payment} member={member} domain={domain} />
+                {payments.map((entry) => (
+                  <PaymentHistoryItem key={entry.id} entry={entry} member={member} domain={domain} />
                 ))}
               </ul>
             ) : (

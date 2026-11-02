@@ -1,6 +1,7 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 import { useApp } from "../store/AppContext.jsx";
 import { currency, displayDate, monthKey, todayKey } from "../lib/dates.js";
+import { memberCollections } from "../lib/payments.js";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 
@@ -83,12 +84,13 @@ export default function PaymentsView() {
     };
     return members.map((member) => {
       const status = domain.getFeeStatus(member);
-      const payments = (member.payments || []).filter(inRange);
+      // Each collection once; an undated one split per term month (memberCollections).
+      const collections = memberCollections(member).filter(inRange);
       return {
         member,
         status,
-        collected: payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-        paymentCount: payments.length,
+        collected: collections.reduce((sum, entry) => sum + Number(entry.amount || 0), 0),
+        paymentCount: new Set(collections.map((entry) => entry.transaction?.id || entry.id)).size,
         // Overdue periods plus any balance left from part payments.
         overdueAmount: domain.getOutstandingAmount(member),
         duePeriods: status === "overdue" ? domain.getDueUnpaidPeriods(member).length : 0,

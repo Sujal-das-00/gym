@@ -9,7 +9,8 @@ const PREVIEW_ROWS = 2;
 // is money received — a part payment is tagged "Part" with what is still due.
 const byNewest = (payments) => [...payments].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-export default function InvoicesCard({ payments = [] }) {
+// `payments` are receipts (receiptsOf); `termRows` the term rows behind them, for part-payment notes.
+export default function InvoicesCard({ payments = [], termRows = payments }) {
   const [expanded, setExpanded] = useState(false);
   const ordered = byNewest(payments);
   const rows = expanded ? ordered : ordered.slice(0, PREVIEW_ROWS);
@@ -33,9 +34,9 @@ export default function InvoicesCard({ payments = [] }) {
       <div className="rounded-2xl bg-surface-container-lowest p-space-md shadow-xs border border-surface-container-high flex flex-col gap-2.5">
         {rows.length ? (
           rows.map((payment, index) => {
-            const partNotes = partPaymentNotes(payment, payments);
+            const partNotes = partPaymentNotes(payment, termRows);
             return (
-            <div key={`${payment.date}-${payment.billingPeriod || index}`}>
+            <div key={payment.id || `${payment.date}-${payment.billingPeriod || index}`}>
               {index > 0 && <div className="h-[1px] w-full bg-surface-container-low mb-2.5" />}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">

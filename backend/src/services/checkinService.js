@@ -1,7 +1,7 @@
 const { todayKey } = require("../utils/date");
 const { isValidDailyCode } = require("../utils/dailyCode");
 const { isMembershipExpired, memberBillingSummary } = require("../utils/billing");
-const { publicMember } = require("../utils/member");
+const { memberFacing } = require("../utils/member");
 const { repo } = require("../models");
 const { notifyCheckin } = require("./autoNotificationService");
 
@@ -20,7 +20,7 @@ async function checkInMember(gymId, identifier, code) {
     return {
       denied: true,
       expired: true,
-      member: publicMember(member),
+      member: memberFacing(member),
       billing: memberBillingSummary(member, settings),
       history: await repo().memberCheckinHistory(member),
     };
@@ -32,7 +32,7 @@ async function checkInMember(gymId, identifier, code) {
 
   if (existing) {
     return {
-      member: publicMember(freshMember),
+      member: memberFacing(freshMember),
       billing: memberBillingSummary(freshMember, settings),
       checkin: existing,
       duplicate: true,
@@ -47,7 +47,7 @@ async function checkInMember(gymId, identifier, code) {
   // Fire and forget: the member's check-in must never wait on, or fail from, a push.
   notifyCheckin(gymId, updated);
   return {
-    member: publicMember(updated),
+    member: memberFacing(updated),
     billing: memberBillingSummary(updated, settings),
     checkin,
     duplicate: false,
@@ -62,7 +62,7 @@ async function getMemberHistory(gymId, identifier) {
   if (!member) return null;
   const settings = await repo().getSettings(gymId);
   return {
-    member: publicMember(member),
+    member: memberFacing(member),
     // Plan/renewal figures for the member app's home screen.
     billing: memberBillingSummary(member, settings),
     history: await repo().memberCheckinHistory(member),

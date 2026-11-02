@@ -8,6 +8,7 @@
  * here so their totals can never disagree.
  * ------------------------------------------------------------------------- */
 import { DATE_NOT_RECORDED } from "./billing.js";
+import { collectionTerms, memberCollections } from "./payments.js";
 import { toDateKey } from "./dates.js";
 
 /**
@@ -20,25 +21,29 @@ import { toDateKey } from "./dates.js";
 export function buildLedgerEntries({ members = [], expenses = [], domain }) {
   const entries = [];
 
+  // One earning per collection: a payment that covered three terms is one
+  // earning, a reversed payment is none (see memberCollections).
   members.forEach((member) => {
-    (member.payments || []).forEach((payment) => {
+    memberCollections(member).forEach((entry) => {
+      const { payment, transaction } = entry;
       entries.push({
         type: "earning",
-        id: payment.id,
+        id: entry.id,
         memberId: member.id,
-        date: toDateKey(payment.date),
-        amount: Number(payment.amount || 0),
+        date: toDateKey(entry.date),
+        amount: Number(entry.amount || 0),
         title: member.name,
-        category: domain.isAdmissionPayment(payment) ? "admission-fee" : "membership-fee",
+        category: payment && domain.isAdmissionPayment(payment) ? "admission-fee" : "membership-fee",
         detail: [
-          domain.getPaymentLabel(payment, member),
-          ...domain.getPartPaymentNotes(member, payment),
+          transaction ? collectionTerms(domain, member, entry) : domain.getPaymentLabel(payment, member),
+          ...(payment ? domain.getPartPaymentNotes(member, payment) : []),
+          transaction?.reference || "",
           // Counted on its term's start date, which is not when it was collected.
-          payment.dateKnown === false ? DATE_NOT_RECORDED : "",
+          entry.dateKnown === false ? DATE_NOT_RECORDED : "",
         ]
           .filter(Boolean)
           .join(" · "),
-        mode: payment.mode || "",
+        mode: entry.mode || "",
       });
     });
   });

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Icon from "../components/Icon.jsx";
 import { rupees } from "../lib/memberStats.js";
-import { downloadInvoice, partPaymentNotes, paymentDateText, paymentMode, paymentTitle } from "../lib/receipt.js";
+import { downloadInvoice, partPaymentNotes, paymentDateText, paymentMode, paymentTitle, receiptsOf } from "../lib/receipt.js";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -35,13 +35,13 @@ export default function MemberReceipts({ gymName, member }) {
   const rows = useMemo(() => {
     // Several periods are often recorded on the same day, so the paid-on date
     // alone leaves the rows in arbitrary order — fall back to the period.
-    const ordered = [...(member.payments || [])].sort(
+    const ordered = receiptsOf(member).sort(
       (a, b) =>
         String(b.date).localeCompare(String(a.date)) ||
         String(b.billingPeriod || "").localeCompare(String(a.billingPeriod || "")),
     );
     return filter === "all" ? ordered : ordered.filter((payment) => payment.kind === filter);
-  }, [filter, member.payments]);
+  }, [filter, member]);
 
   const total = rows.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 

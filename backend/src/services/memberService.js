@@ -73,7 +73,7 @@ function firstBillingPeriodKey(member, settings) {
   return start; // 30-days / custom-days cycles are keyed by the exact start date
 }
 
-async function createMember(gymId, payload) {
+async function createMember(gymId, payload, user = null) {
   const settings = await repo().getSettings(gymId);
   const member = await mergeMemberPayload(null, payload);
   member.id = crypto.randomUUID();
@@ -94,15 +94,25 @@ async function createMember(gymId, payload) {
   // next due date lands one cycle later instead of showing the join period as already due.
   if (member.collectionTiming === "at-join") {
     const periodKey = firstBillingPeriodKey(member, settings);
-    await repo().addPayments(saved, [
+    await repo().addTransaction(
+      gymId,
+      saved.id,
       {
-        date: member.startDate,
         amount: member.fee,
-        month: periodKey.length === 7 ? periodKey : periodKey.slice(0, 7),
-        billingMonth: periodKey.length === 7 ? periodKey : "",
-        billingPeriod: periodKey,
+        date: member.startDate,
+        dateKnown: true,
+        source: "join",
+        enteredBy: user ? { id: user.id, name: user.name || user.email || "", role: user.role } : null,
       },
-    ]);
+      [
+        {
+          billingPeriod: periodKey,
+          billingMonth: periodKey.length === 7 ? periodKey : "",
+          amount: member.fee,
+          periodFee: member.fee,
+        },
+      ],
+    );
   }
 
   return publicMember(await repo().getMemberById(gymId, saved.id));

@@ -5,7 +5,12 @@ function notFound(req, res) {
 }
 
 function errorHandler(error, req, res, next) {
-  if (duplicateMemberError(error)) {
+  // A repeated payment request id is answered with the first result by the
+  // payment service; one still colliding here is a different conflict.
+  if (duplicateMemberError(error) && /payment_transactions|uniq_payment_transactions_request/.test(error.message || "")) {
+    error.status = 409;
+    error.message = "This payment was already recorded. Reload to see the latest.";
+  } else if (duplicateMemberError(error)) {
     error.status = 409;
     error.message = "Member with this Gym ID or phone already exists";
   }

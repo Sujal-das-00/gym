@@ -11,8 +11,9 @@ import { normalizePhone } from "../lib/format.js";
 const CLOSED_MEMBER_DIALOG = { open: false, member: null };
 const CLOSED_TRAINER_DIALOG = { open: false, trainer: null };
 const CLOSED_EXPENSE_DIALOG = { open: false, expense: null };
-const CLOSED_FEE_DIALOG = { open: false, memberId: "", selectedPeriods: [] };
+const CLOSED_FEE_DIALOG = { open: false, memberId: "" };
 const CLOSED_PLAN_DIALOG = { open: false, memberId: "" };
+const CLOSED_PAYMENT_ACTION = { open: false, memberId: "", transactionId: "" };
 
 function generateGymId(members) {
   const existing = new Set(members.map((member) => member.gymId || member.id).filter(Boolean));
@@ -78,6 +79,8 @@ export function AppProvider({ children }) {
   const [expenseDialog, setExpenseDialog] = useState(CLOSED_EXPENSE_DIALOG);
   const [feeDialog, setFeeDialog] = useState(CLOSED_FEE_DIALOG);
   const [planDialog, setPlanDialog] = useState(CLOSED_PLAN_DIALOG);
+  // Edit / correct / reverse one payment (gym owners only).
+  const [paymentAction, setPaymentAction] = useState(CLOSED_PAYMENT_ACTION);
   // Bumped after every plan change, so the screens listing the change log refetch.
   const [planChangeRevision, setPlanChangeRevision] = useState(0);
   const [detailMemberId, setDetailMemberId] = useState("");
@@ -391,63 +394,75 @@ export function AppProvider({ children }) {
   );
 
   /* ---- Fee collection --------------------------------------------------- */
-  const openFeeDialog = useCallback(
-    (memberId) => {
-      const member = membersRef.current.find((item) => item.id === memberId);
-      if (!member) return;
-      const currentDomain = createDomain(settingsRef.current);
-      const unpaidPeriods = currentDomain.getUnpaidPeriods(member);
-      const currentPeriod = currentDomain.getBillablePeriodKeys(member).at(-1);
-      let selectedPeriods =
-        currentPeriod && unpaidPeriods.includes(currentPeriod) ? [currentPeriod] : unpaidPeriods.slice(0, 1);
-      if (!selectedPeriods.length && unpaidPeriods.length) selectedPeriods = [unpaidPeriods[0]];
-      // A balance left from a part payment is collected with the next payment,
-      // so it comes pre-selected alongside the current period.
-      const balances = currentDomain.getPartPaidPeriods(member);
-      // So is what is left of an existing member's opening balance.
-      const opening = currentDomain.getOpeningBalanceLine(member);
-      selectedPeriods = [...new Set([...(opening ? [opening.period] : []), ...balances, ...selectedPeriods])].sort();
-      setFeeDialog({ open: true, memberId: member.id, selectedPeriods });
-    },
-    [],
-  );
+  // Record payment works out what the money goes to (oldest debt first, or the
+  // terms the admin picks), so opening it only needs the member.
+  const openFeeDialog = useCallback((memberId) => {
+    if (!membersRef.current.some((item) => item.id === memberId)) return;
+    setFeeDialog({ open: true, memberId });
+  }, []);
 
   const closeFeeDialog = useCallback(() => setFeeDialog(CLOSED_FEE_DIALOG), []);
 
-  const setSelectedBillingPeriods = useCallback((periods) => {
-    setFeeDialog((dialog) => ({ ...dialog, selectedPeriods: periods }));
+  const replaceMember = useCallback((saved) => {
+    setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
   }, []);
 
-  // `lines` come from allocatePayment(): what to record against each period
-  // (`pay`) and what that leaves on it (`after`). The server re-checks every
-  // amount against what the period still owes.
-  const collectFees = useCallback(
-    async (member, lines, mode = "cash") => {
-      const payments = lines.map(({ period, pay }) => ({
-        id: crypto.randomUUID(),
-        date: todayKey(),
-        month: monthKey(),
-        billingMonth: String(period).length === 7 ? period : "",
-        billingPeriod: period,
-        amount: pay,
-        // How it was collected at the desk; shown on the member's invoice.
-        mode,
-      }));
-      const saved = await api(
-        "/api/members/" + encodeURIComponent(member.id) + "/payments",
-        jsonRequest("POST", { payments }),
-      );
-      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
-      setSelectedPaymentMemberId(saved.id);
+  // One payment, recorded as one transaction (see lib/payments.js for the
+  // body). The sheet's requestId makes a retried submit return the first
+  // result instead of recording the money twice.
+  const recordPayment = useCallback(
+    async (member, body) => {
+      const result = await api("/api/members/" + encodeURIComponent(member.id) + "/payments", jsonRequest("POST", body));
+      replaceMember(result.member);
+      setSelectedPaymentMemberId(result.member.id);
       closeFeeDialog();
-      const received = lines.reduce((sum, line) => sum + line.pay, 0);
-      const left = lines.reduce((sum, line) => sum + line.after, 0);
+      const left = createDomain(settingsRef.current).getOutstandingAmount(result.member);
       showToast(
-        "Collected " + currency(received) + " from " + saved.name + (left > 0 ? " · " + currency(left) + " balance left" : ""),
+        `Recorded ${currency(result.transaction?.amount || 0)} from ${result.member.name}` +
+          (left > 0 ? ` · ${currency(left)} still owed` : " · all paid up"),
       );
+      return result;
     },
-    [closeFeeDialog, showToast],
+    [closeFeeDialog, replaceMember, showToast],
   );
+
+  const openPaymentAction = useCallback(
+    (memberId, transactionId) => setPaymentAction({ open: true, memberId, transactionId }),
+    [],
+  );
+  const closePaymentAction = useCallback(() => setPaymentAction(CLOSED_PAYMENT_ACTION), []);
+
+  // Owner-only payment changes; the server enforces the same roles.
+  const paymentRequest = useCallback(
+    async (memberId, transactionId, path, method, body, message) => {
+      const base = "/api/members/" + encodeURIComponent(memberId) + "/payments/" + encodeURIComponent(transactionId);
+      const result = await api(base + path, jsonRequest(method, body));
+      replaceMember(result.member);
+      closePaymentAction();
+      showToast(message);
+      return result;
+    },
+    [closePaymentAction, replaceMember, showToast],
+  );
+  const editPaymentDetails = useCallback(
+    (memberId, transactionId, body) => paymentRequest(memberId, transactionId, "", "PATCH", body, "Payment details updated"),
+    [paymentRequest],
+  );
+  const correctPayment = useCallback(
+    (memberId, transactionId, body) =>
+      paymentRequest(memberId, transactionId, "/correct", "POST", body, "Payment corrected · the original is kept as reversed"),
+    [paymentRequest],
+  );
+  const reversePayment = useCallback(
+    (memberId, transactionId, body) => paymentRequest(memberId, transactionId, "/reverse", "POST", body, "Payment reversed"),
+    [paymentRequest],
+  );
+  const listPaymentCorrections = useCallback(
+    (memberId, transactionId) =>
+      api("/api/members/" + encodeURIComponent(memberId) + "/payments/" + encodeURIComponent(transactionId) + "/corrections"),
+    [],
+  );
+  const canManagePayments = user?.role === "gym_admin" || user?.role === "super_admin";
 
   /* ---- Plan changes ----------------------------------------------------- */
   // One request: the server moves the billing start, records any payments
@@ -656,7 +671,6 @@ export function AppProvider({ children }) {
       closeExpenseDialog,
       openFeeDialog,
       closeFeeDialog,
-      setSelectedBillingPeriods,
       openDetail,
       closeDetail,
       openDayLedger,
@@ -669,7 +683,14 @@ export function AppProvider({ children }) {
       changePlan,
       deleteMember,
       setMemberAttendanceStatus,
-      collectFees,
+      recordPayment,
+      openPaymentAction,
+      closePaymentAction,
+      editPaymentDetails,
+      correctPayment,
+      reversePayment,
+      listPaymentCorrections,
+      canManagePayments,
       saveExpense,
       deleteExpense,
       saveSettings,
@@ -717,7 +738,6 @@ export function AppProvider({ children }) {
       closeExpenseDialog,
       openFeeDialog,
       closeFeeDialog,
-      setSelectedBillingPeriods,
       openDetail,
       closeDetail,
       openDayLedger,
@@ -729,7 +749,14 @@ export function AppProvider({ children }) {
       changePlan,
       deleteMember,
       setMemberAttendanceStatus,
-      collectFees,
+      recordPayment,
+      openPaymentAction,
+      closePaymentAction,
+      editPaymentDetails,
+      correctPayment,
+      reversePayment,
+      listPaymentCorrections,
+      canManagePayments,
       saveExpense,
       deleteExpense,
       saveSettings,
@@ -743,8 +770,8 @@ export function AppProvider({ children }) {
 
   const shell = useMemo(() => ({ toast, drawerOpen }), [toast, drawerOpen]);
   const dialogs = useMemo(
-    () => ({ memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, detailMemberId, dayLedgerDate }),
-    [memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, detailMemberId, dayLedgerDate],
+    () => ({ memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, paymentAction, detailMemberId, dayLedgerDate }),
+    [memberDialog, trainerDialog, expenseDialog, feeDialog, planDialog, paymentAction, detailMemberId, dayLedgerDate],
   );
 
   return (

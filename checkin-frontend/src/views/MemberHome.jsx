@@ -6,6 +6,7 @@ import MemberStatPills from "../components/MemberStatPills.jsx";
 import NextDueCard from "../components/NextDueCard.jsx";
 import { initials } from "../lib/format.js";
 import { currentStreak, visitsThisMonth, weekStrip } from "../lib/memberStats.js";
+import { receiptsOf } from "../lib/receipt.js";
 
 /**
  * The member's home screen. Everything on it is derived from the one public
@@ -71,7 +72,7 @@ export default function MemberHome({ billing, gymName, history, install, member,
 
       <AttendanceCard gymName={gymName} history={history} week={weekStrip(attendance)} />
 
-      <InvoicesCard payments={member.payments || []} />
+      <InvoicesCard payments={receiptsOf(member)} termRows={member.payments || []} />
     </div>
   );
 }

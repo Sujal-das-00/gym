@@ -4381,3 +4381,55 @@ dialog.qr-present { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 
   .history-term-body { grid-template-columns: minmax(0, 1fr); }
   .history-term-head .segmented { min-width: 0; width: 100%; }
 }
+
+/* ---- Payments: record, history, edit / correct / reverse ---- */
+button.pay-check { padding: 0; background: var(--panel); cursor: pointer; }
+button.pay-check:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.pay-period-copy small.is-muted { color: var(--muted); }
+.pay-line-amount { width: 112px; }
+.pay-line-amount input { min-height: 40px; }
+.pay-date { display: grid; gap: 6px; }
+.pay-date input[type="date"] { min-height: 44px; }
+
+.sheet-history li.is-reversed > span strong,
+.sheet-history li.is-reversed > span small:first-of-type { color: var(--muted); }
+.sheet-history li .is-struck { color: var(--muted); text-decoration: line-through; }
+.sheet-history li .pay-note { color: var(--ink); font-style: italic; }
+.sheet-history li .pay-reversal { color: var(--red); font-weight: 700; }
+.pay-tag.is-reversed { background: var(--red-soft); color: var(--red); }
+.pay-row-menu {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pay-row-menu:hover { background: var(--bg); color: var(--ink); }
+.pay-row-menu:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.pay-row-menu .material-symbols-outlined { font-size: 20px; vertical-align: 0; }
+
+.pay-action-ico {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+.member-kind-option:disabled { cursor: not-allowed; opacity: 0.5; }
+.member-kind-option:disabled:hover { border-color: var(--line); background: var(--panel); }
+.member-kind-option.is-danger > .material-symbols-outlined:first-child { background: var(--red-soft); color: var(--red); }
+.member-kind-option.is-danger:not(:disabled):hover { border-color: var(--red); background: var(--red-soft); }
+.sheet-confirm.is-danger { background: var(--red); }
+.pay-edit-log { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 0.82rem; font-weight: 700; }
+.pay-edit-log small { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 600; }
+@media (max-width: 480px) {
+  .pay-line-amount { width: 96px; }
+}

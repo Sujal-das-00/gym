@@ -228,6 +228,63 @@ CREATE TABLE IF NOT EXISTS expenses (
   CONSTRAINT fk_expenses_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
 
+-- Money actually received from a member: one row per collection, however many
+-- terms it paid. Its allocations are the `payments` rows pointing at it (one per
+-- term, or the opening balance). A transaction is never deleted or edited in its
+-- amount, date or allocations: a mistake is reversed (status 'reversed', with who
+-- and why) and, for a correction, replaced by a new transaction linked to it.
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  member_id CHAR(36) NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  -- When the money was received. With date_known = 0 it was never recorded and
+  -- this holds the start of the earliest term paid (reports split it per term).
+  collected_on DATE NOT NULL,
+  date_known TINYINT(1) NOT NULL DEFAULT 1,
+  payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
+  reference VARCHAR(80) NOT NULL DEFAULT '',
+  note VARCHAR(300) NOT NULL DEFAULT '',
+  -- Sent by the Record payment sheet; a retried submit returns the first result.
+  request_id CHAR(36) NULL DEFAULT NULL,
+  source ENUM('desk', 'join', 'plan_change', 'onboarding', 'correction', 'legacy') NOT NULL DEFAULT 'desk',
+  status ENUM('active', 'reversed') NOT NULL DEFAULT 'active',
+  reversed_at DATETIME NULL DEFAULT NULL,
+  reversed_by_id VARCHAR(64) NULL DEFAULT NULL,
+  reversed_by_name VARCHAR(160) NULL DEFAULT NULL,
+  reversal_reason VARCHAR(300) NULL DEFAULT NULL,
+  -- A correction: the replacement points at the original and back.
+  replaces_id CHAR(36) NULL DEFAULT NULL,
+  replaced_by_id CHAR(36) NULL DEFAULT NULL,
+  -- Who typed it in, and when (created_at). Never the collection date. NULL on
+  -- rows made from payments recorded before transactions existed.
+  entered_by_id VARCHAR(64) NULL DEFAULT NULL,
+  entered_by_name VARCHAR(160) NULL DEFAULT NULL,
+  entered_by_role VARCHAR(32) NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_payment_transactions_request (tenant_id, request_id),
+  INDEX idx_payment_transactions_member (member_id, collected_on),
+  CONSTRAINT fk_payment_transactions_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payment_transactions_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+-- In-place edits of a transaction's method, reference or note, one row per
+-- changed field, so the original value is never lost.
+CREATE TABLE IF NOT EXISTS payment_corrections (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  transaction_id CHAR(36) NOT NULL,
+  field ENUM('mode', 'reference', 'note') NOT NULL,
+  old_value VARCHAR(300) NOT NULL DEFAULT '',
+  new_value VARCHAR(300) NOT NULL DEFAULT '',
+  changed_by_id VARCHAR(64) NOT NULL DEFAULT '',
+  changed_by_name VARCHAR(160) NOT NULL DEFAULT '',
+  changed_by_role VARCHAR(32) NOT NULL DEFAULT '',
+  changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_payment_corrections_transaction (transaction_id),
+  CONSTRAINT fk_payment_corrections_transaction FOREIGN KEY (transaction_id) REFERENCES payment_transactions(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS payments (
   id CHAR(36) NOT NULL PRIMARY KEY,
   member_id CHAR(36) NOT NULL,
@@ -252,8 +309,16 @@ CREATE TABLE IF NOT EXISTS payments (
   -- payment_date then holds the start of the term it paid, so it is reported
   -- in that term's month and never on the day it was typed in.
   date_known TINYINT(1) NOT NULL DEFAULT 1,
+  -- The transaction (money received) this row allocates. NULL only on admission
+  -- rows, which are kept in step with the member profile instead.
+  transaction_id CHAR(36) NULL DEFAULT NULL,
+  -- Copied from the transaction when it is reversed: the row stays for the
+  -- record but no longer pays its term.
+  reversed_at DATETIME NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_payments_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payments_transaction FOREIGN KEY (transaction_id) REFERENCES payment_transactions(id) ON DELETE CASCADE,
+  INDEX idx_payments_transaction (transaction_id),
   INDEX idx_payments_member_date (member_id, payment_date),
   INDEX idx_payments_member_kind (member_id, kind),
   INDEX idx_payments_billing_period (billing_period)

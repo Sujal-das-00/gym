@@ -1,6 +1,6 @@
 # Phase 2: Payment management and financial reconciliation
 
-Technical implementation plan · drafted 2 Nov 2026 · revised 2 Nov 2026 · status: **decisions approved, audit complete, no code written**
+Technical implementation plan · drafted 2 Nov 2026 · revised 2 Nov 2026 · status: **implemented locally (uncommitted); `npm test` 52/52 (Phase 1's 25 + Phase 2's 27)**
 
 Builds on Phase 1 (existing-member onboarding), implemented in the local working tree on `main` and not yet committed. Phase 1 baseline on 2 Nov 2026: `npm test` passes **25/25**. Those tests stay as Phase 2 regression tests.
 
@@ -221,3 +221,13 @@ Member app: `components/InvoicesCard.jsx`, `views/MemberReceipts.jsx`, `lib/rece
 - **A2. Admission sync** stops deleting and re-inserting the row on every profile save (P10, "protect from accidental modification"). A new member's admission date still follows a *changed* joining date, which is today's rule because it's collected at joining. Say if you want it frozen once recorded, as for existing members.
 - **The stand-in date of a multi-term unknown-date transaction:** `collected_on` holds the earliest term's start for sorting. Insights always splits it per term (T11).
 - **Super admin** acting on a gym counts as an owner for P5, as elsewhere in the admin API.
+
+## 8. Implementation notes (as built)
+
+- **A ₹0-fee term can still be marked done with a ₹0 record** (judgement call, flag if you disagree). Gyms that charge no fee have always done this, and rejecting every ₹0 payment would leave those members permanently overdue. Zero is accepted **only** when every term it settles has a ₹0 fee; everywhere else, zero is rejected (T7).
+- **Members only see payments that count.** The member app and kiosk get `memberFacing(member)`: active transactions only, with no reversal reasons, who entered a payment or internal notes.
+- **Allocations are listed oldest debt first** (opening balance, then terms) whenever transactions are loaded. Rows of one payment share their date and entry time, so the table order meant nothing.
+- **Removed:** the old `addPayments` model functions (they wrote payment rows with no transaction) and the Collect sheet's "current term pre-ticked" selection (P8).
+- **One Phase 1 test was updated:** T13 now also expects the legacy row's new `transaction_id` link. Every other field is still checked unchanged.
+- **The SQL file `006-payment-transactions.sql`** was checked on a database built from the Phase 1 schema (`deb3723`), and re-run: the row was linked 1:1, the admission row left alone, the FK added, and the second run changed nothing.
+- **Tests:** `backend/test/payments.billing.test.js` (7: allocation, money parsing, Insights counting, form/server parity) and `backend/test/payments.db.test.js` (20 on a throwaway MySQL database plus the real HTTP routes for P5 and gym isolation).

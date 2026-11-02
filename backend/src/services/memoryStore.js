@@ -15,6 +15,8 @@ const state = {
   trainers: [],
   // Member plan change log (see member_plan_changes in schema.sql).
   planChanges: [],
+  // In-place edits of a payment's method / reference / note (payment_corrections).
+  paymentCorrections: [],
   attendanceRevision: 0,
 };
 
@@ -26,6 +28,7 @@ function normalizeLoaded(data = {}) {
   state.archivedMembers = Array.isArray(data.archivedMembers) ? data.archivedMembers : [];
   state.trainers = Array.isArray(data.trainers) ? data.trainers : [];
   state.planChanges = Array.isArray(data.planChanges) ? data.planChanges : [];
+  state.paymentCorrections = Array.isArray(data.paymentCorrections) ? data.paymentCorrections : [];
   state.attendanceRevision = Number(data.attendanceRevision || 0);
 }
 

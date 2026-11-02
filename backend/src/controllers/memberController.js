@@ -4,7 +4,7 @@ const { createMember, updateMember } = require("../services/memberService");
 const { createExistingMember } = require("../services/onboardingService");
 const { notifyPayment } = require("../services/autoNotificationService");
 const planChangeService = require("../services/planChangeService");
-const { preparePeriodPayments } = require("../services/paymentService");
+const paymentService = require("../services/paymentService");
 
 async function listMembers(req, res) {
   res.json((await repo().getAllMembers(req.gymId)).map(publicMember));
@@ -14,10 +14,10 @@ async function postMember(req, res) {
   const body = req.body || {};
   // A member who joined before being entered into GymBoo, with their history.
   if (body.onboarding?.type === "existing") {
-    const { member, warnings } = await createExistingMember(req.gymId, body);
+    const { member, warnings } = await createExistingMember(req.gymId, body, req.user);
     return res.status(201).json(warnings.length ? { ...member, warnings } : member);
   }
-  return res.status(201).json(await createMember(req.gymId, body));
+  return res.status(201).json(await createMember(req.gymId, body, req.user));
 }
 
 async function putMember(req, res) {
@@ -32,13 +32,37 @@ async function deleteMember(req, res) {
   return res.json({ ok: true });
 }
 
+// Records money received. The older body ({ payments: [...] }) still gets the
+// member back, as it always did; the Record payment sheet also gets the
+// transaction it created.
 async function addPayments(req, res) {
+  const body = req.body || {};
+  const { member, transaction, repeated } = await paymentService.recordPayment(req.gymId, req.params.id, body, req.user);
+  if (!repeated && transaction) notifyPayment(req.gymId, member, [{ amount: transaction.amount }]);
+  if (Array.isArray(body.payments)) return res.json(member);
+  return res.status(repeated ? 200 : 201).json({ member, transaction, repeated });
+}
+
+// Method, reference or note, edited in place with an audit trail (owners only).
+async function patchPayment(req, res) {
+  res.json(await paymentService.editPaymentDetails(req.gymId, req.params.id, req.params.transactionId, req.body || {}, req.user));
+}
+
+// Amount, date or allocation: reversed and replaced in one go (owners only).
+async function postPaymentCorrection(req, res) {
+  res.json(await paymentService.correctPayment(req.gymId, req.params.id, req.params.transactionId, req.body || {}, req.user));
+}
+
+async function postPaymentReversal(req, res) {
+  res.json(await paymentService.reversePayment(req.gymId, req.params.id, req.params.transactionId, req.body || {}, req.user));
+}
+
+async function listPaymentCorrections(req, res) {
   const member = await repo().getMemberById(req.gymId, req.params.id);
-  if (!member) return res.status(404).json({ error: "Member not found" });
-  const payments = preparePeriodPayments(member, Array.isArray(req.body.payments) ? req.body.payments : []);
-  await repo().addPayments(member, payments);
-  notifyPayment(req.gymId, member, payments);
-  return res.json(publicMember(await repo().getMemberById(req.gymId, member.id)));
+  if (!member || !member.transactions.some((tx) => tx.id === req.params.transactionId)) {
+    return res.status(404).json({ error: "Payment not found" });
+  }
+  return res.json(await repo().listCorrections(req.gymId, req.params.transactionId));
 }
 
 // Change a member's plan from a chosen date; logged with who and when.
@@ -54,6 +78,10 @@ async function listPlanChanges(req, res) {
 
 module.exports = {
   addPayments,
+  listPaymentCorrections,
+  patchPayment,
+  postPaymentCorrection,
+  postPaymentReversal,
   listPlanChanges,
   postPlanChange,
   deleteMember,

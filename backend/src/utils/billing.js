@@ -228,6 +228,17 @@ function getUnpaidPeriods(member, settings) {
   return getBillingPeriodKeys(member, settings).filter((period) => !paid.has(period));
 }
 
+// Periods the member can be billed for today: every started period for an
+// upfront member; for a pay-after-term member only the ones that have ended
+// (the running one isn't owed yet). Mirrors getBillablePeriodKeys() in
+// admin-frontend/src/lib/billing.js.
+function billablePeriodKeys(member, settings) {
+  const periods = getBillingPeriodKeys(member, settings);
+  if (collectionTiming(member, settings) !== "fixed-day") return periods;
+  const today = todayKey();
+  return periods.filter((period) => localDateKey(periodEndDate(member, settings, period)) <= today);
+}
+
 // Periods with something paid toward them but not the whole fee. The member
 // keeps training on these; the rest is carried to their next payment.
 function partPaidPeriods(member, settings) {
@@ -405,6 +416,7 @@ module.exports = {
   ADMISSION_PERIOD_KEY,
   OPENING_PERIOD_KEY,
   balanceDue,
+  billablePeriodKeys,
   billingStartKey,
   collectionTiming,
   dueUnpaidPeriods,

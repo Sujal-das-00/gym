@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const { exec, getPool, query } = require("../config/database");
 const { toDateKey, todayKey } = require("../utils/date");
 const { normalizeMember, normalizePaymentMode, normalizePhone } = require("../utils/member");
-const { mapPaymentRow } = require("./paymentModel");
+const { insertTransaction, mapPaymentRow, mapTransactionRow } = require("./paymentModel");
 
 const CHUNK = 500;
 const placeholders = (n) => new Array(n).fill("?").join(",");
@@ -15,10 +15,11 @@ async function hydrateMembers(rows) {
     const slice = rows.slice(i, i + CHUNK);
     const ids = slice.map((row) => row.id);
     const marks = placeholders(ids.length);
-    const [attendanceRows, paymentRows, expiredRows] = await Promise.all([
+    const [attendanceRows, paymentRows, expiredRows, transactionRows] = await Promise.all([
       query(`SELECT member_id, attendance_date FROM attendance WHERE member_id IN (${marks}) ORDER BY attendance_date`, ids),
       query(`SELECT * FROM payments WHERE member_id IN (${marks}) ORDER BY payment_date, created_at`, ids),
       query(`SELECT member_id, checkin_date FROM checkins WHERE member_id IN (${marks}) AND expired = 1 ORDER BY checkin_date`, ids),
+      query(`SELECT * FROM payment_transactions WHERE member_id IN (${marks}) ORDER BY collected_on, created_at`, ids),
     ]);
     const group = (list, map) => {
       const byMember = new Map();
@@ -30,7 +31,20 @@ async function hydrateMembers(rows) {
     };
     const attendance = group(attendanceRows, (item) => toDateKey(item.attendance_date));
     const expired = group(expiredRows, (item) => toDateKey(item.checkin_date));
-    const payments = group(paymentRows, mapPaymentRow);
+    // A reversed payment's rows stay in the table for the record but no longer
+    // pay anything: billing, reports, reminders and the member app all read
+    // `payments`, so leaving them out here is what makes a reversal count.
+    const payments = group(
+      paymentRows.filter((row) => !row.reversed_at),
+      mapPaymentRow,
+    );
+    const allocationsByTransaction = new Map();
+    for (const row of paymentRows) {
+      if (!row.transaction_id) continue;
+      if (!allocationsByTransaction.has(row.transaction_id)) allocationsByTransaction.set(row.transaction_id, []);
+      allocationsByTransaction.get(row.transaction_id).push(mapPaymentRow(row));
+    }
+    const transactions = group(transactionRows, (row) => mapTransactionRow(row, allocationsByTransaction.get(row.id) || []));
     for (const row of slice) {
       out.push(
         normalizeMember({
@@ -56,6 +70,7 @@ async function hydrateMembers(rows) {
           attendance: attendance.get(row.id) || [],
           expiredCheckins: expired.get(row.id) || [],
           payments: payments.get(row.id) || [],
+          transactions: transactions.get(row.id) || [],
         }),
       );
     }
@@ -120,7 +135,7 @@ async function saveMember(gymId, member) {
  * phone or gym code fails the member INSERT and rolls everything back, so a
  * double submit can never leave a second member or extra payments behind.
  */
-async function createMemberWithHistory(gymId, member, payments) {
+async function createMemberWithHistory(gymId, member, payments, enteredBy = null) {
   const connection = await getPool().getConnection();
   try {
     await connection.beginTransaction();
@@ -151,19 +166,27 @@ async function createMemberWithHistory(gymId, member, payments) {
       ],
     );
     for (const payment of payments) {
+      if (payment.kind !== "admission") {
+        // Each past term the admin marked paid was its own collection.
+        await insertTransaction(
+          connection,
+          gymId,
+          member.id,
+          { ...payment, source: "onboarding", enteredBy },
+          [{ ...payment, date: payment.date }],
+        );
+        continue;
+      }
       await connection.execute(
         `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode, date_known)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, '', ?, ?, NULL, 'admission', ?, ?)`,
         [
           crypto.randomUUID(),
           member.id,
           payment.date,
           payment.date.slice(0, 7),
-          payment.billingMonth || "",
           payment.billingPeriod,
           payment.amount,
-          payment.kind === "admission" ? null : payment.periodFee,
-          payment.kind === "admission" ? "admission" : "membership",
           normalizePaymentMode(payment.mode) || null,
           payment.dateKnown ? 1 : 0,
         ],
@@ -177,6 +200,54 @@ async function createMemberWithHistory(gymId, member, payments) {
     connection.release();
   }
   return getMemberById(gymId, member.id);
+}
+
+/**
+ * Runs `work` with this member's row locked (SELECT … FOR UPDATE) inside one
+ * DB transaction, so two payments, corrections or reversals for the same
+ * member can never interleave: the second waits, then reads what the first
+ * committed. Balances are read from `member` (loaded after the lock); every
+ * write goes through `conn`, and all of it commits or rolls back together.
+ */
+async function withMemberLock(gymId, memberId, work) {
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    const [locked] = await conn.execute(
+      "SELECT id FROM members WHERE tenant_id = ? AND id = ? AND archived_at IS NULL FOR UPDATE",
+      [gymId, memberId],
+    );
+    if (!locked.length) {
+      const error = new Error("Member not found");
+      error.status = 404;
+      throw error;
+    }
+    const member = await getMemberById(gymId, memberId);
+    const result = await work(conn, member);
+    await conn.commit();
+    return result;
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+// One transaction written on its own (a new member's first term at joining).
+async function addTransaction(gymId, memberId, tx, allocations) {
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    const id = await insertTransaction(conn, gymId, memberId, tx, allocations);
+    await conn.commit();
+    return id;
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 // Moves a member's joining date and re-keys their paid terms to the new
@@ -197,6 +268,14 @@ async function moveMemberStartDate(gymId, memberId, startDate, moves) {
         [period, period.slice(0, 7), period, paymentId, memberId],
       );
     }
+    // An undated transaction is filed under its earliest term, which just moved.
+    await connection.execute(
+      `UPDATE payment_transactions t
+         SET t.collected_on = (SELECT MIN(p.payment_date) FROM payments p WHERE p.transaction_id = t.id)
+       WHERE t.tenant_id = ? AND t.member_id = ? AND t.date_known = 0
+         AND EXISTS (SELECT 1 FROM payments p WHERE p.transaction_id = t.id)`,
+      [gymId, memberId],
+    );
     await connection.commit();
   } catch (error) {
     await connection.rollback().catch(() => {});
@@ -284,21 +363,27 @@ async function applyPlanChange(gymId, { member, previous, payments, change }) {
       error.status = 409;
       throw error;
     }
-    for (const payment of payments) {
-      await connection.execute(
-        `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'membership', ?)`,
-        [
-          crypto.randomUUID(),
-          member.id,
-          toDateKey(payment.date || todayKey()),
-          String(payment.month),
-          String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
-          payment.billingPeriod,
-          Number(payment.amount || 0),
-          Number(payment.periodFee ?? payment.amount ?? 0),
-          payment.mode || null,
-        ],
+    // Everything collected with the change was taken in one go: one transaction.
+    if (payments.length) {
+      const date = toDateKey(payments[0].date || todayKey());
+      await insertTransaction(
+        connection,
+        gymId,
+        member.id,
+        {
+          amount: payments.reduce((sum, payment) => sum + Math.round(Number(payment.amount || 0) * 100), 0) / 100,
+          date,
+          dateKnown: true,
+          mode: payments[0].mode,
+          source: "plan_change",
+          enteredBy: change.changedBy,
+        },
+        payments.map((payment) => ({
+          billingPeriod: payment.billingPeriod,
+          billingMonth: String(payment.billingPeriod).length === 7 ? payment.billingPeriod : "",
+          amount: Number(payment.amount || 0),
+          periodFee: Number(payment.periodFee ?? payment.amount ?? 0),
+        })),
       );
     }
     await connection.execute(
@@ -363,6 +448,7 @@ function duplicateMemberError(error) {
 module.exports = {
   applyPlanChange,
   clearTrainerFromMembers,
+  addTransaction,
   countMembers,
   createMemberWithHistory,
   deleteMember,
@@ -374,4 +460,5 @@ module.exports = {
   listPlanChanges,
   moveMemberStartDate,
   saveMember,
+  withMemberLock,
 };
