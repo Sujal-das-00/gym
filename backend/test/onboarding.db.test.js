@@ -127,14 +127,16 @@ test("T2: unpaid historical terms are owed", opts, async () => {
 
 test("T3b/T3c: an unrecorded date is filed at the term start, for both collection timings", opts, async () => {
   for (const collectionTiming of ["at-join", "fixed-day"]) {
+    // "After the period" billing doesn't owe the term still running, so it isn't asked about.
+    const terms = collectionTiming === "fixed-day" ? TERMS.slice(0, -1) : TERMS;
     const { member } = await services.createExistingMember(
       gymId,
-      existingPayload(periods(TERMS.map((period) => paid(period, { date: null }))), { collectionTiming }),
+      existingPayload(periods(terms.map((period) => paid(period, { date: null }))), { collectionTiming }),
     );
     const rows = await paymentRows(member.id);
     assert.deepEqual(
       rows.map((row) => [require("../src/utils/date").toDateKey(row.payment_date), Number(row.date_known)]),
-      TERMS.map((period) => [period, 0]),
+      terms.map((period) => [period, 0]),
       collectionTiming,
     );
     assert.ok(member.payments.every((payment) => payment.dateKnown === false));
@@ -261,15 +263,17 @@ test("T9/T10: admission date kept through profile edits (C4)", opts, async () =>
   );
   const admission = async () => (await paymentRows(member.id)).find((row) => row.kind === "admission");
   let row = await admission();
+  // No date given: the admission fee is dated on the joining date and counts as recorded.
   assert.equal(require("../src/utils/date").toDateKey(row.payment_date), "2026-08-02");
-  assert.equal(Number(row.date_known), 0);
+  assert.equal(Number(row.date_known), 1);
 
   await services.updateMember(gymId, member.id, { ...member, name: "Renamed Member" });
+  // A recorded admission fee isn't changed from the profile (Edit payments does that).
   await services.updateMember(gymId, member.id, { ...member, name: "Renamed Member", admissionFee: 600 });
   row = await admission();
-  assert.equal(Number(row.amount), 600);
+  assert.equal(Number(row.amount), 500);
   assert.equal(require("../src/utils/date").toDateKey(row.payment_date), "2026-08-02");
-  assert.equal(Number(row.date_known), 0);
+  assert.equal(Number(row.date_known), 1);
 
   // A recorded date stays put too.
   const known = await services.createExistingMember(
@@ -345,4 +349,122 @@ test("joining-date edit: terms move; unrecorded dates follow them, recorded date
       ["2026-09-11", "2026-09-11", 0],
     ],
   );
+});
+
+test("joined yesterday, collected after the period: nothing to answer, nothing owed, due after the term", opts, async () => {
+  for (const startDate of ["2026-11-01", "2026-10-04"]) {
+    const { member } = await services.createExistingMember(
+      gymId,
+      existingPayload(periods([]), { collectionTiming: "fixed-day", startDate }),
+    );
+    const s = await settings();
+    assert.equal(billing.memberOutstanding(member, s), 0, startDate);
+    assert.equal(billing.isMembershipExpired(member, s), false, startDate);
+    assert.equal(billing.dueUnpaidPeriods(member, s).length, 0, startDate);
+  }
+});
+
+test("a new member can't start before today; today and later are fine", opts, async () => {
+  const add = (startDate) => {
+    const phone = nextPhone();
+    return services.createMember(gymId, {
+      name: "New Start", phone, gymId: `S${phone}`, fee: 1000, admissionFee: 0,
+      membershipType: "monthly", packageMonths: 1, collectionTiming: "fixed-day", startDate,
+    });
+  };
+  await rejects(add("2026-10-20"), 400, /can't start before today/);
+  assert.equal((await add("2026-11-02")).startDate, "2026-11-02");
+  assert.equal((await add("2026-11-10")).startDate, "2026-11-10");
+});
+
+test("an unrecorded payment date can be filled in; term dates can be corrected, a recorded admission date can't", opts, async () => {
+  const { prepareDateEdit } = require("../src/services/paymentService");
+  const { repo } = require("../src/models");
+  const { member } = await services.createExistingMember(
+    gymId,
+    existingPayload(periods([paid("2026-08-02", { date: null }), paid("2026-09-01"), paid("2026-10-01"), unpaid("2026-10-31")])),
+  );
+  // A fee added after onboarding has no known collection date.
+  await services.updateMember(gymId, member.id, { ...member, admissionFee: 200, admissionMode: "cash" });
+  const load = () => repo().getMemberById(gymId, member.id);
+  const rows = (await load()).payments;
+  const term = rows.find((payment) => payment.billingPeriod === "2026-08-02");
+  const admission = rows.find((payment) => payment.kind === "admission");
+  assert.deepEqual([term.dateKnown, admission.dateKnown], [false, false]);
+
+  for (const [payment, date] of [[term, "2026-08-20"], [admission, "2026-08-02"]]) {
+    const edit = prepareDateEdit(await load(), payment.id, date, "2026-11-02");
+    await repo().updatePaymentDate(await load(), edit.payment.id, edit.date);
+    const saved = (await load()).payments.find((item) => item.id === payment.id);
+    assert.deepEqual([saved.date.slice(0, 10), saved.dateKnown, saved.amount], [date, true, payment.amount]);
+  }
+  // Billing is untouched: the same terms are paid and the same one is owed.
+  assert.deepEqual(billing.dueUnpaidPeriods(await load(), await settings()), ["2026-10-31"]);
+
+  const current = await load();
+  // A term payment's recorded date can be corrected (owners only, at the route).
+  assert.equal(prepareDateEdit(current, term.id, "2026-08-21", "2026-11-02").date, "2026-08-21");
+  const other = current.payments.find((payment) => payment.billingPeriod === "2026-09-01");
+  assert.equal(prepareDateEdit(current, other.id, "2026-09-05", "2026-11-02").date, "2026-09-05");
+  // Profile saves no longer rewrite a recorded admission row, so its date can be corrected too.
+  assert.equal(prepareDateEdit(current, admission.id, "2026-08-03", "2026-11-02").date, "2026-08-03");
+  assert.throws(() => prepareDateEdit(current, "missing", "2026-09-05", "2026-11-02"), /not found/);
+});
+
+test("a payment date can't be in the future or before joining", opts, async () => {
+  const { prepareDateEdit } = require("../src/services/paymentService");
+  const { member } = await services.createExistingMember(
+    gymId,
+    existingPayload(periods([paid("2026-08-02", { date: null }), unpaid("2026-09-01"), unpaid("2026-10-01"), unpaid("2026-10-31")])),
+  );
+  const payment = member.payments.find((item) => item.billingPeriod === "2026-08-02");
+  assert.throws(() => prepareDateEdit(member, payment.id, "2026-11-03", "2026-11-02"), /future/);
+  assert.throws(() => prepareDateEdit(member, payment.id, "2026-08-01", "2026-11-02"), /before the joining date/);
+  assert.throws(() => prepareDateEdit(member, payment.id, "", "2026-11-02"), /Enter the date/);
+});
+
+test("admission at onboarding: no date uses the joining date; no fee means no payment row", opts, async () => {
+  const dated = await services.createExistingMember(
+    gymId,
+    existingPayload({ ...periods(TERMS.map((p) => paid(p))), admission: { paid: true, date: null, mode: "cash" } }, { admissionFee: 300 }),
+  );
+  const [row] = (await paymentRows(dated.member.id)).filter((item) => item.kind === "admission");
+  assert.deepEqual(
+    [require("../src/utils/date").toDateKey(row.payment_date), Number(row.date_known), Number(row.amount)],
+    ["2026-08-02", 1, 300],
+  );
+  const none = await services.createExistingMember(gymId, existingPayload(periods(TERMS.map((p) => paid(p))), { admissionFee: 300 }));
+  assert.equal((await paymentRows(none.member.id)).filter((item) => item.kind === "admission").length, 0);
+  assert.equal(none.member.admissionFee, 0);
+});
+
+test("other payments: need a note, never touch what is owed, and can be deleted", opts, async () => {
+  const { prepareOtherPayment, findEditablePayment, prepareAmountEdit } = require("../src/services/paymentService");
+  const { repo } = require("../src/models");
+  const { member } = await services.createExistingMember(gymId, existingPayload(periods(TERMS.slice(0, 3).map((p) => paid(p))), { collectionTiming: "fixed-day" }));
+  const s = await settings();
+  const before = [billing.memberOutstanding(member, s), billing.dueUnpaidPeriods(member, s).length, billing.isMembershipExpired(member, s)];
+
+  assert.throws(() => prepareOtherPayment({ amount: 500, note: "" }, "2026-11-02"), /note/);
+  assert.throws(() => prepareOtherPayment({ amount: 500, note: "  a " }, "2026-11-02"), /note/);
+  assert.throws(() => prepareOtherPayment({ amount: 0, note: "Protein" }, "2026-11-02"), /amount/);
+  assert.throws(() => prepareOtherPayment({ amount: 500, note: "x".repeat(161) }, "2026-11-02"), /160/);
+
+  const edit = prepareOtherPayment({ amount: 750, note: "  Whey   protein  ", mode: "upi" }, "2026-11-02");
+  assert.deepEqual(edit, { date: "2026-11-02", amount: 750, note: "Whey protein", mode: "upi" });
+  await repo().addOtherPayment(member, edit);
+
+  const saved = await repo().getMemberById(gymId, member.id);
+  const extra = saved.payments.find((payment) => payment.kind === "other");
+  assert.deepEqual([extra.amount, extra.note, extra.mode, extra.dateKnown, extra.periodFee], [750, "Whey protein", "upi", true, null]);
+  assert.deepEqual([billing.memberOutstanding(saved, s), billing.dueUnpaidPeriods(saved, s).length, billing.isMembershipExpired(saved, s)], before);
+  assert.equal(billing.getPeriodLedger(saved).has("other"), false, "it is not a term");
+
+  // It can't be amount-edited, but it can be deleted (a mistake), and billing stays the same.
+  assert.throws(() => prepareAmountEdit(saved, extra.id, 100, s), /can't be edited/);
+  assert.equal(findEditablePayment(saved, extra.id, s).payment.id, extra.id);
+  await repo().deletePayment(saved, extra.id);
+  const after = await repo().getMemberById(gymId, member.id);
+  assert.equal(after.payments.some((payment) => payment.kind === "other"), false);
+  assert.deepEqual([billing.memberOutstanding(after, s), billing.dueUnpaidPeriods(after, s).length], [before[0], before[1]]);
 });

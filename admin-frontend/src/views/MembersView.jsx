@@ -46,9 +46,9 @@ const MemberRow = memo(function MemberRow({ member, status, present, hasDues, tr
         </span>
         <span className="contact-state">
           <span className={"status-pill " + status}>
-            {status === "pending" && isPackage
+            {(status === "pending" || status === "upcoming") && isPackage
               ? `${packageEnd < todayKey() ? "Ended" : "Ends"} ${displayDate(packageEnd).slice(0, 6)}`
-              : status === "pending"
+              : status === "pending" || status === "upcoming"
               ? `Due ${displayDate(domain.getDueDateKey(member)).slice(0, 6)}`
               : status === "balance"
                 ? `${currency(domain.getBalanceDue(member) + domain.getOpeningBalanceDue(member))} balance`

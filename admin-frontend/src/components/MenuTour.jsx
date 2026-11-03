@@ -18,6 +18,7 @@ const nav = (view) => `#adminSidebar .nav-link[data-view="${view}"]`;
 const STEPS = [
   { target: "#menuToggle", mobileOnly: true, icon: "menu", title: "Your menu", text: "Tap here any time to open the menu. Every part of the app is in it." },
   { target: nav("dashboard"), icon: "dashboard", title: "Dashboard", text: "Today at a glance: who checked in, fees collected and who is due." },
+  { target: nav("dailylog"), icon: "event_note", title: "Daily Log", text: "Everything done at the gym, day by day: payments, members, plan changes and expenses." },
   { target: nav("attendance"), icon: "productivity", title: "Mark Attendance", text: "Mark members present for any day with a single tap." },
   { target: nav("checkin"), icon: "qr_code_scanner", title: "QR Check-in", text: "Put this QR at your desk. Members scan it to check themselves in." },
   { target: nav("history"), icon: "calendar_month", title: "Attendance History", text: "See who came on which day, for any dates you pick." },

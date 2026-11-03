@@ -34,12 +34,13 @@ export const paymentDateText = (payment) => (payment?.dateKnown === false ? "Dat
 // before part payments have no periodFee and were always full payments.
 export const isPartPayment = (payment) =>
   payment?.kind !== "admission" &&
+  payment?.kind !== "other" &&
   !isOpeningBalancePayment(payment) &&
   payment?.periodFee !== null &&
   payment?.periodFee !== undefined &&
   Number(payment.amount || 0) < Number(payment.periodFee);
 
-const samePeriod = (payment) => (other) => other.kind !== "admission" && other.billingPeriod === payment.billingPeriod;
+const samePeriod = (payment) => (other) => other.kind !== "admission" && other.kind !== "other" && other.billingPeriod === payment.billingPeriod;
 
 /**
  * What is still owed on a part payment's period, from every payment toward it.
@@ -71,9 +72,14 @@ export const partPaymentNotes = (payment, payments = []) => {
   return [`of ${rupees(payment.periodFee)}`, left > 0 ? `${rupees(left)} due` : "balance cleared"];
 };
 
+// What an other payment (supplements, a part payment, ...) was for, as the gym noted it.
+export const isOtherPayment = (payment) => payment?.kind === "other";
+
 export const paymentTitle = (payment) =>
   payment.kind === "admission"
     ? "One-time admission fee"
+    : isOtherPayment(payment)
+      ? `Other payment${payment.note ? ` • ${payment.note}` : ""}`
     : isOpeningBalancePayment(payment)
       ? "Opening balance"
       : `Membership${displayPeriod(payment.billingPeriod) ? ` • ${displayPeriod(payment.billingPeriod)}` : ""}${

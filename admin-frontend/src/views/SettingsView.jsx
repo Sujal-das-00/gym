@@ -239,7 +239,7 @@ export default function SettingsView() {
             <span>
               <strong>Collect at join (upfront)</strong>
               <small>
-                Members pay when they join. Their first term is marked paid and the next payment is due one cycle later.
+                Members pay when they join. Their first payment is marked paid and the next payment is due one cycle later.
               </small>
             </span>
           </label>

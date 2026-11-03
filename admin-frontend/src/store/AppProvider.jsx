@@ -449,6 +449,64 @@ export function AppProvider({ children }) {
     [closeFeeDialog, showToast],
   );
 
+  // Correct or delete one recorded payment (owners only; the server enforces
+  // it). Less than the term's fee leaves the rest due; deleting leaves the term
+  // unpaid, so it shows overdue once it is due.
+  const editPayment = useCallback(
+    async (memberId, paymentId, amount) => {
+      const saved = await api(
+        "/api/members/" + encodeURIComponent(memberId) + "/payments/" + encodeURIComponent(paymentId),
+        jsonRequest("PUT", { amount }),
+      );
+      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
+      showToast("Payment updated for " + saved.name);
+      return saved;
+    },
+    [showToast],
+  );
+
+  // Extra money taken from a member who owes nothing (supplements, a part
+  // payment, ...), with the note saying what it was for. Pays no term.
+  const addOtherPayment = useCallback(
+    async (memberId, { amount, note, mode }) => {
+      const saved = await api(
+        "/api/members/" + encodeURIComponent(memberId) + "/other-payments",
+        jsonRequest("POST", { amount, note, mode }),
+      );
+      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
+      showToast("Recorded " + currency(amount) + " from " + saved.name + " · " + note);
+      return saved;
+    },
+    [showToast],
+  );
+
+  // Fills in the collection date of a payment entered without one.
+  const setPaymentDate = useCallback(
+    async (memberId, paymentId, date) => {
+      const saved = await api(
+        "/api/members/" + encodeURIComponent(memberId) + "/payments/" + encodeURIComponent(paymentId) + "/date",
+        jsonRequest("PUT", { date }),
+      );
+      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
+      showToast("Payment date saved for " + saved.name);
+      return saved;
+    },
+    [showToast],
+  );
+
+  const removePayment = useCallback(
+    async (memberId, paymentId) => {
+      const saved = await api(
+        "/api/members/" + encodeURIComponent(memberId) + "/payments/" + encodeURIComponent(paymentId),
+        { method: "DELETE" },
+      );
+      setMembers((rows) => rows.map((item) => (item.id === saved.id ? saved : item)));
+      showToast("Payment deleted for " + saved.name);
+      return saved;
+    },
+    [showToast],
+  );
+
   /* ---- Plan changes ----------------------------------------------------- */
   // One request: the server moves the billing start, records any payments
   // taken with the change and writes the log entry together.
@@ -670,6 +728,10 @@ export function AppProvider({ children }) {
       deleteMember,
       setMemberAttendanceStatus,
       collectFees,
+      editPayment,
+      addOtherPayment,
+      setPaymentDate,
+      removePayment,
       saveExpense,
       deleteExpense,
       saveSettings,
@@ -730,6 +792,10 @@ export function AppProvider({ children }) {
       deleteMember,
       setMemberAttendanceStatus,
       collectFees,
+      editPayment,
+      addOtherPayment,
+      setPaymentDate,
+      removePayment,
       saveExpense,
       deleteExpense,
       saveSettings,

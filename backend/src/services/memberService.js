@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { shiftedPaymentPeriods } = require("../utils/billing");
-const { todayKey } = require("../utils/date");
+const { toDateKey, todayKey } = require("../utils/date");
 const { normalizeMember, normalizePaymentMode, normalizePhone, publicMember } = require("../utils/member");
 const { saveImageData } = require("./imageService");
 const { repo } = require("../models");
@@ -73,9 +73,22 @@ function firstBillingPeriodKey(member, settings) {
   return start; // 30-days / custom-days cycles are keyed by the exact start date
 }
 
+// A new member starts today or later; anyone who joined earlier is added as an
+// existing member with their past payments. One day of leeway covers a server
+// clock that is ahead of the admin's own date.
+function assertNotBackdated(startDate) {
+  const [year, month, day] = todayKey().split("-").map(Number);
+  if (String(startDate).slice(0, 10) < toDateKey(new Date(year, month - 1, day - 1))) {
+    const error = new Error("A new member can't start before today. If they joined earlier, add them as an existing member.");
+    error.status = 400;
+    throw error;
+  }
+}
+
 async function createMember(gymId, payload) {
   const settings = await repo().getSettings(gymId);
   const member = await mergeMemberPayload(null, payload);
+  assertNotBackdated(member.startDate);
   member.id = crypto.randomUUID();
   // Snapshot the collection timing on the member so it stays stable if the gym default changes later.
   if (!member.collectionTiming) member.collectionTiming = settings.defaultCollectionTiming;
@@ -116,7 +129,13 @@ async function updateMember(gymId, id, payload) {
   // A plan only changes through changeMemberPlan (planChangeService), which
   // moves the billing start and logs the change. Editing these here would
   // re-bill the member's whole history under the new plan, unlogged.
+  // The membership ID is fixed once assigned. A recorded admission fee is
+  // corrected from Edit payments (its own row), never from the profile; only a
+  // fee that was never recorded can be added here.
+  const admissionRecorded = (existing.payments || []).some((payment) => payment.kind === "admission");
   Object.assign(member, {
+    gymId: existing.gymId,
+    ...(admissionRecorded ? { admissionFee: existing.admissionFee } : {}),
     membershipType: existing.membershipType,
     packageMonths: existing.packageMonths,
     fee: existing.fee,
@@ -133,10 +152,9 @@ async function updateMember(gymId, id, payload) {
     await repo().moveMemberStartDate(gymId, id, member.startDate, moves);
   }
   const saved = await repo().saveMember(gymId, member);
-  // Re-sync so changing (or clearing) the admission fee, or moving the start
-  // date, updates the recorded admission payment instead of leaving a stale one.
+  // Records an admission fee added now; a recorded one is left exactly as it is.
   // admissionMode isn't a members-table column, so carry it over explicitly.
-  await repo().syncAdmissionPayment({ ...saved, admissionMode: member.admissionMode });
+  if (!admissionRecorded) await repo().syncAdmissionPayment({ ...saved, admissionMode: member.admissionMode });
   return publicMember(await repo().getMemberById(gymId, id));
 }
 

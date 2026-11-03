@@ -45,7 +45,7 @@ function amountError(value, label, { required = true, max = 1000000 } = {}) {
 
 // A start date far in the past or future is almost always a typo in the year,
 // and it silently shifts every billing period that follows.
-function startDateError(value) {
+function startDateError(value, notBefore = "") {
   const text = String(value || "").trim();
   if (!text) return "Start date is required.";
   const date = new Date(`${text}T00:00:00`);
@@ -56,6 +56,8 @@ function startDateError(value) {
   maxAhead.setFullYear(maxAhead.getFullYear() + 1);
   const minBack = new Date(today);
   minBack.setFullYear(minBack.getFullYear() - 10);
+  // A new member starts today or later; someone who joined earlier is an existing member.
+  if (notBefore && text < notBefore) return "A new member can't start before today. If they joined earlier, add them as an existing member.";
   if (date > maxAhead) return "Start date cannot be more than a year ahead.";
   if (date < minBack) return "Start date cannot be more than 10 years back.";
   return "";
@@ -100,7 +102,7 @@ export function validateMember(values, others = []) {
     else if (!Number.isInteger(months)) errors.packageMonths = "Package months must be a whole number.";
   }
 
-  errors.startDate = startDateError(values.startDate);
+  errors.startDate = startDateError(values.startDate, values.minStartDate);
 
   return stripEmpty(errors);
 }

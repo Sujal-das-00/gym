@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { getBillingPeriodKeys, nextPeriodStartKey, periodStartDate } = require("../utils/billing");
+const { billablePeriodKeys, nextPeriodStartKey, periodStartDate } = require("../utils/billing");
 const { nowIso, toDateKey, todayKey } = require("../utils/date");
 const { createHttpError } = require("../utils/http");
 const { normalizePaymentMode, publicMember } = require("../utils/member");
@@ -49,16 +49,16 @@ function readCollectionDate(value, startDate, today, label) {
  * plan fee) is what the term cost, and the rest stays on it as a balance.
  */
 function termPayments(member, terms, answers, today) {
-  if (!Array.isArray(answers)) throw createHttpError(400, "Mark every past term as paid or unpaid.");
+  if (!Array.isArray(answers)) throw createHttpError(400, "Mark every past payment as paid or unpaid.");
   const byPeriod = new Map();
   for (const answer of answers) {
     const period = String(answer?.period || "");
-    if (!terms.includes(period)) throw createHttpError(400, `${period || "A term"} is not one of this member's terms.`);
+    if (!terms.includes(period)) throw createHttpError(400, `${period || "A payment"} is not one of this member's payments.`);
     if (byPeriod.has(period)) throw createHttpError(400, `${period} is listed more than once.`);
     byPeriod.set(period, answer);
   }
   const missing = terms.filter((period) => !byPeriod.has(period));
-  if (missing.length) throw createHttpError(400, `Mark every past term as paid or unpaid (${missing.join(", ")} missing).`);
+  if (missing.length) throw createHttpError(400, `Mark every past payment as paid or unpaid (${missing.join(", ")} missing).`);
 
   const payments = [];
   for (const period of terms) {
@@ -69,6 +69,9 @@ function termPayments(member, terms, answers, today) {
     const amount = roundRupees(answer.amount);
     if (!Number.isFinite(amount) || amount <= 0) throw createHttpError(400, `Enter the amount received for ${period}.`);
     let periodFee = amount;
+    if (amount > roundRupees(answer.termFee ?? member.fee)) {
+      throw createHttpError(400, `${rupees(amount)} is more than the ${rupees(answer.termFee ?? member.fee)} fee for ${period}.`);
+    }
     if (answer.paidInFull === false) {
       periodFee = roundRupees(answer.termFee ?? member.fee);
       if (!Number.isFinite(periodFee) || periodFee <= 0) throw createHttpError(400, `Enter the fee for ${period}.`);
@@ -118,7 +121,7 @@ async function createExistingMember(gymId, payload) {
   if (method !== "periods" && method !== "opening") throw createHttpError(400, "Choose how to enter the member's past payments.");
   const hasOpening = onboarding.openingBalance !== undefined && onboarding.openingBalance !== null && onboarding.openingBalance !== "";
   if ((method === "periods" && hasOpening) || (method === "opening" && Array.isArray(onboarding.periods) && onboarding.periods.length)) {
-    throw createHttpError(400, "Use either term-by-term history or an opening balance, not both.");
+    throw createHttpError(400, "Use either payment-by-payment history or a total due amount, not both.");
   }
 
   const admission = onboarding.admission || {};
@@ -133,8 +136,9 @@ async function createExistingMember(gymId, payload) {
 
   // The member's own terms from the original joining date up to today, from
   // the gym's billing engine: 30-day terms, calendar months or packages,
-  // whichever this gym and plan use.
-  const terms = getBillingPeriodKeys(member, settings);
+  // whichever this gym and plan use. For "after the period" billing the term
+  // still running is not owed yet, so it is left out.
+  const terms = billablePeriodKeys(member, settings, today);
   const payments = [];
 
   if (method === "periods") {
@@ -160,13 +164,15 @@ async function createExistingMember(gymId, payload) {
   }
 
   if (admission.paid) {
+    // The admission fee is taken when someone joins, so with no date given it
+    // is dated on the joining date and counts as recorded there.
     const date = readCollectionDate(admission.date, member.startDate, today, "The admission fee");
     payments.push({
       kind: "admission",
       billingPeriod: "admission",
       billingMonth: "",
       date: date || member.startDate,
-      dateKnown: Boolean(date),
+      dateKnown: true,
       amount: member.admissionFee,
       mode: normalizePaymentMode(admission.mode),
     });
@@ -175,7 +181,7 @@ async function createExistingMember(gymId, payload) {
   const saved = await repo().createMemberWithHistory(gymId, member, payments);
   const warnings =
     terms.length > TERM_WARNING_THRESHOLD
-      ? [`${terms.length} terms have passed since ${startDate}. Check the joining date is right.`]
+      ? [`${terms.length} payments have fallen due since ${startDate}. Check the joining date is right.`]
       : [];
   return { member: publicMember(saved), warnings };
 }

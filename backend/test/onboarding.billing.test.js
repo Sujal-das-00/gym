@@ -92,7 +92,8 @@ test("T3b: unrecorded dates count in each term's month and are labelled", () => 
   assert.equal(novemberIncome(member), 0);
   const domain = fe.createDomain(SETTINGS);
   const entries = feLedger.buildLedgerEntries({ members: [member], expenses: [], domain });
-  assert.ok(entries.every((entry) => entry.detail.includes(fe.DATE_NOT_RECORDED)));
+  // Each entry carries the flag; the lists show "Date not recorded" from it.
+  assert.ok(entries.every((entry) => entry.dateKnown === false));
   assert.equal(domain.getPaymentDateLabel(payments[0]), fe.DATE_NOT_RECORDED);
 });
 
@@ -196,13 +197,18 @@ test("T8 (form): joining date limits, and every term must be answered", () => {
   const ask = () => feOnboarding.historyProblem({ startDate: member.startDate, terms: TERMS, history, domain, member, today });
   assert.match(ask(), /4 left/);
   for (const period of TERMS) history.answers[period] = { ...feOnboarding.blankAnswer(1000), status: "unpaid" };
+  // The admission fee is a question too: nothing is assumed.
+  assert.match(ask(), /admission fee was paid/);
+  history.admission.paid = true;
+  assert.match(ask(), /Enter the admission fee/);
+  history.admission.paid = false;
   assert.equal(ask(), "");
   history.answers["2026-08-02"] = { ...feOnboarding.blankAnswer(1000), status: "paid" };
   assert.match(ask(), /Don't know the date/);
   history.answers["2026-08-02"].dateUnknown = true;
   assert.equal(ask(), "");
-  history.answers["2026-08-02"].paidInFull = false;
-  assert.match(ask(), /must be more than the amount paid/);
+  history.answers["2026-08-02"].amount = "1200";
+  assert.match(ask(), /more than the monthly fee/);
 });
 
 test("form preview and payload match what the server stores", () => {
@@ -212,7 +218,7 @@ test("form preview and payload match what the server stores", () => {
   history.answers = {
     "2026-08-02": { ...feOnboarding.blankAnswer(1000), status: "paid", date: "2026-08-02" },
     "2026-09-01": { ...feOnboarding.blankAnswer(1000), status: "paid", amount: "800", dateUnknown: true },
-    "2026-10-01": { ...feOnboarding.blankAnswer(1000), status: "paid", amount: "500", paidInFull: false, date: "2026-10-03" },
+    "2026-10-01": { ...feOnboarding.blankAnswer(1000), status: "paid", amount: "500", date: "2026-10-03" },
     "2026-10-31": { ...feOnboarding.blankAnswer(1000), status: "unpaid" },
   };
   const preview = feOnboarding.previewMember({ member, terms: TERMS, history, cutover: "" });
@@ -220,20 +226,83 @@ test("form preview and payload match what the server stores", () => {
     preview.payments.map(({ billingPeriod, amount, periodFee, date, dateKnown }) => [billingPeriod, amount, periodFee, date, dateKnown]),
     [
       ["2026-08-02", 1000, 1000, "2026-08-02", true],
-      ["2026-09-01", 800, 800, "2026-09-01", false],
+      ["2026-09-01", 800, 1000, "2026-09-01", false],
       ["2026-10-01", 500, 1000, "2026-10-03", true],
     ],
   );
-  // ₹500 balance on 1 Oct + the unpaid 31 Oct term.
-  assert.equal(domain.getOutstandingAmount(preview), 1500);
+  // ₹200 short on 1 Sep + ₹500 short on 1 Oct + the unpaid 31 Oct term.
+  assert.equal(domain.getOutstandingAmount(preview), 1700);
 
-  const payload = feOnboarding.onboardingPayload({ terms: TERMS, history });
+  const payload = feOnboarding.onboardingPayload({ terms: TERMS, history, fee: 1000 });
   assert.equal(payload.method, "periods");
-  assert.deepEqual(payload.periods[1], { period: "2026-09-01", status: "paid", amount: 800, paidInFull: true, date: null, mode: "" });
+  assert.deepEqual(payload.periods[1], { period: "2026-09-01", status: "paid", amount: 800, paidInFull: false, termFee: 1000, date: null, mode: "" });
   assert.deepEqual(payload.periods[2].termFee, 1000);
   assert.deepEqual(payload.periods[3], { period: "2026-10-31", status: "unpaid" });
 
   const cutover = feOnboarding.openingCutover(domain, member);
   assert.equal(cutover, "2026-11-30");
   assert.equal(cutover, be.nextPeriodStartKey(member, SETTINGS), "form and server agree on the cut-over");
+});
+
+test("other payments: income with a note that never changes what is owed, on both sides", () => {
+  const paidUp = existingMember({ payments: TERMS.map((period) => termPayment(period)), collectionTiming: "at-join" });
+  const extra = {
+    id: "x1",
+    kind: "other",
+    billingPeriod: "other",
+    billingMonth: "",
+    amount: 750,
+    periodFee: null,
+    date: "2026-11-02",
+    dateKnown: true,
+    mode: "upi",
+    note: "Whey protein",
+  };
+  const member = { ...paidUp, payments: [...paidUp.payments, extra] };
+
+  const before = both(paidUp);
+  const after = both(member);
+  assert.deepEqual([after.overdue, after.outstanding, after.expired, after.status], [before.overdue, before.outstanding, before.expired, before.status]);
+  assert.equal(after.status, "paid");
+  assert.equal(after.domain.isPartPayment(extra), false);
+  assert.equal(after.domain.getPaymentLabel(extra, member), "Other payment");
+  assert.equal(after.domain.getPeriodLedger?.(member)?.has?.("other") ?? false, false);
+
+  // The ledger counts it as income, named by its note.
+  const entry = feLedger.buildLedgerEntries({ members: [member], expenses: [], domain: after.domain }).find((item) => item.id === "x1");
+  assert.deepEqual(
+    [entry.type, entry.amount, entry.category, entry.purchase, entry.detail, entry.dateKnown],
+    ["earning", 750, "other-payment", "Whey protein", "Other payment", true],
+  );
+  assert.equal(novemberIncome(member) - novemberIncome(paidUp), 750);
+});
+
+test("part-paying the running package of an after-the-period member before it ends", () => {
+  const pkg = (payments = []) => ({
+    id: "pkg", name: "Pkg", fee: 6000, membershipType: "package", packageMonths: 3, collectionTiming: "fixed-day",
+    startDate: "2026-11-02", planStartDate: "", billingCutover: "", openingBalance: 0, payments,
+  });
+  const part = { id: "a", kind: "membership", billingPeriod: "2026-11-02", amount: 2000, periodFee: 6000, date: "2026-11-02", dateKnown: true };
+  const domain = fe.createDomain(SETTINGS);
+
+  // The running term is the one offered for an advance payment, until something is paid on it.
+  assert.equal(domain.getAdvanceTerm(pkg()), "2026-11-02");
+  assert.equal(domain.getAdvanceTerm(pkg([part])), "");
+  assert.equal(domain.getAdvanceTerm({ ...pkg(), collectionTiming: "at-join" }), "", "upfront members pay at the start, not in advance");
+
+  // The server takes it, stamping the term's full fee, and refuses more than the fee.
+  const [prepared] = preparePeriodPayments(pkg(), [{ billingPeriod: "2026-11-02", amount: 2000 }]);
+  assert.deepEqual([prepared.amount, prepared.periodFee], [2000, 6000]);
+  assert.throws(() => preparePeriodPayments(pkg(), [{ billingPeriod: "2026-11-02", amount: 7000 }]), /more than/);
+
+  // Same answers on both sides: a balance, not overdue, and still due at the end of the package.
+  const result = both(pkg([part]));
+  assert.deepEqual([result.outstanding, result.expired, result.overdue], [4000, false, []]);
+  assert.equal(result.status, "balance");
+  assert.equal(result.domain.getDueDateKey(pkg([part])), "2027-02-02");
+  assert.equal(be.memberBillingSummary(pkg([part]), SETTINGS).nextDueDate, "2027-02-02");
+
+  // Paying the whole fee early settles the term.
+  const full = pkg([{ ...part, amount: 6000 }]);
+  assert.equal(both(full).outstanding, 0);
 });

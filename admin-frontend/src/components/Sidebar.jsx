@@ -7,7 +7,10 @@ import AuthBar from "../auth/AuthBar.jsx";
 const NAV_SECTIONS = [
   {
     label: "Overview",
-    links: [{ view: "dashboard", icon: "dashboard", text: "Dashboard" }],
+    links: [
+      { view: "dashboard", icon: "dashboard", text: "Dashboard" },
+      { view: "dailylog", icon: "event_note", text: "Daily Log" },
+    ],
   },
   {
     label: "Attendance",

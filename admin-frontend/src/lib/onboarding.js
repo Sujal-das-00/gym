@@ -33,8 +33,8 @@ export function blankHistory() {
     method: "periods",
     answers: {},
     openingBalance: "",
-    openingAdmission: "",
-    admission: { paid: false, amount: "", date: "", dateUnknown: false, mode: "" },
+    // paid: null until the admin says whether one was paid (nothing assumed).
+    admission: { paid: null, amount: "", date: "", dateUnknown: false, mode: "" },
   };
 }
 
@@ -75,30 +75,31 @@ export function historyProblem({ startDate, terms, history, domain, member, toda
 
   if (history.method === "periods") {
     const unanswered = terms.filter((period) => !history.answers[period]?.status).length;
-    if (unanswered) return `Mark every past term as paid or unpaid (${unanswered} left).`;
+    if (unanswered) return `Mark every past payment as paid or unpaid (${unanswered} left).`;
     for (const period of terms) {
       const answer = history.answers[period];
       if (answer.status !== "paid") continue;
       const label = termRange(domain, member, period);
       const amount = Number(answer.amount);
       if (!(amount > 0)) return `Enter the amount received for ${label}.`;
-      if (!answer.paidInFull && !(Number(answer.termFee) > amount)) {
-        return `The fee for ${label} must be more than the amount paid, or tick "Paid in full".`;
+      if (Number(member.fee) > 0 && amount > Number(member.fee)) {
+        return `The amount for ${label} can't be more than the monthly fee (₹${Number(member.fee)}).`;
       }
       const problem = dateProblem(answer, label, startDate, today);
       if (problem) return problem;
     }
   } else {
     const balance = Number(history.openingBalance);
-    if (!(balance > 0)) return "Enter the opening balance owed.";
-    const admissionPart = Number(history.openingAdmission || 0);
-    if (!(admissionPart >= 0) || admissionPart > balance) return "The admission-fee part can't be more than the opening balance.";
-    if (admissionPart > 0 && history.admission.paid) return "The admission fee can't be both paid and part of the opening balance.";
+    if (!(balance > 0)) return "Enter the total amount due.";
   }
 
+  if (history.admission.paid === null || history.admission.paid === undefined) {
+    return "Say whether an admission fee was paid.";
+  }
   if (history.admission.paid) {
     if (!(Number(history.admission.amount) > 0)) return "Enter the admission fee that was paid.";
-    const problem = dateProblem(history.admission, "The admission fee", startDate, today);
+    // The date is optional: left empty, the fee is dated on the joining date.
+    const problem = dateProblem({ ...history.admission, dateUnknown: !history.admission.date }, "The admission fee", startDate, today);
     if (problem) return problem;
   }
   return "";
@@ -117,7 +118,7 @@ export function previewMember({ member, terms, history, cutover }) {
         kind: "membership",
         billingPeriod: period,
         amount,
-        periodFee: answer.paidInFull ? amount : Number(answer.termFee) || amount,
+        periodFee: Math.max(amount, Number(member.fee) || 0),
         date: answer.dateUnknown || !answer.date ? termStartKey(period) : answer.date,
         dateKnown: !answer.dateUnknown && Boolean(answer.date),
       });
@@ -132,23 +133,22 @@ export function previewMember({ member, terms, history, cutover }) {
     planStartDate: "",
     onboardingType: "existing",
     openingBalance: opening ? Number(history.openingBalance) || 0 : 0,
-    openingBalanceAdmission: opening ? Number(history.openingAdmission) || 0 : 0,
+    openingBalanceAdmission: 0,
     billingCutover: opening ? cutover : "",
     payments,
   };
 }
 
 // The `onboarding` block POST /api/members expects for an existing member.
-export function onboardingPayload({ terms, history }) {
+export function onboardingPayload({ terms, history, fee = 0 }) {
   const admission = history.admission.paid
-    ? { paid: true, date: history.admission.dateUnknown ? null : history.admission.date, mode: history.admission.mode }
+    ? { paid: true, date: history.admission.date || null, mode: history.admission.mode }
     : { paid: false };
   if (history.method === "opening") {
     return {
       type: "existing",
       method: "opening",
       openingBalance: Number(history.openingBalance),
-      openingBalanceAdmission: Number(history.openingAdmission || 0),
       admission,
     };
   }
@@ -162,8 +162,8 @@ export function onboardingPayload({ terms, history }) {
         period,
         status: "paid",
         amount: Number(answer.amount),
-        paidInFull: Boolean(answer.paidInFull),
-        ...(answer.paidInFull ? {} : { termFee: Number(answer.termFee) }),
+        paidInFull: Number(answer.amount) >= fee,
+        ...(Number(answer.amount) >= fee ? {} : { termFee: fee }),
         date: answer.dateUnknown ? null : answer.date,
         mode: answer.mode,
       };

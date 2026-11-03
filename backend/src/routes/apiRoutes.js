@@ -3,6 +3,7 @@ const appController = require("../controllers/appController");
 const attendanceController = require("../controllers/attendanceController");
 const authController = require("../controllers/authController");
 const checkinController = require("../controllers/checkinController");
+const dailyLogController = require("../controllers/dailyLogController");
 const expenseController = require("../controllers/expenseController");
 const memberController = require("../controllers/memberController");
 const publicController = require("../controllers/publicController");
@@ -106,8 +107,15 @@ router.post("/members", asyncHandler(memberController.postMember));
 router.put("/members/:id", asyncHandler(memberController.putMember));
 router.delete("/members/:id", asyncHandler(memberController.deleteMember));
 router.post("/members/:id/payments", asyncHandler(memberController.addPayments));
+router.post("/members/:id/other-payments", asyncHandler(memberController.postOtherPayment));
+router.put("/members/:id/payments/:paymentId", requireRole("gym_admin", "super_admin"), asyncHandler(memberController.putPayment));
+router.put("/members/:id/payments/:paymentId/date", requireRole("gym_admin", "super_admin"), asyncHandler(memberController.putPaymentDate));
+router.delete("/members/:id/payments/:paymentId", requireRole("gym_admin", "super_admin"), asyncHandler(memberController.deletePayment));
 router.post("/members/:id/plan", asyncHandler(memberController.postPlanChange));
 router.get("/plan-changes", asyncHandler(memberController.listPlanChanges));
+
+// Everything that happened in the gym, day by day, rebuilt from record timestamps.
+router.get("/daily-log", asyncHandler(dailyLogController.listDailyLog));
 
 router.get("/trainers", asyncHandler(trainerController.listTrainers));
 router.put("/trainers/:id", asyncHandler(trainerController.putTrainer));

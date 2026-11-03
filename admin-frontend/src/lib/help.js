@@ -269,7 +269,7 @@ export const HELP_GUIDE = [
         "<b>Gym name &amp; logo:</b> shown across the app and on the member check-in page   upload your logo for branding.",
         "<b>App colours:</b> match the app to your brand colours.",
         "<b>Billing cycle:</b> pick how you charge   1st of every month, a rolling 30-day membership, or a custom number of days (e.g. 25).",
-        "<b>Payment collection:</b> “Collect at join (upfront)” marks the first term paid and sets the next due date; “Collect after the period” records the fee as due at the end of each period.",
+        "<b>Payment collection:</b> “Collect at join (upfront)” marks the first payment paid and sets the next due date; “Collect after the period” records the fee as due at the end of each period.",
         "<b>Expired memberships:</b> allow lapsed members to still check in (visits flagged red), or block check-in until they renew.",
         "<b>Gym holidays:</b> choose weekly closed days and add specific festival/event dates   these are excluded from every member's attendance rate.",
       ],
@@ -295,7 +295,7 @@ export const HELP_FAQ = {
   en: [
     {
       q: "My gym collects the fee at the time of joining (upfront)   what setting should I turn on?",
-      a: "Go to <b>Settings → Payment collection</b> and choose <b>“Collect at join (upfront)”</b>. The member's first term is marked paid and the next payment is set to fall due one cycle later.",
+      a: "Go to <b>Settings → Payment collection</b> and choose <b>“Collect at join (upfront)”</b>. The member's first payment is marked paid and the next payment is set to fall due one cycle later.",
     },
     {
       q: "My gym collects the fee after the period (e.g. after 30 days)   what setting should I turn on?",

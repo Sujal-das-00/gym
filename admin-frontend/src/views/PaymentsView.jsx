@@ -10,7 +10,8 @@ const VISIBLE_LIMIT = 120;
 const GROUPS = [
   { key: "overdue", label: "Overdue" },
   { key: "balance", label: "Balance due" },
-  { key: "pending", label: "Pending" },
+  { key: "pending", label: "Due now" },
+  { key: "upcoming", label: "Up to date" },
   { key: "paid", label: "Paid" },
 ];
 
@@ -23,12 +24,16 @@ const PaymentRow = memo(function PaymentRow({ row, hasRange, domain, openFeeDial
           <Photo person={row.member} />
         </span>
         <span className="contact-copy">
-          <strong>{row.member.name}</strong>
+          <strong>
+            <span className="contact-name">{row.member.name}</span>
+            {domain.getMembershipType(row.member) === "package" ? <em className="contact-tag package">Package</em> : null}
+          </strong>
           <small>
             {hasRange
               ? `${row.paymentCount} payment${row.paymentCount === 1 ? "" : "s"} · ${currency(row.collected)}`
               : [row.member.phone, domain.getMembershipLabel(row.member)].filter(Boolean).join(" · ")}
           </small>
+
         </span>
         <span className="contact-state">
           {row.status === "overdue" ? (
@@ -99,7 +104,7 @@ export default function PaymentsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, domain, hasRange, startDate, endDate, today]);
 
-  const counts = { all: rows.length, overdue: 0, balance: 0, pending: 0, paid: 0 };
+  const counts = { all: rows.length, overdue: 0, balance: 0, pending: 0, upcoming: 0, paid: 0 };
   let collected = 0;
   let outstanding = 0;
   rows.forEach((row) => {

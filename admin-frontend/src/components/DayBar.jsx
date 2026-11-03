@@ -15,8 +15,11 @@ function dayHeading(key) {
   return dateFormatter({ weekday: "long" }).format(parseDateKey(key));
 }
 
-/** ‹ Today · 18 Oct 2026 › — step a day either way, or tap the middle to pick a date. */
-export default function DayBar({ date, onChange, inputId, label = "Date" }) {
+/**
+ * ‹ Today · 18 Oct 2026 › — step a day either way, or tap the middle to pick a date.
+ * `max` (a date key) is the last day that can be reached; without it any day can.
+ */
+export default function DayBar({ date, onChange, inputId, label = "Date", max }) {
   return (
     <div className="day-bar">
       <button type="button" className="day-step" aria-label="Previous day" onClick={() => onChange(shiftDay(date, -1))}>
@@ -31,11 +34,12 @@ export default function DayBar({ date, onChange, inputId, label = "Date" }) {
           type="date"
           aria-label={label}
           value={date}
+          max={max}
           onChange={(event) => onChange(event.target.value || todayKey())}
           onClick={(event) => event.currentTarget.showPicker?.()}
         />
       </label>
-      <button type="button" className="day-step" aria-label="Next day" onClick={() => onChange(shiftDay(date, 1))}>
+      <button type="button" className="day-step" aria-label="Next day" disabled={Boolean(max) && date >= max} onClick={() => onChange(shiftDay(date, 1))}>
         <Icon name="chevron_right" />
       </button>
       {date !== todayKey() ? (

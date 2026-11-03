@@ -3,6 +3,7 @@ const { nowIso, todayKey, toDateKey } = require("../utils/date");
 const { normalizeMember, normalizePaymentMode, normalizePhone, publicMember } = require("../utils/member");
 const { normalizeSettings } = require("../utils/settings");
 const { ADMISSION_PERIOD_KEY } = require("../utils/billing");
+const { parseTime } = require("../utils/dailyLog");
 const store = require("../services/memoryStore");
 
 function getAllMembers() {
@@ -185,6 +186,62 @@ function setMemberAttendance(memberId, date, present) {
 function attendanceStatusRows(date) {
   const key = toDateKey(date);
   return getAllMembers().map((member) => ({ id: member.id, gymId: member.gymId, present: (member.attendance || []).includes(key) }));
+}
+
+function updatePaymentAmount(member, paymentId, period, amount, periodFee) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  if (!target) return;
+  for (const payment of target.payments || []) {
+    if (payment.id === paymentId) payment.amount = amount;
+    if (payment.kind !== "admission" && payment.billingPeriod === period) payment.periodFee = periodFee;
+  }
+  store.persist();
+}
+
+function updateAdmissionAmount(member, paymentId, amount) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  const payment = (target?.payments || []).find((item) => item.id === paymentId && item.kind === "admission");
+  if (!payment) return;
+  payment.amount = amount;
+  target.admissionFee = amount;
+  store.persist();
+}
+
+function updatePaymentDate(member, paymentId, date) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  const payment = (target?.payments || []).find((item) => item.id === paymentId);
+  if (!payment) return;
+  payment.date = date;
+  payment.month = date.slice(0, 7);
+  payment.dateKnown = true;
+  store.persist();
+}
+
+function addOtherPayment(member, { id, date, amount, mode, note }) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  if (!target) return;
+  target.payments ||= [];
+  target.payments.push({
+    id: id || crypto.randomUUID(),
+    date,
+    month: date.slice(0, 7),
+    billingMonth: "",
+    billingPeriod: "other",
+    amount,
+    periodFee: null,
+    kind: "other",
+    note,
+    mode: normalizePaymentMode(mode),
+    dateKnown: true,
+  });
+  store.persist();
+}
+
+function deletePayment(member, paymentId) {
+  const target = store.getState().members.find((item) => item.id === member.id);
+  if (!target) return;
+  target.payments = (target.payments || []).filter((payment) => !(payment.id === paymentId && payment.kind !== "admission"));
+  store.persist();
 }
 
 function addPayments(member, payments = []) {
@@ -382,8 +439,64 @@ function memberCheckinHistory(member, limit = 12) {
     }));
 }
 
+// JSON mode keeps the activity record in the store like everything else.
+function insertActivity(gymId, entry) {
+  const state = store.getState();
+  state.activity ||= [];
+  state.activity.push({ id: crypto.randomUUID(), ...entry, details: entry.details || {} });
+  store.persist();
+}
+
+function getActivityRecords(gymId, { from, to }) {
+  const all = store.getState().activity || [];
+  return {
+    rows: all
+      .filter((row) => row.at >= from && row.at < to)
+      .map((row) => ({ ...row, memberId: row.memberId || "", actor: row.actor?.id ? row.actor : null, amount: row.amount ?? null })),
+    since: all.length ? Math.min(...all.map((row) => row.at)) : null,
+  };
+}
+
+// JSON mode keeps no edit or payment times, so its Daily Log shows members
+// added and removed, plan changes, trainers and check-ins (dev use only).
+function getDailyLogRecords(gymId, { fromDay, toDay }) {
+  const state = store.getState();
+  const toMember = (member) => ({
+    id: member.id,
+    name: member.name,
+    code: member.gymId,
+    createdAt: parseTime(member.createdAt),
+    updatedAt: null,
+    archivedAt: parseTime(member.archivedAt),
+    membershipType: member.membershipType === "package" ? "package" : "monthly",
+    packageMonths: Number(member.packageMonths || 1),
+    fee: Number(member.fee || 0),
+    onboardingType: member.onboardingType,
+  });
+  const checkins = {};
+  for (const member of state.members) {
+    for (const day of member.attendance || []) {
+      const key = toDateKey(day);
+      if (key >= fromDay && key <= toDay) checkins[key] = (checkins[key] || 0) + 1;
+    }
+  }
+  return {
+    members: [...state.members, ...(state.archivedMembers || [])].map(toMember),
+    planChanges: (state.planChanges || []).map((change) => ({ ...change, at: parseTime(change.changedAt), by: change.changedBy || null })),
+    payments: [],
+    expenses: [],
+    trainers: (state.trainers || []).map((trainer) => ({ id: trainer.id, name: trainer.name, createdAt: parseTime(trainer.createdAt) })),
+    checkins,
+  };
+}
+
 module.exports = {
   addPayments,
+  deletePayment,
+  addOtherPayment,
+  updatePaymentAmount,
+  updatePaymentDate,
+  updateAdmissionAmount,
   applyPlanChange,
   attendanceStatusRows,
   createCheckin,
@@ -393,6 +506,9 @@ module.exports = {
   deleteMember,
   deleteTrainer,
   getAllTrainers,
+  getDailyLogRecords,
+  getActivityRecords,
+  insertActivity,
   getTrainerById,
   saveTrainer,
   findCheckinForDate,

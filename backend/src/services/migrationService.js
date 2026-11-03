@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { exec, query, raw } = require("../config/database");
+const { exec, getPool, query, raw } = require("../config/database");
 const { DEFAULT_SETTINGS } = require("../config/constants");
 const { normalizePhone } = require("../utils/member");
 const { slugify } = require("../utils/slug");
@@ -255,6 +255,21 @@ async function ensureFeatureColumns() {
   if (!(await columnExists("payments", "date_known"))) {
     await tryRaw("ALTER TABLE payments ADD COLUMN date_known TINYINT(1) NOT NULL DEFAULT 1 AFTER payment_mode", "payments.date_known");
   }
+  // Extra payments (supplements, a part payment taken while up to date, ...):
+  // their own kind, with a note saying what they were for. Every existing row
+  // keeps its kind and an empty note.
+  const kindType = await query(
+    "SELECT column_type AS type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'payments' AND column_name = 'kind' LIMIT 1",
+  );
+  if (kindType.length && !String(kindType[0].type || kindType[0].TYPE || "").includes("'other'")) {
+    await tryRaw(
+      "ALTER TABLE payments MODIFY COLUMN kind ENUM('membership', 'admission', 'other') NOT NULL DEFAULT 'membership'",
+      "payments.kind other",
+    );
+  }
+  if (!(await columnExists("payments", "note"))) {
+    await tryRaw("ALTER TABLE payments ADD COLUMN note VARCHAR(160) NOT NULL DEFAULT '' AFTER date_known", "payments.note");
+  }
   // Assigned trainer. Existing members have none ('').
   if (!(await columnExists("members", "trainer_id"))) {
     await tryRaw("ALTER TABLE members ADD COLUMN trainer_id VARCHAR(64) NOT NULL DEFAULT '' AFTER photo", "members.trainer_id");
@@ -272,6 +287,16 @@ async function ensureFeatureColumns() {
       "ALTER TABLE expenses ADD COLUMN payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL AFTER expense_date",
       "expenses.payment_mode",
     );
+  }
+  // When a payment or expense was last edited, for the Daily Log. NULL until
+  // an edit: existing rows must not all read as "edited" on the upgrade day.
+  for (const table of ["payments", "expenses"]) {
+    if (!(await columnExists(table, "updated_at"))) {
+      await tryRaw(
+        `ALTER TABLE ${table} ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
+        `${table}.updated_at`,
+      );
+    }
   }
 }
 
@@ -328,6 +353,65 @@ async function ensureMemberArchive() {
   }
 }
 
+// "Keep as balance due" from the reverted membership-lifecycle release: old-plan
+// terms a plan change left owed, listed in member_plan_changes.dues_detail.carried.
+// This code has no such terms, so what is still owed on them moves to the
+// member's opening balance, which behaves the same way (owed and collectable,
+// never overdue, never blocks check-in). Each row is converted once: its
+// entries move to dues_detail.carriedToOpeningBalance.
+async function convertCarriedDues() {
+  if (!(await columnExists("member_plan_changes", "dues_detail"))) return;
+  const rows = await query(
+    "SELECT id, member_id, dues_detail FROM member_plan_changes WHERE dues_detail IS NOT NULL AND JSON_LENGTH(dues_detail, '$.carried') > 0",
+  );
+  const hasReversed = await columnExists("payments", "reversed_at");
+  for (const row of rows) {
+    const detail = typeof row.dues_detail === "string" ? JSON.parse(row.dues_detail) : row.dues_detail;
+    const carried = Array.isArray(detail?.carried) ? detail.carried : [];
+    if (!carried.length) continue;
+    let owed = 0;
+    const converted = [];
+    for (const term of carried) {
+      const paidRows = await query(
+        `SELECT amount, period_fee FROM payments WHERE member_id = ? AND billing_period = ? AND kind = 'membership'${hasReversed ? " AND reversed_at IS NULL" : ""}`,
+        [row.member_id, String(term.period)],
+      );
+      const paid = paidRows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const legacy = paidRows.some((item) => item.period_fee === null);
+      const charge = paidRows.find((item) => item.period_fee !== null)?.period_fee ?? term.fee;
+      const left = legacy ? 0 : Math.max(0, Math.round((Number(charge || 0) - paid) * 100) / 100);
+      owed += left;
+      converted.push({ ...term, balanceMoved: left });
+    }
+    owed = Math.round(owed * 100) / 100;
+    const next = { ...detail, carried: [], carriedToOpeningBalance: converted };
+    await withTransaction(async (connection) => {
+      const [updated] = await connection.execute(
+        "UPDATE member_plan_changes SET dues_detail = ? WHERE id = ? AND JSON_LENGTH(dues_detail, '$.carried') > 0",
+        [JSON.stringify(next), row.id],
+      );
+      if (updated.affectedRows && owed > 0) {
+        await connection.execute("UPDATE members SET opening_balance = opening_balance + ?, updated_at = updated_at WHERE id = ?", [owed, row.member_id]);
+      }
+    });
+    console.log(`Migration: moved ${owed} of kept-as-balance dues to the opening balance of member ${row.member_id}.`);
+  }
+}
+
+async function withTransaction(work) {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await work(connection);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function runMigrations() {
   await ensureTenantColumns();
   await ensureFeatureColumns();
@@ -344,6 +428,7 @@ async function runMigrations() {
 
   await tightenConstraints();
   await ensureMemberArchive();
+  await convertCarriedDues();
   // Super-admins are authenticated straight from env (SUPER_ADMIN_EMAIL /
   // SUPER_ADMIN_PASSWORD) via the /superadmin panel — nothing to seed here.
 }

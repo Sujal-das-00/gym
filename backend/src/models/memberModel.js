@@ -30,7 +30,12 @@ async function hydrateMembers(rows) {
     };
     const attendance = group(attendanceRows, (item) => toDateKey(item.attendance_date));
     const expired = group(expiredRows, (item) => toDateKey(item.checkin_date));
-    const payments = group(paymentRows, mapPaymentRow);
+    // A database that ran the reverted payment-transactions release can hold
+    // reversed rows (payments.reversed_at); they no longer pay anything.
+    const payments = group(
+      paymentRows.filter((item) => !item.reversed_at),
+      mapPaymentRow,
+    );
     for (const row of slice) {
       out.push(
         normalizeMember({
@@ -372,6 +377,7 @@ module.exports = {
   getAllMembers,
   getMemberById,
   listPlanChanges,
+  mapPlanChangeRow,
   moveMemberStartDate,
   saveMember,
 };

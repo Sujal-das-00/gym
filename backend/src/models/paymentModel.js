@@ -1,11 +1,11 @@
 const crypto = require("crypto");
-const { exec, query } = require("../config/database");
+const { exec, getPool, query } = require("../config/database");
 const { todayKey, toDateKey } = require("../utils/date");
-const { ADMISSION_PERIOD_KEY } = require("../utils/billing");
+const { ADMISSION_PERIOD_KEY, EXTRA_PERIOD_KEY } = require("../utils/billing");
 const { normalizePaymentMode } = require("../utils/member");
 
 function paymentKind(payment) {
-  return payment?.kind === "admission" ? "admission" : "membership";
+  return ["admission", "other"].includes(payment?.kind) ? payment.kind : "membership";
 }
 
 function mapPaymentRow(row) {
@@ -20,6 +20,7 @@ function mapPaymentRow(row) {
     // payments, each of which paid its period in full (see getPeriodLedger).
     periodFee: row.period_fee === null || row.period_fee === undefined ? null : Number(row.period_fee),
     kind: paymentKind(row),
+    note: String(row.note || ""),
     mode: normalizePaymentMode(row.payment_mode),
     // false: entered later without its collection date (date = term start).
     dateKnown: row.date_known === undefined || row.date_known === null ? true : Number(row.date_known) !== 0,
@@ -96,6 +97,59 @@ async function syncRecordedAdmission(member) {
   );
 }
 
+// Corrects one payment's amount. Every row of its term is restamped with the
+// term's full fee so the term counts as paid only once its rows reach it.
+async function updatePaymentAmount(member, paymentId, period, amount, periodFee) {
+  await exec("UPDATE payments SET amount = ? WHERE id = ? AND member_id = ?", [amount, paymentId, member.id]);
+  await exec("UPDATE payments SET period_fee = ? WHERE member_id = ? AND billing_period = ? AND kind = 'membership'", [
+    periodFee,
+    member.id,
+    period,
+  ]);
+}
+
+// Corrects the admission fee: its payment row and members.admission_fee
+// together, so the profile and the ledger agree. updated_at on the member is
+// kept, since this is a payment edit, not a profile edit (Daily Log).
+async function updateAdmissionAmount(member, paymentId, amount) {
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute("UPDATE payments SET amount = ? WHERE id = ? AND member_id = ? AND kind = 'admission'", [amount, paymentId, member.id]);
+    await connection.execute("UPDATE members SET admission_fee = ?, updated_at = updated_at WHERE id = ?", [amount, member.id]);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+// Sets the day a payment was collected; it counts as recorded from then on.
+async function updatePaymentDate(member, paymentId, date) {
+  await exec("UPDATE payments SET payment_date = ?, month_key = ?, date_known = 1 WHERE id = ? AND member_id = ?", [
+    date,
+    date.slice(0, 7),
+    paymentId,
+    member.id,
+  ]);
+}
+
+// Extra money taken from a member, with the note saying what it was for. It
+// pays no term, so billing is untouched (billing_period is the literal 'other').
+async function addOtherPayment(member, { id, date, amount, mode, note }) {
+  await exec(
+    `INSERT INTO payments (id, member_id, payment_date, month_key, billing_month, billing_period, amount, period_fee, kind, payment_mode, note)
+     VALUES (?, ?, ?, ?, '', ?, ?, NULL, 'other', ?, ?)`,
+    [id || crypto.randomUUID(), member.id, date, date.slice(0, 7), EXTRA_PERIOD_KEY, amount, normalizePaymentMode(mode) || null, note],
+  );
+}
+
+async function deletePayment(member, paymentId) {
+  await exec("DELETE FROM payments WHERE id = ? AND member_id = ? AND kind IN ('membership', 'other')", [paymentId, member.id]);
+}
+
 async function importPayment(member, payment) {
   const billingPeriod = payment.billingPeriod || payment.month || todayKey().slice(0, 7);
   await exec(
@@ -117,7 +171,12 @@ async function importPayment(member, payment) {
 }
 
 module.exports = {
+  addOtherPayment,
   addPayments,
+  deletePayment,
+  updateAdmissionAmount,
+  updatePaymentAmount,
+  updatePaymentDate,
   importPayment,
   mapPaymentRow,
   syncAdmissionPayment,

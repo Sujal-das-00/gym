@@ -24,6 +24,7 @@ export const CATEGORY_ICONS = {
   other: "more_horiz",
   "membership-fee": "card_membership",
   "admission-fee": "how_to_reg",
+  "other-payment": "shopping_bag",
 };
 
 // Keep in sync with PAYMENT_MODES in backend/src/config/constants.js.
@@ -59,6 +60,7 @@ export const DEFAULT_SETTINGS = {
 
 export const VIEW_COPY = {
   dashboard: ["Dashboard", "Today at your gym."],
+  dailylog: ["Daily Log", "Everything done at the gym, day by day."],
   attendance: ["Mark Attendance", "Mark attendance for any date."],
   checkin: ["QR Check-in", "Members scan the desk QR to check in."],
   history: ["Attendance History", "Attendance records by date."],
@@ -76,6 +78,7 @@ export const VIEW_COPY = {
 // Short labels used by the mobile app bar — the sidebar link text for each view.
 export const VIEW_SHORT_TITLE = {
   dashboard: "Dashboard",
+  dailylog: "Daily Log",
   attendance: "Attendance",
   checkin: "QR Check-in",
   history: "History",

@@ -91,9 +91,18 @@ export default function DayLedgerDialog() {
                         </span>
                         <span className="contact-copy">
                           <strong>
-                            <span className="contact-name">{entry.title}</span>
+                            <span className="contact-name">{entry.purchase || entry.title}</span>
+                            {entry.dateKnown === false ? (
+                              <i className="undated-dot" title="Collection date not recorded" />
+                            ) : null}
                           </strong>
-                          <small>{[entry.detail, domain.paymentModeLabel(entry.mode)].filter(Boolean).join(" · ")}</small>
+                          <small>{[entry.purchase ? entry.title : "", entry.detail, domain.paymentModeLabel(entry.mode)].filter(Boolean).join(" · ")}</small>
+                          {entry.dateKnown === false ? (
+                            <small className="undated-line">
+                              <i className="undated-dot" aria-hidden="true" />
+                              Date not recorded
+                            </small>
+                          ) : null}
                         </span>
                         <span className="contact-state">
                           <strong className="ledger-amount">

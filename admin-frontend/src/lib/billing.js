@@ -178,6 +178,16 @@ export function isAdmissionPayment(payment) {
   return payment?.kind === "admission" || payment?.billingPeriod === ADMISSION_PERIOD_KEY;
 }
 
+// Extra money taken from a member (supplements, a part payment while up to
+// date, ...) carries this literal as its billing period. It is income with a
+// note, never a payment toward a term. Keep in sync with EXTRA_PERIOD_KEY in
+// backend/src/utils/billing.js.
+export const EXTRA_PERIOD_KEY = "other";
+
+export function isExtraPayment(payment) {
+  return payment?.kind === "other" || payment?.billingPeriod === EXTRA_PERIOD_KEY;
+}
+
 // Payments toward an existing member's opening balance carry this literal as
 // their billing period; like admission, it never marks a term paid. Keep in
 // sync with OPENING_PERIOD_KEY in backend/src/utils/billing.js.
@@ -220,6 +230,7 @@ export function getOpeningBalanceLine(member) {
 // What a payment row is for: "Admission fee", or the billing period it settles.
 export function getPaymentLabel(settings, payment, member = null) {
   if (isAdmissionPayment(payment)) return "Admission fee";
+  if (isExtraPayment(payment)) return "Other payment";
   if (isOpeningBalancePayment(payment)) return "Opening balance";
   return getBillingPeriodLabel(settings, getPaymentPeriodKey(payment), member);
 }
@@ -235,7 +246,7 @@ export function getPaymentLabel(settings, payment, member = null) {
 export function getPeriodLedger(member) {
   const ledger = new Map();
   for (const payment of member?.payments || []) {
-    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) continue;
+    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment) || isExtraPayment(payment)) continue;
     const period = getPaymentPeriodKey(payment);
     if (!period) continue;
     const entry = ledger.get(period) || { paid: 0, charge: null, legacy: false };
@@ -253,7 +264,7 @@ export function getPeriodLedger(member) {
 
 // A membership payment that covered only part of its period's fee.
 export function isPartPayment(payment) {
-  if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) return false;
+  if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment) || isExtraPayment(payment)) return false;
   if (payment?.periodFee === null || payment?.periodFee === undefined) return false;
   return Number(payment.amount || 0) < Number(payment.periodFee);
 }
@@ -301,9 +312,27 @@ export function getBillablePeriodKeys(settings, member) {
   return periods.filter((period) => localDateKey(periodEndDate(settings, member, period)) <= today);
 }
 
+// The term running now for an "after the period" member, which is not billable
+// until it ends and has nothing paid yet: the one a member may part-pay in
+// advance. "" for everyone else (upfront members pay at the start; a term with
+// something paid already shows as a balance on its own).
+export function getAdvanceTerm(settings, member) {
+  if (getCollectionTiming(settings, member) !== "fixed-day") return "";
+  const last = getBillingPeriodKeys(settings, member).at(-1);
+  if (!last || getBillablePeriodKeys(settings, member).includes(last)) return "";
+  return getPeriodLedger(member).has(last) ? "" : last;
+}
+
+// A period with part of its fee already paid stays listed even before it is
+// billable (the in-progress term of an "after the period" member): the rest is
+// a known balance, not something to hide until the term ends.
 export function getUnpaidPeriods(settings, member) {
   const paidPeriods = getPaidPeriodSet(member);
-  return getBillablePeriodKeys(settings, member).filter((period) => !paidPeriods.has(period));
+  const ledger = getPeriodLedger(member);
+  const billable = new Set(getBillablePeriodKeys(settings, member));
+  return getBillingPeriodKeys(settings, member).filter(
+    (period) => !paidPeriods.has(period) && (billable.has(period) || ledger.has(period)),
+  );
 }
 
 // Periods with part of the fee paid. The member keeps training on these; what
@@ -367,6 +396,20 @@ export function getDueDate(settings, member) {
   return nextPeriodStartDate(settings, member);
 }
 
+// The due date of the most recent term that has been paid in full, or "" when
+// none has: when that payment fell due (the term's start for "upfront" members,
+// its end for "after the period" ones). The next payment is getDueDate.
+export function getLastPaymentDueKey(settings, member) {
+  const paid = getPaidPeriodSet(member);
+  const last = getBillingPeriodKeys(settings, member)
+    .filter((period) => paid.has(period))
+    .pop();
+  if (!last) return "";
+  return getCollectionTiming(settings, member) === "fixed-day"
+    ? localDateKey(periodEndDate(settings, member, last))
+    : localDateKey(periodStartDate(last));
+}
+
 export function getDueDateKey(settings, member) {
   return localDateKey(getDueDate(settings, member));
 }
@@ -401,33 +444,135 @@ export function isPlanChangeAhead(member) {
 }
 
 /* ---- Plan changes ------------------------------------------------------- */
-// Same rules as backend/src/services/planChangeService.js — the dialog shows
-// what the server will enforce.
+// Same rules as changeMemberPlan() in backend/src/services/planChangeService.js:
+// the sheet shows exactly what the server will check and record.
+// backend/test/plan-change.unit.test.js runs both on the same cases.
 
 const periodStartKey = (period) => (String(period).length === 7 ? period + "-01" : String(period));
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_PLAN_FEE = 10000000;
 
-/**
- * Unpaid periods of the current plan that start before `effectiveDate`. Billing
- * restarts from that date, so the change must collect or waive these.
- */
-export function unsettledBeforeChange(settings, member, effectiveDate) {
-  const paid = getPaidPeriodSet(member);
-  return getBillingPeriodKeys(settings, member).filter(
-    (period) => periodStartKey(period) < effectiveDate && !paid.has(period),
-  );
+// When the term running now renews, or the billing start itself while that is
+// still ahead: nextPeriodStartKey() in backend/src/utils/billing.js. Stepped
+// term by term like the server, so a package that began on the 31st renews on
+// the day the server expects.
+export function planRenewalKey(settings, member) {
+  const last = getBillingPeriodKeys(settings, member).at(-1);
+  return last ? localDateKey(periodEndDate(settings, member, last)) : billingStartKey(member);
 }
 
-// The latest date a new plan may start: the current period's renewal (or today).
-export function latestPlanChangeDate(settings, member) {
-  const renewal = localDateKey(nextPeriodStartDate(settings, member));
+// The dates a new plan may start on: from the start of the current plan (to
+// correct a plan entered wrongly) up to its next renewal, or today if later.
+export function planChangeWindow(settings, member) {
   const today = todayKey();
-  return renewal > today ? renewal : today;
+  const renewal = planRenewalKey(settings, member);
+  return { today, earliest: billingStartKey(member), renewal, latest: renewal > today ? renewal : today };
 }
 
 // The key the new plan's first period will have (see getBillingPeriodKeys).
 export function firstPlanPeriodKey(settings, plan, effectiveDate) {
   if (plan.membershipType !== "package" && getBillingCycleMode(settings) === "month-start") return effectiveDate.slice(0, 7);
   return effectiveDate;
+}
+
+/**
+ * Everything a plan change will check and record, worked out the way the
+ * server does it.
+ *
+ * choice: { membershipType, packageMonths, fee, collectionTiming, effectiveDate,
+ *           oldDues: "collect" | "waive" | null, collectFirstTerm: true | false | null }
+ * collectionTiming, oldDues and collectFirstTerm are answers the admin has to
+ * give: null (not answered yet) is an error whenever the question applies, so
+ * nothing is collected, waived or left due by default.
+ *
+ * Returns the plan as it will be saved, the start-date window, errors by field
+ * (short enough for a button), the unpaid old-plan periods billing would drop
+ * (each { period, charge, paid, balance }), the new plan's first term when it
+ * can be collected now ({ period, amount, collect }), the payment rows the
+ * server will write, and the member's billing after the change.
+ */
+export function quotePlanChange(settings, member, choice) {
+  const dates = planChangeWindow(settings, member);
+  const isPackage = choice.membershipType === "package";
+  const months = Number(choice.packageMonths);
+  const fee = Number(choice.fee);
+  const plan = {
+    membershipType: isPackage ? "package" : "monthly",
+    packageMonths: isPackage ? months : 1,
+    fee: Math.round(fee * 100) / 100,
+    collectionTiming: ["at-join", "fixed-day"].includes(choice.collectionTiming) ? choice.collectionTiming : "",
+  };
+  const effectiveDate = String(choice.effectiveDate || "");
+
+  const errors = {};
+  if (isPackage && !(Number.isInteger(months) && months >= 1 && months <= 60)) errors.packageMonths = "Enter 1 to 60 months";
+  if (!(Number.isFinite(fee) && fee > 0)) errors.fee = "Enter the fee";
+  else if (fee > MAX_PLAN_FEE) errors.fee = "Fee can be up to ₹1,00,00,000";
+  if (!plan.collectionTiming) errors.timing = "Select the billing terms";
+  if (
+    !DATE_KEY_PATTERN.test(effectiveDate) ||
+    Number.isNaN(Date.parse(effectiveDate)) ||
+    effectiveDate < dates.earliest ||
+    effectiveDate > dates.latest
+  ) {
+    errors.date = "Pick a start date";
+  }
+  const unchanged =
+    plan.membershipType === getMembershipType(member) &&
+    (!isPackage || plan.packageMonths === getPackageMonths(member)) &&
+    plan.fee === Number(member.fee || 0) &&
+    plan.collectionTiming === getCollectionTiming(settings, member);
+
+  const quote = { plan, dates, effectiveDate, errors, unchanged, dues: [], duesAmount: 0, firstTerm: null, payments: [], collectNow: 0, waived: 0, preview: null };
+  if (errors.date) return quote;
+
+  // Billing restarts on the new plan from effectiveDate, so unpaid terms that
+  // start before it would silently disappear: they are collected or waived.
+  const ledger = getPeriodLedger(member);
+  const paid = getPaidPeriodSet(member);
+  quote.dues = getBillingPeriodKeys(settings, member)
+    .filter((period) => periodStartKey(period) < effectiveDate && !paid.has(period))
+    .map((period) => getPeriodDue(member, period));
+  // Part-paid periods only owe what is left on them.
+  quote.duesAmount = quote.dues.reduce((sum, due) => sum + due.balance, 0);
+  if (quote.dues.length) {
+    if (choice.oldDues === "waive") quote.waived = quote.duesAmount;
+    else if (choice.oldDues === "collect") {
+      for (const due of quote.dues) quote.payments.push({ billingPeriod: due.period, amount: due.balance, periodFee: due.charge });
+    } else errors.oldDues = "Settle the previous dues";
+  }
+
+  if (!errors.fee && !errors.packageMonths && plan.collectionTiming === "at-join") {
+    const key = firstPlanPeriodKey(settings, plan, effectiveDate);
+    // Already paid (e.g. the same calendar month on a month-start gym): never charged twice.
+    const alreadyPaid = paid.has(key) || quote.payments.some((payment) => payment.billingPeriod === key);
+    if (!alreadyPaid) {
+      const collect = choice.collectFirstTerm === true;
+      if (typeof choice.collectFirstTerm !== "boolean") errors.firstTerm = "Choose the first payment";
+      const amount = Math.max(0, plan.fee - (ledger.get(key)?.paid || 0));
+      quote.firstTerm = { period: key, amount, collect };
+      if (collect) quote.payments.push({ billingPeriod: key, amount, periodFee: plan.fee });
+    }
+  }
+  quote.collectNow = quote.payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+  if (!Object.keys(errors).length && !unchanged) {
+    const after = {
+      ...member,
+      ...plan,
+      planStartDate: effectiveDate,
+      payments: [
+        ...(member.payments || []),
+        ...quote.payments.map((payment) => ({ ...payment, kind: "membership", date: dates.today })),
+      ],
+    };
+    quote.preview = {
+      dueKey: getDueDateKey(settings, after),
+      packageEndKey: plan.membershipType === "package" ? getPackageEndKey(settings, after) : "",
+      owes: getOverdueAmount(settings, after),
+    };
+  }
+  return quote;
 }
 
 export function planLabel(plan) {
@@ -462,18 +607,26 @@ export function getOutstandingAmount(settings, member) {
   return getOverdueAmount(settings, member) + getBalanceDue(settings, member) + getOpeningBalanceDue(member);
 }
 
-export const FEE_STATUS_LABELS = { overdue: "Overdue", balance: "Balance due", paid: "Paid", pending: "Pending" };
+export const FEE_STATUS_LABELS = {
+  overdue: "Overdue",
+  balance: "Balance due",
+  paid: "Paid",
+  pending: "Due now",
+  upcoming: "Up to date",
+};
 
 /**
  * One word for where a member stands on fees, shared by every list:
  * "overdue" (a period is due with nothing paid), "balance" (part paid, the
- * rest carried forward, or an opening balance still owed), "paid" (this period paid in full) or "pending".
+ * rest carried forward, or an opening balance still owed), "paid" (this period paid in full),
+ * "pending" (a term is billable but unpaid, and not yet overdue: collect now) or "upcoming"
+ * (nothing is billable yet, e.g. a new "after the period" member: nothing owed).
  */
 export function getFeeStatus(settings, member) {
   if (isOverdue(settings, member)) return "overdue";
   if (getBalanceDue(settings, member) > 0 || getOpeningBalanceDue(member) > 0) return "balance";
   if (isPaidThisPeriod(settings, member)) return "paid";
-  return "pending";
+  return getBillablePeriodKeys(settings, member).length ? "pending" : "upcoming";
 }
 
 /**
@@ -514,6 +667,7 @@ export function hasTrainerAttendance(trainer, day) {
 export function expenseCategoryLabel(value) {
   if (value === "membership-fee") return "Membership fee";
   if (value === "admission-fee") return "Admission fee";
+  if (value === "other-payment") return "Other payments";
   return EXPENSE_CATEGORIES.find((category) => category.value === value)?.label || "Other";
 }
 
@@ -582,6 +736,7 @@ export function createDomain(settings) {
     getBillingPeriodKeys: perMember(getBillingPeriodKeys),
     getPaymentPeriodKey,
     isAdmissionPayment,
+    isExtraPayment,
     isOpeningBalancePayment,
     getOpeningBalanceDue,
     getOpeningBalanceLine,
@@ -596,6 +751,7 @@ export function createDomain(settings) {
     getOutstandingAmount: perMember(getOutstandingAmount),
     getFeeStatus: perMember(getFeeStatus),
     getBillablePeriodKeys: perMember(getBillablePeriodKeys),
+    getAdvanceTerm: perMember(getAdvanceTerm),
     getUnpaidPeriods: perMember(getUnpaidPeriods),
     periodStartDate,
     periodEndDate: (member, periodKey) => periodEndDate(settings, member, periodKey),
@@ -603,6 +759,7 @@ export function createDomain(settings) {
     // A Date is mutable, so it is rebuilt each call; the key form is cached.
     getDueDate: (member) => getDueDate(settings, member),
     getDueDateKey: perMember(getDueDateKey),
+    getLastPaymentDueKey: perMember(getLastPaymentDueKey),
     getPackageEndKey: perMember(getPackageEndKey),
     isPaidThisPeriod: perMember(isPaidThisPeriod),
     getDueUnpaidPeriods: perMember(getDueUnpaidPeriods),

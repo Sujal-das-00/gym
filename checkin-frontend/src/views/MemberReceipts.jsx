@@ -7,6 +7,7 @@ const FILTERS = [
   { id: "all", label: "All" },
   { id: "membership", label: "Membership" },
   { id: "admission", label: "Admission" },
+  { id: "other", label: "Other" },
 ];
 
 /**

@@ -8,6 +8,7 @@ import PlanBanner from "./components/PlanBanner.jsx";
 import MaintenanceNotice from "./components/MaintenanceNotice.jsx";
 import AppTabbar from "./components/AppTabbar.jsx";
 import DashboardView from "./views/DashboardView.jsx";
+import DailyLogView from "./views/DailyLogView.jsx";
 import AttendanceView from "./views/AttendanceView.jsx";
 import CheckinView from "./views/CheckinView.jsx";
 import HistoryView from "./views/HistoryView.jsx";
@@ -37,6 +38,7 @@ import MenuTour from "./components/MenuTour.jsx";
 // when you navigate away and back, and preserves the view-enter animation.
 const VIEWS = [
   ["dashboard", DashboardView],
+  ["dailylog", DailyLogView],
   ["attendance", AttendanceView],
   ["checkin", CheckinView],
   ["history", HistoryView],

@@ -50,7 +50,8 @@ const samePlan = (a, b) =>
  * Old-plan billing periods that start before the new plan does and are unpaid.
  * Billing restarts from the effective date, so these would silently disappear:
  * the change has to collect them or explicitly waive them. Same rule as
- * unsettledBeforeChange() in admin-frontend/src/lib/billing.js.
+ * quotePlanChange() in admin-frontend/src/lib/billing.js (checked against this
+ * service by backend/test/plan-change.unit.test.js).
  */
 function unsettledPeriods(member, settings, effectiveDate) {
   const paid = getPaidPeriodSet(member);

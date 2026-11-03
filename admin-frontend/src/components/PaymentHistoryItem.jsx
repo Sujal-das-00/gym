@@ -7,18 +7,21 @@ import { currency } from "../lib/dates.js";
  */
 export default function PaymentHistoryItem({ payment, member, domain }) {
   const partNotes = domain.getPartPaymentNotes(member, payment);
+  const extra = domain.isExtraPayment(payment);
   return (
     <li>
       <span>
         <strong>
           {domain.getPaymentLabel(payment, member)}
           {partNotes.length ? <em className="pay-tag">Part</em> : null}
+          {extra ? <em className="pay-tag">Extra</em> : null}
         </strong>
         <small>
           {[domain.getPaymentDateLabel(payment), domain.paymentModeLabel(payment.mode), ...partNotes]
             .filter(Boolean)
             .join(" · ")}
         </small>
+        {extra && payment.note ? <small className="pay-note">“{payment.note}”</small> : null}
       </span>
       <strong>{currency(payment.amount)}</strong>
     </li>

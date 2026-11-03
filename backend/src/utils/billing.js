@@ -130,7 +130,9 @@ function* datedPeriodKeys(member, settings) {
 function shiftedPaymentPeriods(previous, next, settings) {
   const moves = new Map();
   if (!isDateKeyedSchedule(next, settings) || billingStartKey(previous) === billingStartKey(next)) return moves;
-  const payments = (previous?.payments || []).filter((payment) => !isAdmissionPayment(payment) && !isOpeningBalancePayment(payment));
+  const payments = (previous?.payments || []).filter(
+    (payment) => !isAdmissionPayment(payment) && !isOpeningBalancePayment(payment) && !isExtraPayment(payment),
+  );
   const keys = payments.map(paymentPeriodKey).filter((key) => String(key || "").length === 10);
   if (!keys.length) return moves;
   const latest = keys.reduce((max, key) => (key > max ? key : max));
@@ -154,6 +156,16 @@ const ADMISSION_PERIOD_KEY = "admission";
 
 function isAdmissionPayment(payment) {
   return payment?.kind === "admission" || payment?.billingPeriod === ADMISSION_PERIOD_KEY;
+}
+
+// Extra money taken from a member (supplements, a part payment while up to
+// date, ...) is stored with this literal as its billing period. It is income
+// with a note, never a payment toward a term. Keep in sync with
+// EXTRA_PERIOD_KEY in admin-frontend/src/lib/billing.js.
+const EXTRA_PERIOD_KEY = "other";
+
+function isExtraPayment(payment) {
+  return payment?.kind === "other" || payment?.billingPeriod === EXTRA_PERIOD_KEY;
 }
 
 // Payments toward an existing member's opening balance carry this literal as
@@ -193,7 +205,7 @@ function paymentPeriodKey(payment) {
 function getPeriodLedger(member) {
   const ledger = new Map();
   for (const payment of member?.payments || []) {
-    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment)) continue;
+    if (isAdmissionPayment(payment) || isOpeningBalancePayment(payment) || isExtraPayment(payment)) continue;
     const period = paymentPeriodKey(payment);
     if (!period) continue;
     const entry = ledger.get(period) || { paid: 0, charge: null, legacy: false };
@@ -259,6 +271,15 @@ function nextPeriodStartKey(member, settings) {
   const periods = getBillingPeriodKeys(member, settings);
   const last = periods[periods.length - 1];
   return last ? localDateKey(periodEndDate(member, settings, last)) : billingStartKey(member);
+}
+
+// Periods that can be billed right now. "At join" members pay as each period
+// starts; "after the period" members only once it has ended, so the term in
+// progress is not owed yet. Mirrors getBillablePeriodKeys in the admin app.
+function billablePeriodKeys(member, settings, today = todayKey()) {
+  const periods = getBillingPeriodKeys(member, settings);
+  if (collectionTiming(member, settings) !== "fixed-day") return periods;
+  return periods.filter((period) => localDateKey(periodEndDate(member, settings, period)) <= today);
 }
 
 // Unpaid periods that are already PAST their collection point — the ones a member
@@ -405,13 +426,16 @@ module.exports = {
   ADMISSION_PERIOD_KEY,
   OPENING_PERIOD_KEY,
   balanceDue,
+  billablePeriodKeys,
   billingStartKey,
   collectionTiming,
   dueUnpaidPeriods,
   getBillingPeriodKeys,
   getPaidPeriodSet,
   getPeriodLedger,
+  EXTRA_PERIOD_KEY,
   isAdmissionPayment,
+  isExtraPayment,
   isMembershipExpired,
   isOpeningBalancePayment,
   memberBillingSummary,

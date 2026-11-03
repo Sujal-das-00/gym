@@ -224,6 +224,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   -- saved before this column existed), which is not the same as cash.
   payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Last edit (Daily Log); NULL until the row is edited.
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_expenses_tenant_date (tenant_id, expense_date),
   CONSTRAINT fk_expenses_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );
@@ -244,7 +246,10 @@ CREATE TABLE IF NOT EXISTS payments (
   -- 'admission' rows are the one-off joining fee and never mark a period paid
   -- (billing_period is the literal 'admission'); one per member, kept in sync
   -- with members.admission_fee.
-  kind ENUM('membership', 'admission') NOT NULL DEFAULT 'membership',
+  -- 'other' rows are extra money taken from a member (supplements, a part
+  -- payment while up to date, ...). They never pay a period (billing_period is
+  -- the literal 'other') and always carry a note saying what they were for.
+  kind ENUM('membership', 'admission', 'other') NOT NULL DEFAULT 'membership',
   -- How the money was collected. NULL means it was never recorded (every row
   -- saved before this column existed), which is not the same as cash.
   payment_mode ENUM('cash', 'upi', 'card', 'bank', 'cheque', 'other') NULL DEFAULT NULL,
@@ -252,7 +257,11 @@ CREATE TABLE IF NOT EXISTS payments (
   -- payment_date then holds the start of the term it paid, so it is reported
   -- in that term's month and never on the day it was typed in.
   date_known TINYINT(1) NOT NULL DEFAULT 1,
+  -- What an 'other' payment was for (required there, empty on every other row).
+  note VARCHAR(160) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Last edit (Daily Log); NULL until the row is edited.
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_payments_member FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
   INDEX idx_payments_member_date (member_id, payment_date),
   INDEX idx_payments_member_kind (member_id, kind),
@@ -422,4 +431,28 @@ CREATE TABLE IF NOT EXISTS meta_sent_purchases (
   tenant_id CHAR(36) NOT NULL,
   sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_meta_sent_gym (tenant_id)
+);
+
+-- The gym's activity record (Daily Log): one row per thing done in the admin
+-- panel, written when the action succeeds, with who did it and what changed
+-- (old and new values, deleted records in full). Never edited or deleted.
+-- Times are epoch milliseconds, so they are exact whatever the server zone.
+-- Activity from before this table existed is rebuilt from record timestamps.
+CREATE TABLE IF NOT EXISTS gym_activity (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  tenant_id CHAR(36) NOT NULL,
+  at_ms BIGINT NOT NULL,
+  action VARCHAR(40) NOT NULL,
+  member_id CHAR(36) NULL DEFAULT NULL,
+  member_name VARCHAR(160) NOT NULL DEFAULT '',
+  member_code VARCHAR(40) NOT NULL DEFAULT '',
+  actor_id VARCHAR(64) NULL DEFAULT NULL,
+  actor_name VARCHAR(160) NULL DEFAULT NULL,
+  actor_role VARCHAR(32) NULL DEFAULT NULL,
+  amount DECIMAL(12,2) NULL DEFAULT NULL,
+  details MEDIUMTEXT NULL,
+  UNIQUE KEY uniq_gym_activity_seq (seq),
+  INDEX idx_gym_activity_time (tenant_id, at_ms),
+  CONSTRAINT fk_gym_activity_gym FOREIGN KEY (tenant_id) REFERENCES gyms(id) ON DELETE CASCADE
 );

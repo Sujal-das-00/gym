@@ -7,7 +7,6 @@
  * and by category. Both the Expense Tracker and the Insights screen read from
  * here so their totals can never disagree.
  * ------------------------------------------------------------------------- */
-import { DATE_NOT_RECORDED } from "./billing.js";
 import { toDateKey } from "./dates.js";
 
 /**
@@ -29,16 +28,19 @@ export function buildLedgerEntries({ members = [], expenses = [], domain }) {
         date: toDateKey(payment.date),
         amount: Number(payment.amount || 0),
         title: member.name,
-        category: domain.isAdmissionPayment(payment) ? "admission-fee" : "membership-fee",
-        detail: [
-          domain.getPaymentLabel(payment, member),
-          ...domain.getPartPaymentNotes(member, payment),
-          // Counted on its term's start date, which is not when it was collected.
-          payment.dateKnown === false ? DATE_NOT_RECORDED : "",
-        ]
+        category: domain.isAdmissionPayment(payment) ? "admission-fee" : domain.isExtraPayment(payment) ? "other-payment" : "membership-fee",
+        detail: (domain.isExtraPayment(payment)
+          ? ["Other payment"]
+          : [domain.getPaymentLabel(payment, member), ...domain.getPartPaymentNotes(member, payment)]
+        )
           .filter(Boolean)
           .join(" · "),
+        // What an other payment was for (supplements, ...): lists lead with it.
+        purchase: domain.isExtraPayment(payment) ? String(payment.note || "") : "",
         mode: payment.mode || "",
+        // False when the admin didn't know when it was collected: `date` is then
+        // the start of the term it paid, not a collection date.
+        dateKnown: payment.dateKnown !== false,
       });
     });
   });
@@ -159,3 +161,10 @@ export function topPayingMembers(entries, limit = 5) {
   }
   return [...byMember.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name)).slice(0, limit);
 }
+
+// The wording for a payment counted on its term's start date, which is not
+// when it was collected (entry.dateKnown === false).
+export { DATE_NOT_RECORDED } from "./billing.js";
+
+/** Payments whose collection date was never recorded (counted on their term's start). */
+export const undatedEntries = (entries) => entries.filter((entry) => entry.type === "earning" && entry.dateKnown === false);

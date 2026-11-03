@@ -3,6 +3,7 @@ import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
+import PaymentEditDialog from "./PaymentEditDialog.jsx";
 import PaymentHistoryItem from "../components/PaymentHistoryItem.jsx";
 import WhatsAppIcon from "../components/WhatsAppIcon.jsx";
 import { currency, dateFormatter, displayDate, localDateKey, parseDateKey, todayKey } from "../lib/dates.js";
@@ -29,6 +30,8 @@ export default function DetailDialog() {
     settings,
   } = useApp();
   const { detailMemberId } = useDialogs();
+  // "": closed, "choose": Edit member / Edit payments, "payments": the payments editor.
+  const [editStep, setEditStep] = useState("");
   const [planHistory, setPlanHistory] = useState({ memberId: "", rows: [], failed: false });
 
   // This member's plan-change log; refetched after a change made from here.
@@ -80,10 +83,18 @@ export default function DetailDialog() {
   const lastPayment = payments[0];
   const gymSlug = user?.gym?.slug || gyms.find((gym) => gym.id === gymId)?.slug || "";
 
+  const canEditPayments = user?.role === "gym_admin" || user?.role === "super_admin";
+
   const actions = [
     hasDues && { key: "collect", icon: "currency_rupee", label: "Collect", primary: true, run: () => openFeeDialog(member.id) },
     { key: "plan", icon: "swap_horiz", label: "Plan", run: () => openPlanDialog(member.id) },
-    { key: "edit", icon: "edit", label: "Edit", run: () => openMemberDialog(member) },
+    {
+      key: "edit",
+      icon: "edit",
+      label: "Edit",
+      // Only owners can change payments, so staff go straight to the member.
+      run: () => (canEditPayments ? setEditStep("choose") : openMemberDialog(member)),
+    },
     {
       key: "login",
       icon: "key",
@@ -275,6 +286,47 @@ export default function DetailDialog() {
           </details>
         </div>
       </div>
+
+      <Dialog className="sheet" id="editChoiceDialog" open={editStep === "choose"} onClose={() => setEditStep((step) => (step === "choose" ? "" : step))}>
+        <div className="sheet-panel">
+          <header className="sheet-head">
+            <span className="sheet-grabber" aria-hidden="true" />
+            <h2>What do you want to edit?</h2>
+            <button className="sheet-close" aria-label="Close" type="button" onClick={() => setEditStep("")}>
+              <Icon name="close" />
+            </button>
+          </header>
+          <div className="sheet-body">
+            <div className="member-kind">
+              <button
+                type="button"
+                className="member-kind-option"
+                id="editMemberOption"
+                onClick={() => {
+                  setEditStep("");
+                  openMemberDialog(member);
+                }}
+              >
+                <Icon name="person" />
+                <span>
+                  <strong>Edit member</strong>
+                  <small>Name, phone, address, trainer and joining date.</small>
+                </span>
+                <Icon name="chevron_right" className="member-kind-go" />
+              </button>
+              <button type="button" className="member-kind-option" id="editPaymentsOption" onClick={() => setEditStep("payments")}>
+                <Icon name="receipt_long" />
+                <span>
+                  <strong>Edit payments</strong>
+                  <small>Change the amount of a recorded payment, or delete it.</small>
+                </span>
+                <Icon name="chevron_right" className="member-kind-go" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+      <PaymentEditDialog memberId={member.id} open={editStep === "payments"} onClose={() => setEditStep("")} />
     </Dialog>
   );
 }

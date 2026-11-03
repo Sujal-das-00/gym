@@ -4,7 +4,10 @@ import Dialog from "../components/Dialog.jsx";
 import Photo from "../components/Photo.jsx";
 import Icon from "../components/Icon.jsx";
 import PaymentHistoryItem from "../components/PaymentHistoryItem.jsx";
-import { currency } from "../lib/dates.js";
+import OtherPaymentForm from "../components/OtherPaymentForm.jsx";
+import StepProgress from "../components/StepProgress.jsx";
+import ReviewCard from "../components/ReviewCard.jsx";
+import { currency, displayDate, localDateKey } from "../lib/dates.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
 import { FEE_STATUS_LABELS, allocatePayment } from "../lib/billing.js";
 
@@ -28,6 +31,10 @@ export default function FeeDialog() {
   const [mode, setMode] = useState("cash");
   const [isPart, setIsPart] = useState(false);
   const [amountText, setAmountText] = useState("");
+  // 0 = choose what is being paid and how; 1 = review it, then record.
+  const [step, setStep] = useState(0);
+  // Paying part of the running term before it ends ("after the period" members).
+  const [advance, setAdvance] = useState(false);
   const amountRef = useRef(null);
 
   // Every new sheet starts on a full cash payment, the most common at the desk.
@@ -36,17 +43,25 @@ export default function FeeDialog() {
     setMode("cash");
     setIsPart(false);
     setAmountText("");
+    setStep(0);
+    setAdvance(false);
   }, [feeDialog.open, feeDialog.memberId]);
 
   const member = members.find((item) => item.id === feeDialog.memberId);
   // An existing member's opening balance is listed first: it is the oldest debt.
   const openingLine = member ? domain.getOpeningBalanceLine(member) : null;
-  const unpaidPeriods = member ? [...(openingLine ? [openingLine.period] : []), ...domain.getUnpaidPeriods(member)] : [];
+  const advanceTerm = member ? domain.getAdvanceTerm(member) : "";
+  const unpaidPeriods = member
+    ? [...(openingLine ? [openingLine.period] : []), ...domain.getUnpaidPeriods(member), ...(advance && advanceTerm ? [advanceTerm] : [])]
+    : [];
+  const advanceEnds = advanceTerm ? displayDate(localDateKey(domain.periodEndDate(member, advanceTerm))) : "";
   const duePeriods = new Set(member ? domain.getDueUnpaidPeriods(member) : []);
   const selected = new Set(feeDialog.selectedPeriods);
   const periodUnit = member ? domain.getPeriodUnitLabel(member) : "month";
   const allSelected = unpaidPeriods.length > 0 && unpaidPeriods.every((period) => selected.has(period));
   const status = member ? domain.getFeeStatus(member) : "";
+  const isMonthly = member ? domain.getMembershipType(member) === "monthly" : false;
+  const lastDueKey = member ? domain.getLastPaymentDueKey(member) : "";
   const history = member ? [...(member.payments || [])].reverse().slice(0, HISTORY_LIMIT) : [];
   const modeLabel = PAYMENT_MODES.find((option) => option.value === mode)?.label || mode;
 
@@ -76,16 +91,37 @@ export default function FeeDialog() {
 
   const toggleAll = () => setSelectedBillingPeriods(allSelected ? [] : [...unpaidPeriods]);
 
+  const startAdvance = () => {
+    setAdvance(true);
+    setIsPart(true);
+    setAmountText("");
+    setSelectedBillingPeriods([advanceTerm]);
+    window.requestAnimationFrame(() => amountRef.current?.focus());
+  };
+  const stopAdvance = () => {
+    setAdvance(false);
+    setIsPart(false);
+    setAmountText("");
+    setSelectedBillingPeriods([]);
+  };
+
   const choosePart = (part) => {
     setIsPart(part);
     // Focus after the field has rendered.
     if (part) window.requestAnimationFrame(() => amountRef.current?.focus());
   };
 
-  // The summary card is the confirmation step, so there is no extra prompt.
+  const reviewing = step === 1 && dues.length > 0;
+  const goNext = () => {
+    if (canSubmit) setStep(1);
+  };
+
+  // The review step is the confirmation, so there is no extra prompt. Enter on
+  // the first step moves to the review instead of recording.
   const onSubmit = async (event) => {
     event.preventDefault();
     if (!member || !canSubmit) return;
+    if (!reviewing) return goNext();
     setBusy(true);
     try {
       await collectFees(member, total === 0 ? plan : recorded, mode);
@@ -104,18 +140,20 @@ export default function FeeDialog() {
         className: due.paid > 0 ? "is-part" : "",
       };
     }
+    if (due.period === advanceTerm) return { text: `Not due yet · due on ${advanceEnds}`, className: "" };
     if (due.paid > 0) return { text: `${currency(due.paid)} of ${currency(due.charge)} paid`, className: "is-part" };
     if (duePeriods.has(due.period)) return { text: "Overdue", className: "is-due" };
     return { text: "Current", className: "" };
   };
 
-  const confirmLabel = !chosen.length
+  const nextLabel = !chosen.length
     ? `Select a ${periodUnit}`
     : tooMuch
       ? `More than ${currency(total)} selected`
       : isPart && !(amount > 0)
         ? "Enter the amount received"
-        : `Record ${currency(amount)}${carried > 0 ? ` · ${currency(carried)} balance` : ""}`;
+        : "Next";
+  const recordLabel = `Record ${currency(amount)}${carried > 0 ? ` · ${currency(carried)} balance` : ""}`;
 
   return (
     <Dialog className="sheet" id="feeDialog" open={feeDialog.open} onClose={closeFeeDialog}>
@@ -123,11 +161,18 @@ export default function FeeDialog() {
         <form className="sheet-panel" id="feeCollectionForm" method="dialog" onSubmit={onSubmit}>
           <header className="sheet-head">
             <span className="sheet-grabber" aria-hidden="true" />
-            <h2 id="feeDialogTitle">Collect payment</h2>
+            {reviewing ? (
+              <button className="sheet-back" type="button" aria-label="Back to edit the payment" onClick={() => setStep(0)}>
+                <Icon name="arrow_back" />
+              </button>
+            ) : null}
+            <h2 id="feeDialogTitle">{reviewing ? "Review payment" : "Collect payment"}</h2>
             <button className="sheet-close" id="closeFeeDialog" aria-label="Close" type="button" onClick={closeFeeDialog}>
               <Icon name="close" />
             </button>
           </header>
+
+          {dues.length ? <StepProgress steps={["Payment", "Review"]} current={step} /> : null}
 
           <div className="sheet-body">
             <div className="sheet-member">
@@ -141,7 +186,40 @@ export default function FeeDialog() {
               <span className={"status-pill " + status}>{FEE_STATUS_LABELS[status]}</span>
             </div>
 
-            {dues.length ? (
+            {reviewing ? (
+              <>
+                <ReviewCard
+                  title="Payment summary"
+                  rows={[
+                    ...plan.map((line) => ({
+                      label: domain.getBillingPeriodLabel(line.period, member),
+                      value: line.pay > 0 || line.balance === 0 ? currency(line.pay) : "Not paid now",
+                      hint:
+                        line.after > 0 && line.pay > 0
+                          ? `${currency(line.after)} balance left`
+                          : line.pay > 0 || line.balance === 0
+                            ? "Paid in full"
+                            : "Stays due",
+                      skipped: line.pay === 0 && line.balance > 0,
+                    })),
+                    { label: "Mode", value: modeLabel },
+                    ...(carried > 0 && !tooMuch ? [{ label: "Balance carried forward", value: currency(carried), tone: "due" }] : []),
+                  ]}
+                  total={{ label: "Received now", value: currency(Math.min(amount, total)) }}
+                  notes={[
+                    advance && carried > 0 ? `The other ${currency(carried)} is still due on ${advanceEnds}.` : "",
+                    untouched.length && amount > 0
+                      ? `${untouched.map((line) => domain.getBillingPeriodLabel(line.period, member)).join(", ")} ${
+                          untouched.length === 1 ? "isn't" : "aren't"
+                        } reached by this amount and will stay due.`
+                      : "",
+                  ]}
+                />
+              </>
+            ) : (
+              <>
+
+            {dues.length && !advance ? (
               <p className={"pay-owed" + (duePeriods.size ? " is-due" : "")}>
                 <span>Total owed</span>
                 <strong>{currency(owedTotal)}</strong>
@@ -187,12 +265,50 @@ export default function FeeDialog() {
                   })}
                 </div>
               ) : (
-                <p className="sheet-note">
-                  <Icon name="check_circle" />
-                  All dues are collected up to the current {periodUnit}.
-                </p>
+                <>
+                  <p className="sheet-note">
+                    <Icon name="check_circle" />
+                    All dues are collected up to the current {periodUnit}.
+                  </p>
+                  <dl className="plan-summary next-due">
+                    {isMonthly ? (
+                      <div>
+                        <dt>Last payment due</dt>
+                        <dd>{lastDueKey ? displayDate(lastDueKey) : "None yet"}</dd>
+                      </div>
+                    ) : null}
+                    <div>
+                      <dt>Next payment due</dt>
+                      <dd>{displayDate(domain.getDueDateKey(member))}</dd>
+                    </div>
+                    <div>
+                      <dt>Billing cycle</dt>
+                      <dd>
+                        {domain.getCollectionTiming(member) === "fixed-day" ? "End" : "Start"} of the {periodUnit}
+                      </dd>
+                    </div>
+                  </dl>
+                  {advanceTerm ? (
+                    <button type="button" className="other-pay-open" onClick={startAdvance}>
+                      <span className="other-pay-ico" aria-hidden="true">
+                        <Icon name="payments" />
+                      </span>
+                      <span>
+                        <strong>Part-pay this {periodUnit} now</strong>
+                        <small>Pay what they can now. The rest is due on {advanceEnds}.</small>
+                      </span>
+                      <Icon name="chevron_right" className="other-pay-go" />
+                    </button>
+                  ) : null}
+                </>
               )}
+              {advance ? (
+                <button type="button" className="sheet-link" onClick={stopAdvance}>
+                  Not paying early
+                </button>
+              ) : null}
             </section>
+
 
             {dues.length ? (
               <>
@@ -274,50 +390,11 @@ export default function FeeDialog() {
                   </div>
                 </section>
 
-                {chosen.length ? (
-                  <section className="pay-summary-card" aria-label="Summary">
-                    <h3>Summary</h3>
-                    <dl>
-                      {plan.map((line) => (
-                        <div key={line.period} className={line.pay === 0 && line.balance > 0 ? "is-skipped" : ""}>
-                          <dt>{domain.getBillingPeriodLabel(line.period, member)}</dt>
-                          <dd>
-                            {line.pay > 0 || line.balance === 0 ? currency(line.pay) : "Not paid now"}
-                            <small>
-                              {line.after > 0 && line.pay > 0
-                                ? `${currency(line.after)} balance left`
-                                : line.pay > 0 || line.balance === 0
-                                  ? "Paid in full"
-                                  : "Stays due"}
-                            </small>
-                          </dd>
-                        </div>
-                      ))}
-                      <div>
-                        <dt>Mode</dt>
-                        <dd>{modeLabel}</dd>
-                      </div>
-                      <div className="pay-summary-total">
-                        <dt>Received now</dt>
-                        <dd id="feeSelectedTotal">{currency(Math.min(amount, total))}</dd>
-                      </div>
-                      {carried > 0 && !tooMuch ? (
-                        <div className="pay-summary-balance">
-                          <dt>Balance carried forward</dt>
-                          <dd>{currency(carried)}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                    {untouched.length && !tooMuch && amount > 0 ? (
-                      <p className="pay-hint">
-                        {untouched.map((line) => domain.getBillingPeriodLabel(line.period, member)).join(", ")}{" "}
-                        {untouched.length === 1 ? "isn't" : "aren't"} reached by this amount and will stay due.
-                      </p>
-                    ) : null}
-                  </section>
-                ) : null}
               </>
             ) : null}
+
+            {/* Money outside the fee (supplements, ...): open to every member, owing or not. */}
+            <OtherPaymentForm member={member} />
 
             {history.length ? (
               <details className="sheet-history" open={!unpaidPeriods.length}>
@@ -332,18 +409,26 @@ export default function FeeDialog() {
                 </ul>
               </details>
             ) : null}
+              </>
+            )}
           </div>
 
           {dues.length ? (
-            <footer className="sheet-foot">
-              <button
-                className={"sheet-confirm" + (busy ? " is-busy" : "")}
-                id="confirmFeeCollection"
-                type="submit"
-                disabled={!canSubmit}
-              >
-                {capitalize(confirmLabel)}
-              </button>
+            <footer className={"sheet-foot" + (reviewing ? " is-split" : "")}>
+              {reviewing ? (
+                <button className="sheet-secondary" type="button" disabled={busy} onClick={() => setStep(0)}>
+                  Back
+                </button>
+              ) : null}
+              {reviewing ? (
+                <button key="record" className={"sheet-confirm" + (busy ? " is-busy" : "")} id="confirmFeeCollection" type="submit" disabled={!canSubmit}>
+                  {recordLabel}
+                </button>
+              ) : (
+                <button key="next" className="sheet-confirm" id="nextFeeStep" type="button" disabled={!canSubmit} onClick={goNext}>
+                  {capitalize(nextLabel)}
+                </button>
+              )}
             </footer>
           ) : null}
         </form>

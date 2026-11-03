@@ -1,5 +1,7 @@
 const attendanceModel = require("./attendanceModel");
+const auditModel = require("./auditModel");
 const checkinModel = require("./checkinModel");
+const dailyLogModel = require("./dailyLogModel");
 const expenseModel = require("./expenseModel");
 const fallbackModel = require("./fallbackModel");
 const memberModel = require("./memberModel");
@@ -22,7 +24,9 @@ function repo() {
   if (usingFallback()) return fallbackModel;
   return {
     ...attendanceModel,
+    ...auditModel,
     ...checkinModel,
+    ...dailyLogModel,
     ...expenseModel,
     ...memberModel,
     ...paymentModel,

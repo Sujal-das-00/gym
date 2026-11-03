@@ -1,13 +1,16 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp, useDialogs } from "../store/AppContext.jsx";
 import Dialog from "../components/Dialog.jsx";
 import FieldError from "../components/FieldError.jsx";
 import PhoneField from "../components/PhoneField.jsx";
 import Icon from "../components/Icon.jsx";
-import { currency, displayDate, todayKey } from "../lib/dates.js";
+import OptionCards, { billingTermOptions } from "../components/OptionCards.jsx";
+import { currency, displayDate, localDateKey, todayKey } from "../lib/dates.js";
 import { collectionTimingLabel, planLabel } from "../lib/billing.js";
 import { blankHistory, historyProblem, joiningDateProblem, onboardingPayload } from "../lib/onboarding.js";
-import ExistingMemberHistory from "../components/ExistingMemberHistory.jsx";
+import ExistingMemberHistory, { ExistingMemberReview } from "../components/ExistingMemberHistory.jsx";
+import StepProgress from "../components/StepProgress.jsx";
+import ReviewCard from "../components/ReviewCard.jsx";
 import { readPhoto } from "../lib/photo.js";
 import { PAYMENT_MODES } from "../lib/constants.js";
 import { firstErrorField, toPhoneDigits, validateMember } from "../lib/validation.js";
@@ -17,7 +20,21 @@ const PACKAGE_PRESETS = [3, 6, 12];
 
 // Order the fields appear in the form, so the first invalid one is the one we
 // focus after a failed submit.
-const FIELD_ORDER = ["name", "phone", "gymId", "address", "packageMonths", "fee", "startDate", "admissionFee"];
+const FIELD_ORDER = ["name", "phone", "gymId", "address", "packageMonths", "fee", "startDate", "collectionTiming", "admissionFee", "admissionMode"];
+
+// Adding a member is a few short screens ending in a review, so nothing is
+// saved before the admin has seen what they entered. An existing member asks
+// for one kind of thing per screen; a new member's details fit on one.
+const EXISTING_STEPS = [
+  { title: "Member details", fields: ["name", "phone", "gymId", "address"] },
+  { title: "Membership", fields: ["packageMonths", "fee", "startDate"] },
+  { title: "Payment details", fields: ["collectionTiming"] },
+  { title: "Review", fields: [] },
+];
+const NEW_STEPS = [
+  { title: "Member details", fields: ["name", "phone", "gymId", "address", "packageMonths", "fee", "startDate", "collectionTiming", "admissionFee", "admissionMode"] },
+  { title: "Review", fields: [] },
+];
 
 const FIELD_IDS = {
   gymId: "gymIdInput",
@@ -28,6 +45,8 @@ const FIELD_IDS = {
   admissionFee: "admissionFeeInput",
   packageMonths: "packageMonthsInput",
   startDate: "startDateInput",
+  collectionTiming: "collectionTimingInput",
+  admissionMode: "admissionModeInput",
 };
 
 export default function MemberDialog() {
@@ -109,12 +128,15 @@ function MemberForm({ member, kind = "new", onBack }) {
   const [fee, setFee] = useState(member?.fee || "");
   const [admissionFee, setAdmissionFee] = useState(Number(member?.admissionFee || 0) > 0 ? member.admissionFee : "");
   const [admissionMode, setAdmissionMode] = useState(
-    () => member?.payments?.find((payment) => payment.kind === "admission")?.mode || "cash",
+    () => member?.payments?.find((payment) => payment.kind === "admission")?.mode || (member ? "cash" : ""),
   );
   const [membershipType, setMembershipType] = useState(() => domain.getMembershipType(member));
   const [packageMonths, setPackageMonths] = useState(() => String(domain.getPackageMonths(member)));
-  const [collectionTiming, setCollectionTiming] = useState(() => domain.getCollectionTiming(member));
+  // Someone being added has to be given billing terms: neither is chosen for them.
+  const [collectionTiming, setCollectionTiming] = useState(() => (member ? domain.getCollectionTiming(member) : null));
   const isExisting = !member && kind === "existing";
+  // Someone joining now can start today or later, never on an earlier day.
+  const isNew = !member && !isExisting;
   // An existing member's original joining date has to be typed: defaulting it
   // to today would make them a new member.
   const [startDate, setStartDate] = useState(member?.startDate || (isExisting ? "" : todayKey()));
@@ -127,13 +149,20 @@ function MemberForm({ member, kind = "new", onBack }) {
   const [touched, setTouched] = useState({});
   const [formError, setFormError] = useState("");
   const formRef = useRef(null);
+  const bodyRef = useRef(null);
+  const [step, setStep] = useState(0);
+  // Set once Next is tried on the past-payments screen, so unanswered items are marked there.
+  const [historyChecked, setHistoryChecked] = useState(false);
 
 
   const isPackage = membershipType === "package";
+  // Once recorded, the admission fee has its own payment row, corrected from
+  // Edit payments; the profile only adds one that was never recorded.
+  const recordedAdmission = liveMember?.payments?.find((payment) => payment.kind === "admission") || null;
 
   const otherMembers = useMemo(() => (members || []).filter((item) => item.id !== member?.id), [members, member?.id]);
   const errors = validateMember(
-    { gymId, name, phone, address, fee, admissionFee, membershipType, packageMonths, startDate },
+    { gymId, name, phone, address, fee, admissionFee, membershipType, packageMonths, startDate, minStartDate: isNew ? todayKey() : "" },
     otherMembers,
   );
   // An existing member's plan isn't edited here (see the Change plan sheet).
@@ -147,6 +176,8 @@ function MemberForm({ member, kind = "new", onBack }) {
     const joining = joiningDateProblem(startDate);
     if (joining) errors.startDate = joining;
   }
+  if (!member && !collectionTiming) errors.collectionTiming = "Select the billing terms.";
+  if (isNew && Number(admissionFee) > 0 && !admissionMode) errors.admissionMode = "Select how the admission fee was paid.";
   const errorCount = Object.keys(errors).length;
 
   // The member-to-be, so the past terms come from the gym's own billing engine
@@ -164,8 +195,44 @@ function MemberForm({ member, kind = "new", onBack }) {
     }),
     [startDate, fee, membershipType, packageMonths, collectionTiming],
   );
-  const terms = isExisting && !joiningDateProblem(startDate) ? domain.getBillingPeriodKeys(draft) : [];
+  const terms = isExisting && collectionTiming && !joiningDateProblem(startDate) ? domain.getBillablePeriodKeys(draft) : [];
   const historyError = isExisting ? historyProblem({ startDate, terms, history, domain, member: draft }) : "";
+
+  // A message from an earlier save attempt describes the form as it was then:
+  // once the history changes (switching to "After the period" drops the term
+  // that was being asked about) it no longer applies.
+  useEffect(() => setFormError(""), [historyError]);
+
+  // What the Review screen shows for someone joining now.
+  const trainerName = trainers.find((trainer) => trainer.id === trainerId)?.name || "";
+  const admissionAmount = Math.max(0, Number(admissionFee) || 0);
+  const upfront = collectionTiming === "at-join";
+  const receivedNow = isNew ? (upfront ? Number(fee) || 0 : 0) + admissionAmount : 0;
+  const unitWord = membershipType === "package" ? "package" : "month";
+  let nextDueNote = "";
+  let newMemberRows = [];
+  if (isNew && startDate) {
+    // The first term's key, as the server names it when the member is added.
+    const firstKey = membershipType === "package" || domain.settings?.billingCycleMode !== "month-start" ? startDate : startDate.slice(0, 7);
+    const firstEnd = domain.periodEndDate(draft, firstKey);
+    const nextDue = Number.isNaN(firstEnd.getTime()) ? "" : displayDate(localDateKey(firstEnd));
+    nextDueNote = nextDue
+      ? upfront
+        ? `The first ${unitWord} payment is marked paid now. The next payment is due ${nextDue}.`
+        : `Nothing is collected now. The first ${unitWord} payment is due ${nextDue}, when the ${unitWord} ends.`
+      : "";
+    newMemberRows = [
+      { label: "Member", value: name.trim(), hint: toPhoneDigits(phone) },
+      { label: "Gym ID", value: String(gymId || "").trim().toUpperCase() },
+      { label: "Plan", value: domain.getMembershipLabel(draft), hint: `${currency(Number(fee) || 0)} · ${collectionTimingLabel(collectionTiming)}` },
+      { label: "Starts", value: displayDate(startDate) },
+      { label: "Trainer", value: trainerName || "No trainer" },
+      ...(upfront ? [{ label: `First ${unitWord} payment`, value: currency(Number(fee) || 0), hint: "Paid now" }] : []),
+      ...(admissionAmount > 0
+        ? [{ label: "Admission fee", value: currency(admissionAmount), hint: PAYMENT_MODES.find((option) => option.value === admissionMode)?.label || "" }]
+        : []),
+    ];
+  }
 
   const markTouched = (field) => setTouched((current) => ({ ...current, [field]: true }));
   const errorFor = (field) => (touched[field] ? errors[field] || "" : "");
@@ -191,21 +258,56 @@ function MemberForm({ member, kind = "new", onBack }) {
     }
   };
 
+  const steps = isExisting ? EXISTING_STEPS : isNew ? NEW_STEPS : null;
+  const lastStep = steps ? steps.length - 1 : 0;
+  // A new member's sections all sit on the first screen; an existing member's
+  // each get their own. Editing shows everything. The last screen is the review.
+  const at = (index) => !steps || (step < lastStep && step === (isExisting ? index : 0));
+  const goToStep = (index) => {
+    setStep(index);
+    setFormError("");
+    bodyRef.current?.scrollTo?.({ top: 0 });
+  };
+  // Every blocking problem shows in two places: inline above the buttons and as a toast.
+  const showError = (message) => {
+    setFormError(message);
+    showToast(message);
+  };
+  const goNext = () => {
+    const stepErrors = steps[step].fields.filter((field) => errors[field]);
+    if (stepErrors.length) {
+      setTouched((current) => ({ ...current, ...Object.fromEntries(stepErrors.map((field) => [field, true])) }));
+      const field = firstErrorField(errors, stepErrors);
+      showError(stepErrors.length === 1 ? errors[field] : `${errors[field]} (${stepErrors.length} fields to fix)`);
+      formRef.current?.querySelector("#" + FIELD_IDS[field])?.focus();
+      return;
+    }
+    // An existing member's past payments are checked on their own screen, not only at the end.
+    if (isExisting && step === 2 && historyError) {
+      setHistoryChecked(true);
+      showError(historyError);
+      return;
+    }
+    goToStep(step + 1);
+  };
+  const onBackClick = () => (step > 0 ? goToStep(step - 1) : onBack?.());
+
   const onSubmit = async (event) => {
     event.preventDefault();
     if (busy) return;
+    // Enter in a field moves on to the next screen instead of saving early.
+    if (steps && step < lastStep) return goNext();
 
     if (errorCount) {
       setTouched(Object.fromEntries(FIELD_ORDER.map((field) => [field, true])));
-      setFormError(
-        errorCount === 1 ? "Fix the highlighted field to save." : "Fix the " + errorCount + " highlighted fields to save.",
-      );
       const field = firstErrorField(errors, FIELD_ORDER);
+      showError(errorCount === 1 ? errors[field] : `${errors[field]} (${errorCount} fields to fix)`);
       formRef.current?.querySelector("#" + FIELD_IDS[field])?.focus();
       return;
     }
     if (historyError) {
-      setFormError(historyError);
+      setHistoryChecked(true);
+      showError(historyError);
       return;
     }
 
@@ -218,8 +320,8 @@ function MemberForm({ member, kind = "new", onBack }) {
       phone: toPhoneDigits(phone),
       address: String(address).trim(),
       fee: liveMember ? Number(liveMember.fee) : Number(fee),
-      admissionFee: Math.max(0, Number(admissionFee) || 0),
-      admissionMode: Math.max(0, Number(admissionFee) || 0) > 0 ? admissionMode : "",
+      admissionFee: recordedAdmission ? Number(recordedAdmission.amount) : Math.max(0, Number(admissionFee) || 0),
+      admissionMode: recordedAdmission ? recordedAdmission.mode || "" : Math.max(0, Number(admissionFee) || 0) > 0 ? admissionMode : "",
       // Ignored by the server for an existing member; sent as they stand.
       membershipType: liveMember ? liveMember.membershipType : membershipType === "package" ? "package" : "monthly",
       packageMonths: liveMember ? liveMember.packageMonths : Math.max(1, Math.round(Number(packageMonths || 1))),
@@ -231,7 +333,7 @@ function MemberForm({ member, kind = "new", onBack }) {
     if (isExisting) {
       payload.admissionFee = history.admission.paid ? Number(history.admission.amount) || 0 : 0;
       payload.admissionMode = history.admission.paid ? history.admission.mode : "";
-      payload.onboarding = onboardingPayload({ terms, history });
+      payload.onboarding = onboardingPayload({ terms, history, fee: Number(fee) || 0 });
     }
     try {
       await saveMember(payload);
@@ -279,7 +381,7 @@ function MemberForm({ member, kind = "new", onBack }) {
         <header className="sheet-head">
           <span className="sheet-grabber" aria-hidden="true" />
           {onBack ? (
-            <button className="sheet-back" type="button" aria-label="Back to member type" onClick={onBack}>
+            <button className="sheet-back" type="button" aria-label={step > 0 ? "Previous step" : "Back to member type"} onClick={onBackClick}>
               <Icon name="arrow_back" />
             </button>
           ) : null}
@@ -289,7 +391,10 @@ function MemberForm({ member, kind = "new", onBack }) {
           </button>
         </header>
 
-        <div className="sheet-body">
+        {steps ? <StepProgress steps={steps.map((item) => item.title)} current={step} /> : null}
+
+        <div className="sheet-body" ref={bodyRef}>
+          {at(0) ? (
           <section className="sheet-section">
             <div className="mf-photo">
               <label className="mf-avatar">
@@ -316,7 +421,9 @@ function MemberForm({ member, kind = "new", onBack }) {
               </div>
             </div>
           </section>
+          ) : null}
 
+          {at(0) ? (
           <section className="sheet-section">
             <div className="sheet-section-head">
               <h3>Member details</h3>
@@ -352,10 +459,12 @@ function MemberForm({ member, kind = "new", onBack }) {
                   placeholder="Auto generated"
                   maxLength={40}
                   value={gymId}
+                  readOnly={Boolean(member)}
                   onChange={(event) => setGymId(event.target.value)}
                   {...fieldProps("gymId")}
                 />
                 <FieldError id="gymIdInput-error" message={errorFor("gymId")} />
+                {member ? <small className="field-hint">Fixed once assigned.</small> : null}
               </label>
               <label className="mf-field wide">
                 Address
@@ -373,10 +482,12 @@ function MemberForm({ member, kind = "new", onBack }) {
               </label>
             </div>
           </section>
+          ) : null}
 
+          {at(1) ? (
           <section className="sheet-section">
             <div className="sheet-section-head">
-              <h3>Plan</h3>
+              <h3>{isExisting ? "Membership" : "Plan"}</h3>
             </div>
             <div className="mf-grid">
               {liveMember ? (
@@ -502,6 +613,7 @@ function MemberForm({ member, kind = "new", onBack }) {
                   id="startDateInput"
                   name="startDate"
                   type="date"
+                  min={isNew ? todayKey() : undefined}
                   max={isExisting ? todayKey() : undefined}
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
@@ -510,6 +622,8 @@ function MemberForm({ member, kind = "new", onBack }) {
                 <FieldError id="startDateInput-error" message={errorFor("startDate")} />
                 {isExisting ? (
                   <small className="field-hint">When they first joined the gym, not today.</small>
+                ) : isNew ? (
+                  <small className="field-hint">Today or a later date.</small>
                 ) : null}
               </label>
               <label className="mf-field wide">
@@ -531,52 +645,49 @@ function MemberForm({ member, kind = "new", onBack }) {
               </label>
             </div>
           </section>
+          ) : null}
 
+          {at(2) ? (
           <section className="sheet-section">
             <div className="sheet-section-head">
-              <h3>Payment</h3>
+              <h3>{isExisting ? "Payment setup" : "Payment"}</h3>
             </div>
             <div className="mf-grid">
               {member ? null : (
               <div className="mf-field wide">
                 <span className="mf-label" id="collectionTimingLabel">
-                  When is the fee collected?
+                  Set the billing terms
                 </span>
-                <div className="segmented" role="radiogroup" aria-labelledby="collectionTimingLabel">
-                  <label>
-                    <input
-                      type="radio"
-                      name="collectionTiming"
-                      value="at-join"
-                      checked={collectionTiming === "at-join"}
-                      onChange={() => setCollectionTiming("at-join")}
-                    />
-                    <span>Upfront</span>
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="collectionTiming"
-                      value="fixed-day"
-                      checked={collectionTiming === "fixed-day"}
-                      onChange={() => setCollectionTiming("fixed-day")}
-                    />
-                    <span>After the period</span>
-                  </label>
-                </div>
-                <small className="field-hint">
-                  {collectionTiming === "fixed-day"
-                    ? isExisting
-                      ? "Each term's fee is due when that term ends."
-                      : "No payment at join. The fee is due at the end of each period."
-                    : isExisting
-                      ? "Each term's fee is due when that term starts."
-                      : "Mark the first term paid now. The next payment is due one cycle later."}
-                </small>
+                <OptionCards
+                  name="collectionTiming"
+                  label="Billing terms"
+                  value={collectionTiming}
+                  onChange={(value) => {
+                    setCollectionTiming(value);
+                    markTouched("collectionTiming");
+                  }}
+                  options={billingTermOptions(unitWord)}
+                  invalid={Boolean(errorFor("collectionTiming"))}
+                  firstId="collectionTimingInput"
+                />
+                <FieldError id="collectionTimingInput-error" message={errorFor("collectionTiming")} />
               </div>
               )}
 
-              {isExisting ? null : (
+              {isExisting ? null : recordedAdmission ? (
+              <div className="mf-field wide">
+                <span className="mf-label">Admission fee</span>
+                <div className="mf-locked">
+                  <Icon name="lock" />
+                  <span>
+                    <strong>{currency(recordedAdmission.amount)}</strong>
+                    <small>
+                      Recorded{recordedAdmission.dateKnown === false ? "" : ` on ${displayDate(String(recordedAdmission.date).slice(0, 10))}`}. Correct it from Edit payments.
+                    </small>
+                  </span>
+                </div>
+              </div>
+              ) : (
               <>
               <label className="mf-field wide">
                 <span className="mf-label-row">
@@ -610,9 +721,10 @@ function MemberForm({ member, kind = "new", onBack }) {
                     Admission fee paid by
                   </span>
                   <div className="pay-modes" role="radiogroup" aria-labelledby="admissionModeLabel">
-                    {PAYMENT_MODES.map((option) => (
+                    {PAYMENT_MODES.map((option, index) => (
                       <button
                         key={option.value}
+                        id={index === 0 ? "admissionModeInput" : undefined}
                         type="button"
                         role="radio"
                         aria-checked={admissionMode === option.value}
@@ -623,15 +735,31 @@ function MemberForm({ member, kind = "new", onBack }) {
                       </button>
                     ))}
                   </div>
+                  <FieldError id="admissionModeInput-error" message={errorFor("admissionMode")} />
                 </div>
               ) : null}
               </>
               )}
             </div>
           </section>
+          ) : null}
 
-          {isExisting ? (
-            <ExistingMemberHistory member={draft} terms={terms} history={history} onChange={setHistory} domain={domain} />
+          {isExisting && step === 2 && collectionTiming ? (
+            <ExistingMemberHistory member={draft} terms={terms} history={history} onChange={setHistory} domain={domain} showErrors={historyChecked} />
+          ) : null}
+
+          {isExisting && step === lastStep ? (
+            <ExistingMemberReview member={draft} terms={terms} history={history} domain={domain} person={{ name: name.trim(), phone: toPhoneDigits(phone), trainer: trainerName }} />
+          ) : null}
+
+          {isNew && step === lastStep ? (
+            <ReviewCard
+              title="Review before adding"
+              subtitle="Check everything, then add the member."
+              rows={newMemberRows}
+              total={{ label: "Received at joining", value: currency(receivedNow) }}
+              notes={[nextDueNote]}
+            />
           ) : null}
 
           {formError ? (
@@ -654,9 +782,21 @@ function MemberForm({ member, kind = "new", onBack }) {
               <Icon name="delete" />
             </button>
           ) : null}
-          <button className={"sheet-confirm" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
-            {busy ? "Saving..." : member ? "Save changes" : isExisting ? "Add existing member" : "Add member"}
-          </button>
+          {steps && step > 0 ? (
+            <button className="sheet-secondary" type="button" disabled={busy} onClick={() => goToStep(step - 1)}>
+              Back
+            </button>
+          ) : null}
+          {steps && step < lastStep ? (
+            // A key of its own: the same button must not turn into the submit button mid-click.
+            <button key="next" className="sheet-confirm" type="button" onClick={goNext}>
+              Next step
+            </button>
+          ) : (
+            <button key="save" className={"sheet-confirm" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
+              {busy ? "Saving..." : member ? "Save changes" : isExisting ? "Add existing member" : "Add member"}
+            </button>
+          )}
         </footer>
       </form>
   );

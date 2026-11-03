@@ -81,7 +81,8 @@ function normalizeMember(member) {
           amount: Number(payment.amount || 0),
           // null: recorded before part payments, so it paid its period in full.
           periodFee: (payment.periodFee ?? payment.period_fee ?? null) === null ? null : Number(payment.periodFee ?? payment.period_fee),
-          kind: payment.kind === "admission" ? "admission" : "membership",
+          kind: ["admission", "other"].includes(payment.kind) ? payment.kind : "membership",
+          note: String(payment.note || ""),
           mode: normalizePaymentMode(payment.mode || payment.payment_mode),
           // false: entered later without its collection date; `date` is then the
           // start of the term it paid (see payments.date_known).

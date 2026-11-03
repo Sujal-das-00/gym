@@ -52,9 +52,11 @@ export default function InvoicesCard({ payments = [] }) {
                         rupees(payment.amount),
                         payment.kind === "admission"
                           ? "Admission fee"
-                          : isOpeningBalancePayment(payment)
-                            ? "Opening balance"
-                            : "Membership",
+                          : payment.kind === "other"
+                            ? payment.note || "Other payment"
+                            : isOpeningBalancePayment(payment)
+                              ? "Opening balance"
+                              : "Membership",
                         ...partNotes,
                       ].join(" • ")}
                     </span>
