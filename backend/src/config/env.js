@@ -118,7 +118,7 @@ function referralConfig() {
     licencePrice: num("LICENCE_PRICE", 6999),
     monthlyPrice: num("MONTHLY_PRICE", 249),
     maintenancePrice: num("MAINTENANCE_PRICE", 1999),
-    referralDiscount: num("REFERRAL_DISCOUNT", 2000),
+    referralDiscount: num("REFERRAL_DISCOUNT", 1000),
     referrerReward: num("REFERRER_REWARD", 1000),
     supportEmail: String(process.env.SUPPORT_EMAIL || "support@gymboo.app").trim(),
   };

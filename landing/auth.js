@@ -189,7 +189,7 @@
     // Tell the owner straight away whether the code works; the server re-checks on submit.
     var codeValid = null;
     var codeTimer;
-    var CODE_HINT = "Got a code from a Gymboo partner? Enter it to save ₹2,000 on the one-time licence.";
+    var CODE_HINT = "Got a code from a Gymboo partner? Enter it to save ₹1,000 on the one-time licence.";
     function checkCode() {
       var code = $("referralCode").value.trim().toUpperCase();
       var hint = $("referralHint");
